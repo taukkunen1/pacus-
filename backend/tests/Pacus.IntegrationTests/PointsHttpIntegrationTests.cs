@@ -1,0 +1,333 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using Pacus.Domain.Entities;
+using Pacus.Domain.Enums;
+
+namespace Pacus.IntegrationTests;
+
+public sealed class PointsHttpIntegrationTests
+    : IClassFixture<MongoIntegrationFixture>
+{
+    private readonly MongoIntegrationFixture _mongo;
+
+    public PointsHttpIntegrationTests(
+        MongoIntegrationFixture mongo)
+    {
+        _mongo = mongo;
+    }
+
+    [Fact]
+    public async Task GetBalance_WhenNoTransactions_ShouldReturnZero()
+    {
+        using var factory =
+            new PacusApiFactory(_mongo.ConnectionString);
+
+        using var client =
+            factory.CreateClient();
+
+        var family =
+            await BootstrapAsync(client);
+
+        await LoginAdultAsync(client, family);
+
+        var response =
+            await client.GetAsync("/api/v1/points");
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            response.StatusCode);
+
+        var body =
+            await response.Content
+                .ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(
+            0,
+            body.GetProperty("balance").GetInt32());
+
+        Assert.Equal(
+            0,
+            body.GetProperty("brl").GetDouble());
+    }
+
+    [Fact]
+    public async Task GetBalance_ShouldSumAllPointTransactions()
+    {
+        using var factory =
+            new PacusApiFactory(_mongo.ConnectionString);
+
+        using var client =
+            factory.CreateClient();
+
+        var family =
+            await BootstrapAsync(client);
+
+        await InsertTransactionAsync(
+            factory,
+            family.FamilyId,
+            100,
+            "Tarefa concluída");
+
+        await InsertTransactionAsync(
+            factory,
+            family.FamilyId,
+            -30,
+            "Resgate na loja");
+
+        await InsertTransactionAsync(
+            factory,
+            family.FamilyId,
+            20,
+            "Bônus");
+
+        await LoginAdultAsync(client, family);
+
+        var response =
+            await client.GetAsync("/api/v1/points");
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            response.StatusCode);
+
+        var body =
+            await response.Content
+                .ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(
+            90,
+            body.GetProperty("balance").GetInt32());
+
+        Assert.Equal(
+            4.5,
+            body.GetProperty("brl").GetDouble());
+    }
+
+    [Fact]
+    public async Task GetTransactions_ShouldReturnOnlyCurrentFamilyTransactions()
+    {
+        using var factory =
+            new PacusApiFactory(_mongo.ConnectionString);
+
+        using var client =
+            factory.CreateClient();
+
+        var family =
+            await BootstrapAsync(client);
+
+        var otherFamily =
+            await BootstrapAsync(client);
+
+        await InsertTransactionAsync(
+            factory,
+            family.FamilyId,
+            50,
+            "Transação da família atual");
+
+        await InsertTransactionAsync(
+            factory,
+            otherFamily.FamilyId,
+            999,
+            "Transação de outra família");
+
+        await LoginAdultAsync(client, family);
+
+        var response =
+            await client.GetAsync(
+                "/api/v1/points/transactions");
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            response.StatusCode);
+
+        var transactions =
+            await response.Content
+                .ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(
+            JsonValueKind.Array,
+            transactions.ValueKind);
+
+        Assert.Single(
+            transactions.EnumerateArray());
+
+        var transaction =
+            transactions[0];
+
+        Assert.Equal(
+            "Transação da família atual",
+            transaction.GetProperty("taskTitle").GetString());
+
+        Assert.Equal(
+            50,
+            transaction.GetProperty("points").GetInt32());
+    }
+
+    [Fact]
+    public async Task PointsEndpoint_WithoutToken_ShouldReturnUnauthorized()
+    {
+        using var factory =
+            new PacusApiFactory(_mongo.ConnectionString);
+
+        using var client =
+            factory.CreateClient();
+
+        var response =
+            await client.GetAsync("/api/v1/points");
+
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            response.StatusCode);
+    }
+
+    private static async Task InsertTransactionAsync(
+        PacusApiFactory factory,
+        string familyId,
+        int points,
+        string taskTitle)
+    {
+        var client =
+            new MongoClient(
+                GetConnectionString(factory));
+
+        var database =
+            client.GetDatabase(
+                factory.DatabaseName);
+
+        var collection =
+    database.GetCollection<PointTransaction>(
+        "point_transactions");
+
+        var familyObjectId =
+            ObjectId.Parse(familyId);
+
+        var transaction =
+            new PointTransaction
+            {
+                Id = ObjectId.GenerateNewId(),
+                UserId = familyObjectId,
+                Date = "2026-08-24",
+                TaskId = ObjectId.GenerateNewId().ToString(),
+                TaskTitle = taskTitle,
+                Type = PointTransactionType.Award,
+                Points = points,
+                BalanceAfter = points,
+                ActorId = familyObjectId,
+                ActorRole = UserRole.Adult,
+                CreatedAt = DateTime.UtcNow
+            };
+
+        await collection.InsertOneAsync(transaction);
+    }
+
+    private static string GetConnectionString(
+        PacusApiFactory factory)
+    {
+        var field =
+            typeof(PacusApiFactory)
+                .GetField(
+                    "_connectionString",
+                    System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Instance);
+
+        return (string)field!.GetValue(factory)!;
+    }
+
+    private async Task LoginAdultAsync(
+        HttpClient client,
+        TestFamily family)
+    {
+        var response =
+            await client.PostAsJsonAsync(
+                "/api/v1/auth/adult/login",
+                new
+                {
+                    email = family.AdultEmail,
+                    password = family.AdultPassword
+                });
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            response.StatusCode);
+
+        var body =
+            await response.Content
+                .ReadFromJsonAsync<JsonElement>();
+
+        var token =
+            body.GetProperty("token").GetString();
+
+        Assert.False(
+            string.IsNullOrWhiteSpace(token));
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(
+                "Bearer",
+                token);
+    }
+
+    private static async Task<TestFamily> BootstrapAsync(
+        HttpClient client)
+    {
+        var suffix =
+            Guid.NewGuid()
+                .ToString("N")[..8];
+
+        var adultEmail =
+            $"adult-{suffix}@test.local";
+
+        const string adultPassword =
+            "Teste123!";
+
+        const string childPin =
+            "1234";
+
+        var response =
+            await client.PostAsJsonAsync(
+                "/api/v1/bootstrap",
+                new
+                {
+                    adultName =
+                        $"Adulto {suffix}",
+                    adultEmail,
+                    adultPassword,
+                    childName =
+                        $"Crianca {suffix}",
+                    childPin
+                });
+
+        Assert.Contains(
+            response.StatusCode,
+            new[]
+            {
+                HttpStatusCode.OK,
+                HttpStatusCode.Created
+            });
+
+        var body =
+            await response.Content
+                .ReadFromJsonAsync<JsonElement>();
+
+        return new TestFamily(
+            body.GetProperty("adultUserId")
+                .GetString()!,
+            body.GetProperty("childUserId")
+                .GetString()!,
+            body.GetProperty("familyId")
+                .GetString()!,
+            adultEmail,
+            adultPassword,
+            childPin);
+    }
+
+    private sealed record TestFamily(
+        string AdultUserId,
+        string ChildUserId,
+        string FamilyId,
+        string AdultEmail,
+        string AdultPassword,
+        string ChildPin);
+}

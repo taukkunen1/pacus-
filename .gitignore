@@ -1,0 +1,28 @@
+# .NET
+bin/
+obj/
+*.user
+
+# Ambiente / segredos â€” NUNCA commitar
+.env
+.env.*
+appsettings.Production.json
+appsettings.*.local.json
+
+# Node (caso o frontend evolua para build tooling)
+node_modules/
+
+# SO
+.DS_Store
+Thumbs.db
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# Arquivos temporários de auditoria e testes
+backend/artifacts/
+backend/audit-backend.txt
+backend/bootstrap.json
+

@@ -1,0 +1,53 @@
+.card {
+  background: var(--surface-card);
+  color: var(--text-on-light);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-card);
+}
+
+.card-dim { background: var(--surface-card-dim); }
+
+.progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+.progress-header__date {
+  font-size: var(--step-sm);
+  color: var(--text-on-dark-dim);
+  text-transform: capitalize;
+}
+.progress-header__title {
+  font-size: var(--step-2xl);
+  color: var(--text-on-dark);
+}
+
+.progress-ring {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+}
+.progress-ring svg { transform: rotate(-90deg); }
+.progress-ring circle {
+  fill: none;
+  stroke-width: 6;
+}
+.progress-ring__track { stroke: rgba(234, 246, 243, 0.15); }
+.progress-ring__value {
+  stroke: var(--color-sun);
+  stroke-linecap: round;
+  transition: stroke-dashoffset var(--duration-med) var(--ease-water);
+}
+.progress-ring__label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: var(--step-sm);
+  color: var(--text-on-dark);
+}

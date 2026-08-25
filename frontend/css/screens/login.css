@@ -1,0 +1,92 @@
+.login-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  background:
+    radial-gradient(ellipse at 30% 0%, rgba(46, 140, 134, 0.35), transparent 60%),
+    var(--surface-0);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+}
+
+.login-brand {
+  font-family: var(--font-display);
+  font-size: var(--step-2xl);
+  color: var(--text-on-dark);
+  margin-bottom: var(--space-2);
+}
+.login-tagline {
+  color: var(--text-on-dark-dim);
+  font-size: var(--step-sm);
+  margin-bottom: var(--space-6);
+}
+
+.role-switch {
+  display: flex;
+  background: rgba(234, 246, 243, 0.08);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  margin-bottom: var(--space-5);
+}
+.role-switch button {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-size: var(--step-sm);
+  color: var(--text-on-dark-dim);
+  transition: background var(--duration-fast) var(--ease-water), color var(--duration-fast) var(--ease-water);
+}
+.role-switch button.is-active {
+  background: var(--color-coral);
+  color: var(--color-tide-deep);
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  text-align: left;
+}
+
+.pin-dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+.pin-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(234, 246, 243, 0.35);
+  transition: background var(--duration-fast), border-color var(--duration-fast);
+}
+.pin-dot.is-filled {
+  background: var(--color-coral);
+  border-color: var(--color-coral);
+}
+
+.pin-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+.pin-key {
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  background: rgba(234, 246, 243, 0.08);
+  font-family: var(--font-display);
+  font-size: var(--step-lg);
+  color: var(--text-on-dark);
+  transition: background var(--duration-fast) var(--ease-water), transform var(--duration-fast) var(--ease-water);
+}
+.pin-key:active { transform: scale(0.94); background: rgba(234, 246, 243, 0.16); }
+.pin-key--action { font-size: var(--step-md); color: var(--text-on-dark-dim); }

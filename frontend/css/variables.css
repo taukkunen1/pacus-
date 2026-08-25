@@ -1,0 +1,71 @@
+:root {
+  /* ===== Paleta — "Tide" (tema aquario/habitat do Pacus) ===== */
+  --color-tide: #0F3D3A;
+  --color-tide-deep: #0A2B29;
+  --color-lagoon: #1B6E6A;
+  --color-lagoon-light: #2E8C86;
+  --color-foam: #EAF6F3;
+  --color-foam-dim: #C7DEDA;
+  --color-coral: #F4A6B7;
+  --color-coral-dark: #D9788C;
+  --color-sand: #E8D9B5;
+  --color-sun: #FFC857;
+  --color-danger: #E0665A;
+
+  /* Superficies */
+  --surface-0: var(--color-tide-deep);
+  --surface-1: var(--color-tide);
+  --surface-2: #124844;
+  --surface-card: #ffffff;
+  --surface-card-dim: #F6F3EA;
+
+  /* Texto */
+  --text-on-dark: var(--color-foam);
+  --text-on-dark-dim: var(--color-foam-dim);
+  --text-on-light: #12302D;
+  --text-on-light-dim: #5B7671;
+
+  /* Tipografia */
+  --font-display: "Fredoka", "Baloo 2", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+  --font-data: "Inter", system-ui, sans-serif;
+
+  /* Escala */
+  --step-xs: 0.75rem;
+  --step-sm: 0.875rem;
+  --step-md: 1rem;
+  --step-lg: 1.25rem;
+  --step-xl: 1.75rem;
+  --step-2xl: 2.25rem;
+
+  /* Espacamento */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Forma */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+
+  /* Sombra */
+  --shadow-card: 0 8px 24px -8px rgba(15, 61, 58, 0.35);
+  --shadow-float: 0 4px 14px -4px rgba(15, 61, 58, 0.45);
+
+  /* Movimento */
+  --ease-water: cubic-bezier(0.45, 0.05, 0.35, 1);
+  --duration-fast: 160ms;
+  --duration-med: 420ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-med: 0ms;
+  }
+}

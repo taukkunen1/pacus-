@@ -1,0 +1,44 @@
+.points-footer {
+  position: sticky;
+  bottom: 0;
+  margin-top: var(--space-6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(10, 43, 41, 0.9);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid rgba(234, 246, 243, 0.12);
+}
+.points-footer__balance {
+  font-family: var(--font-display);
+  font-size: var(--step-lg);
+  color: var(--color-sun);
+}
+.points-footer__brl {
+  font-size: var(--step-xs);
+  color: var(--text-on-dark-dim);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-6);
+  transform: translateX(-50%) translateY(8px);
+  background: var(--color-tide-deep);
+  color: var(--text-on-dark);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-pill);
+  font-size: var(--step-sm);
+  box-shadow: var(--shadow-float);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-water), transform var(--duration-fast) var(--ease-water);
+  z-index: 50;
+}
+.toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.toast.is-error { background: var(--color-danger); }

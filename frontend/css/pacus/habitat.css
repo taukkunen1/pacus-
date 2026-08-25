@@ -1,0 +1,125 @@
+/* ===== O tanque do Pacus — elemento de assinatura da interface ===== */
+
+.pacus-tank {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: linear-gradient(180deg, #1E7A74 0%, var(--color-lagoon) 45%, var(--color-tide) 100%);
+  box-shadow: var(--shadow-card), inset 0 0 0 1px rgba(234, 246, 243, 0.12);
+}
+
+/* Linha d'agua com leve ondulacao continua no topo do tanque */
+.pacus-tank::before {
+  content: "";
+  position: absolute;
+  top: 0; left: -10%;
+  width: 120%;
+  height: 18px;
+  background: repeating-linear-gradient(
+    100deg,
+    rgba(234, 246, 243, 0.35) 0 2px,
+    transparent 2px 26px
+  );
+  animation: tank-water-drift 7s linear infinite;
+  opacity: 0.5;
+}
+
+@keyframes tank-water-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(26px); }
+}
+
+/* Bolhas subindo, timings dessincronizados para nao parecer um loop mecanico */
+.tank-bubble {
+  position: absolute;
+  bottom: -10px;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: rgba(234, 246, 243, 0.45);
+  animation: tank-bubble-rise 4.5s ease-in infinite;
+}
+.tank-bubble:nth-child(1) { left: 18%; width: 5px; height: 5px; animation-delay: 0s; animation-duration: 5.2s; }
+.tank-bubble:nth-child(2) { left: 42%; width: 8px; height: 8px; animation-delay: 1.3s; animation-duration: 4.1s; }
+.tank-bubble:nth-child(3) { left: 65%; width: 4px; height: 4px; animation-delay: 2.6s; animation-duration: 6s; }
+.tank-bubble:nth-child(4) { left: 82%; width: 6px; height: 6px; animation-delay: 0.7s; animation-duration: 4.8s; }
+
+@keyframes tank-bubble-rise {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 0.7; }
+  90% { opacity: 0.4; }
+  100% { transform: translateY(-200px) translateX(6px); opacity: 0; }
+}
+
+/* Fundo: areia e pedras */
+.tank-floor {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 34px;
+  background: linear-gradient(180deg, transparent, rgba(232, 217, 181, 0.25));
+}
+.tank-rock {
+  position: absolute;
+  bottom: 6px;
+  background: rgba(232, 217, 181, 0.3);
+  border-radius: 50% 50% 45% 45%;
+}
+.tank-rock--1 { left: 10%; width: 30px; height: 14px; }
+.tank-rock--2 { right: 14%; width: 44px; height: 18px; }
+
+/* O proprio PACUS: forma organica simples, sem pixel art — um corpo oval com
+   3 fios de guelra por lado, balancando devagar como se nadasse em suspensao. */
+.pacus-body {
+  position: absolute;
+  bottom: 46px;
+  left: 50%;
+  width: 68px;
+  height: 46px;
+  animation: pacus-swim 6.5s var(--ease-water) infinite;
+}
+
+@keyframes pacus-swim {
+  0%, 100% { transform: translate(-70px, 0) rotate(-3deg); }
+  50% { transform: translate(30px, -14px) rotate(3deg); }
+}
+
+.pacus-body__torso {
+  position: absolute;
+  inset: 0;
+  background: var(--color-coral);
+  border-radius: 60% 55% 50% 50% / 65% 65% 45% 45%;
+  box-shadow: inset -6px -6px 12px rgba(15, 61, 58, 0.15);
+}
+
+.pacus-body__gill {
+  position: absolute;
+  top: -6px;
+  width: 5px;
+  height: 16px;
+  background: var(--color-coral-dark);
+  border-radius: var(--radius-pill);
+  transform-origin: bottom center;
+  animation: pacus-gill-wave 1.8s ease-in-out infinite;
+}
+.pacus-body__gill:nth-child(1) { left: 6px; animation-delay: 0s; }
+.pacus-body__gill:nth-child(2) { left: 14px; animation-delay: 0.15s; }
+.pacus-body__gill:nth-child(3) { left: 22px; animation-delay: 0.3s; }
+
+@keyframes pacus-gill-wave {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(10deg); }
+}
+
+.tank-caption {
+  position: absolute;
+  left: var(--space-4);
+  bottom: var(--space-3);
+  color: var(--text-on-dark);
+  font-family: var(--font-display);
+  font-size: var(--step-sm);
+  background: rgba(10, 43, 41, 0.45);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  backdrop-filter: blur(2px);
+}

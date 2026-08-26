@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Bson;
 using Pacus.Api.Auth;
@@ -13,17 +14,23 @@ using Pacus.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Carrega explicitamente os User Secrets do projeto.
+// Isso evita depender apenas do carregamento automático do ambiente Development.
+builder.Configuration.AddUserSecrets<Program>(optional: true);
+
 // MongoDB
 builder.Services.Configure<MongoDbSettings>(options =>
 {
     options.ConnectionString =
         builder.Configuration["MongoDb:ConnectionString"]
+        ?? builder.Configuration["MONGODB_URI"]
         ?? Environment.GetEnvironmentVariable("MONGODB_URI")
         ?? throw new InvalidOperationException(
             "MONGODB_URI nao configurada.");
 
     options.DatabaseName =
         builder.Configuration["MongoDb:DatabaseName"]
+        ?? builder.Configuration["MONGODB_DATABASE"]
         ?? Environment.GetEnvironmentVariable("MONGODB_DATABASE")
         ?? "pacus";
 });
@@ -31,35 +38,59 @@ builder.Services.Configure<MongoDbSettings>(options =>
 builder.Services.AddSingleton<MongoDbContext>();
 
 // JWT
-var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET")
-    ?? builder.Configuration["Jwt:Secret"]
-    ?? throw new InvalidOperationException("JWT_SECRET nao configurada.");
+var jwtSecret =
+    builder.Configuration["Jwt:Secret"]
+    ?? builder.Configuration["JWT_SECRET"]
+    ?? Environment.GetEnvironmentVariable("JWT_SECRET");
+
+if (string.IsNullOrWhiteSpace(jwtSecret))
+{
+    throw new InvalidOperationException(
+        "JWT_SECRET nao configurada.");
+}
 
 builder.Services.Configure<JwtSettings>(options =>
 {
     options.Secret = jwtSecret;
-    options.Issuer = builder.Configuration["Jwt:Issuer"] ?? "pacus-api";
-    options.Audience = builder.Configuration["Jwt:Audience"] ?? "pacus-clients";
+    options.Issuer =
+        builder.Configuration["Jwt:Issuer"]
+        ?? "pacus-api";
+
+    options.Audience =
+        builder.Configuration["Jwt:Audience"]
+        ?? "pacus-clients";
 });
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "pacus-api",
-            ValidAudience = builder.Configuration["Jwt:Audience"] ?? "pacus-clients",
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwtSecret)),
-            ClockSkew = TimeSpan.FromMinutes(1),
-        };
+        options.TokenValidationParameters =
+            new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+
+                ValidIssuer =
+                    builder.Configuration["Jwt:Issuer"]
+                    ?? "pacus-api",
+
+                ValidAudience =
+                    builder.Configuration["Jwt:Audience"]
+                    ?? "pacus-clients",
+
+                IssuerSigningKey =
+                    new SymmetricSecurityKey(
+                        Encoding.UTF8.GetBytes(jwtSecret)),
+
+                ClockSkew = TimeSpan.FromMinutes(1)
+            };
     });
 
 builder.Services.AddAuthorization();
+
 builder.Services.AddHttpContextAccessor();
 
 // Repositories
@@ -88,14 +119,16 @@ builder.Services.AddScoped<IDayClosingService, DayClosingService>();
 builder.Services.AddScoped<IStoreService, StoreService>();
 builder.Services.AddScoped<ITaskTemplateService, TaskTemplateService>();
 
-builder.Services.AddControllers()
+builder.Services
+    .AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNamingPolicy =
             JsonNamingPolicy.CamelCase;
 
         options.JsonSerializerOptions.Converters.Add(
-            new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+            new JsonStringEnumConverter(
+                JsonNamingPolicy.CamelCase));
 
         options.JsonSerializerOptions.Converters.Add(
             new ObjectIdJsonConverter());
@@ -110,10 +143,12 @@ builder.Services.AddSwaggerGen(options =>
         new Microsoft.OpenApi.Models.OpenApiSecurityScheme
         {
             Name = "Authorization",
-            Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+            Type =
+                Microsoft.OpenApi.Models.SecuritySchemeType.Http,
             Scheme = "Bearer",
             BearerFormat = "JWT",
-            In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+            In =
+                Microsoft.OpenApi.Models.ParameterLocation.Header
         });
 
     options.AddSecurityRequirement(
@@ -128,18 +163,20 @@ builder.Services.AddSwaggerGen(options =>
                             Type =
                                 Microsoft.OpenApi.Models.ReferenceType
                                     .SecurityScheme,
-                            Id = "Bearer",
-                        },
+                            Id = "Bearer"
+                        }
                 },
                 Array.Empty<string>()
-            },
+            }
         });
 });
 
+// CORS
 builder.Services.AddCors(options =>
 {
     var origins =
-        Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS")
+        Environment.GetEnvironmentVariable(
+            "CORS_ALLOWED_ORIGINS")
         ?? builder.Configuration["Cors:AllowedOrigins"]
         ?? "http://localhost:5500";
 
@@ -162,14 +199,19 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
 app.UseCors();
+
 app.UseAuthentication();
+
 app.UseAuthorization();
+
 app.MapControllers();
 
 app.Run();
 
-public sealed class ObjectIdJsonConverter : JsonConverter<ObjectId>
+public sealed class ObjectIdJsonConverter
+    : JsonConverter<ObjectId>
 {
     public override ObjectId Read(
         ref Utf8JsonReader reader,

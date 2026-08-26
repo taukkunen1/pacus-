@@ -5,8 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pacus</title>
 
-  <!-- Aponte para onde a Pacus.Api estiver rodando antes de abrir esta pagina. -->
-  <script>window.PACUS_API_BASE_URL = "http://localhost:5000/api/v1";</script>
+  <!-- Detecta automaticamente onde a API esta rodando: localhost em dev, Render em producao. -->
+  <script>
+    window.PACUS_API_BASE_URL =
+      (location.hostname === "localhost" || location.hostname === "127.0.0.1")
+        ? "http://localhost:5000/api/v1"
+        : "https://pacus.onrender.com/api/v1";
+  </script>
 
   <link rel="stylesheet" href="css/reset.css" />
   <link rel="stylesheet" href="css/variables.css" />

@@ -59,8 +59,10 @@ public class DailyRoutineService : IDailyRoutineService
         var templates =
             await _taskTemplateRepository.GetActiveByUserAsync(userId);
 
+        // Inclui tarefas ja deletadas (DeletedAt != null) para nao recriar
+        // uma tarefa permanente que o usuario removeu apenas para hoje.
         var existingTemplateIds = routine.Tasks
-            .Where(t => t.TaskTemplateId is not null && t.DeletedAt is null)
+            .Where(t => t.TaskTemplateId is not null)
             .Select(t => t.TaskTemplateId!)
             .ToHashSet();
 

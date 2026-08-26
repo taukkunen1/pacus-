@@ -68,20 +68,46 @@
 .tank-rock--1 { left: 10%; width: 30px; height: 14px; }
 .tank-rock--2 { right: 14%; width: 44px; height: 18px; }
 
-/* O proprio PACUS: forma organica simples, sem pixel art — um corpo oval com
-   3 fios de guelra por lado, balancando devagar como se nadasse em suspensao. */
+/* ===== Criatura (estagios baby / young / adult) =====
+   Forma organica simples, sem pixel art — um corpo oval com 3 fios de
+   guelra por lado, balancando devagar como se nadasse em suspensao.
+   --swim-duration/--swim-range/--swim-lift sao ajustados por
+   frontend/js/pacus/movement.js conforme o estagio. --pacus-scale muda o
+   tamanho conforme o estagio (filhote menor, adulto no tamanho cheio). */
 .pacus-body {
   position: absolute;
   bottom: 46px;
   left: 50%;
   width: 68px;
   height: 46px;
-  animation: pacus-swim 6.5s var(--ease-water) infinite;
+  --swim-duration: 6.5s;
+  --swim-range: 70px;
+  --swim-lift: 14px;
+  animation: pacus-swim var(--swim-duration) var(--ease-water) infinite;
 }
 
+.pacus-body--baby { --pacus-scale: 0.6; }
+.pacus-body--young { --pacus-scale: 0.82; }
+.pacus-body--adult { --pacus-scale: 1; }
+
 @keyframes pacus-swim {
-  0%, 100% { transform: translate(-70px, 0) rotate(-3deg); }
-  50% { transform: translate(30px, -14px) rotate(3deg); }
+  0%, 100% {
+    transform:
+      translate(calc(-1 * var(--swim-range)), 0)
+      rotate(-3deg)
+      scale(var(--pacus-scale, 1));
+  }
+  50% {
+    transform:
+      translate(calc(var(--swim-range) * 0.43), calc(-1 * var(--swim-lift)))
+      rotate(3deg)
+      scale(var(--pacus-scale, 1));
+  }
+}
+
+/* Gesto pontual disparado por behavior.js — uma "arrancada" breve */
+.pacus-body--dart {
+  animation-duration: calc(var(--swim-duration) * 0.35);
 }
 
 .pacus-body__torso {
@@ -111,6 +137,83 @@
   50% { transform: rotate(10deg); }
 }
 
+/* ===== Ovo (estagios egg / cracking / hatching) =====
+   Mesmo elemento visual nas tres fases; so a intensidade da racha e o
+   "espiadinha" da cria mudam por estagio, via as classes pacus-egg--*. */
+.pacus-egg {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  width: 46px;
+  height: 56px;
+  --egg-bob-duration: 5s;
+  transform: translateX(-50%);
+  animation: pacus-egg-bob var(--egg-bob-duration) var(--ease-water) infinite;
+}
+
+@keyframes pacus-egg-bob {
+  0%, 100% { transform: translateX(-50%) translateY(0) rotate(-2deg); }
+  50% { transform: translateX(-50%) translateY(-6px) rotate(2deg); }
+}
+
+.pacus-egg--egg { --pacus-egg-scale: 0.9; }
+.pacus-egg--cracking { --pacus-egg-scale: 1; }
+.pacus-egg--hatching { --pacus-egg-scale: 1.08; }
+
+.pacus-egg__shell {
+  position: absolute;
+  inset: 0;
+  transform: scale(var(--pacus-egg-scale, 1));
+  background: linear-gradient(180deg, var(--color-foam) 0%, var(--color-sand) 100%);
+  border-radius: 50% 50% 45% 45% / 60% 60% 40% 40%;
+  box-shadow: inset -5px -6px 10px rgba(15, 61, 58, 0.18), var(--shadow-float);
+}
+
+.pacus-egg__crack {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  width: 2px;
+  height: 20px;
+  background: var(--color-tide);
+  opacity: 0;
+  transition: opacity var(--duration-med) ease;
+}
+.pacus-egg__crack--1 { transform: translateX(-9px) rotate(-18deg); }
+.pacus-egg__crack--2 { transform: translateX(6px) rotate(14deg); height: 16px; top: 22px; }
+
+.pacus-egg--cracking .pacus-egg__crack,
+.pacus-egg--hatching .pacus-egg__crack {
+  opacity: 0.55;
+}
+
+.pacus-egg__peek {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 14px;
+  height: 10px;
+  transform: translateX(-50%) scale(0);
+  background: var(--color-coral);
+  border-radius: 50% 50% 40% 40%;
+  opacity: 0;
+  transition: opacity var(--duration-med) ease, transform var(--duration-med) ease;
+}
+.pacus-egg--hatching .pacus-egg__peek {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* Gesto pontual disparado por behavior.js — a casca treme */
+.pacus-egg--shake {
+  animation: pacus-egg-shake 0.5s ease-in-out;
+}
+@keyframes pacus-egg-shake {
+  0%, 100% { transform: translateX(-50%) rotate(0deg); }
+  25% { transform: translateX(-50%) rotate(-6deg); }
+  75% { transform: translateX(-50%) rotate(6deg); }
+}
+
 .tank-caption {
   position: absolute;
   left: var(--space-4);
@@ -122,4 +225,15 @@
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-pill);
   backdrop-filter: blur(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pacus-tank::before,
+  .tank-bubble,
+  .pacus-body,
+  .pacus-body__gill,
+  .pacus-egg,
+  .pacus-egg--shake {
+    animation: none;
+  }
 }

@@ -22,3 +22,7 @@ export function createTask({ title, description, type, period, points }) {
 export function getPointsBalance() {
   return apiClient("/points");
 }
+
+export function getPacus() {
+  return apiClient("/pacus/me");
+}

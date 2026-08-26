@@ -1,6 +1,9 @@
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using MongoDB.Bson;
 using Pacus.Api.Auth;
 using Pacus.Application.Interfaces;
 using Pacus.Application.Services;
@@ -27,7 +30,7 @@ builder.Services.Configure<MongoDbSettings>(options =>
 
 builder.Services.AddSingleton<MongoDbContext>();
 
-// JWT — segredo tambem via variavel de ambiente, nunca hardcoded.
+// JWT
 var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET")
     ?? builder.Configuration["Jwt:Secret"]
     ?? throw new InvalidOperationException("JWT_SECRET nao configurada.");
@@ -88,9 +91,14 @@ builder.Services.AddScoped<ITaskTemplateService, TaskTemplateService>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
+        options.JsonSerializerOptions.PropertyNamingPolicy =
+            JsonNamingPolicy.CamelCase;
+
         options.JsonSerializerOptions.Converters.Add(
-            new System.Text.Json.Serialization.JsonStringEnumConverter(
-                System.Text.Json.JsonNamingPolicy.CamelCase));
+            new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+
+        options.JsonSerializerOptions.Converters.Add(
+            new ObjectIdJsonConverter());
     });
 
 builder.Services.AddEndpointsApiExplorer();
@@ -117,7 +125,9 @@ builder.Services.AddSwaggerGen(options =>
                     Reference =
                         new Microsoft.OpenApi.Models.OpenApiReference
                         {
-                            Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                            Type =
+                                Microsoft.OpenApi.Models.ReferenceType
+                                    .SecurityScheme,
                             Id = "Bearer",
                         },
                 },
@@ -158,3 +168,30 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public sealed class ObjectIdJsonConverter : JsonConverter<ObjectId>
+{
+    public override ObjectId Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        var value = reader.GetString();
+
+        if (ObjectId.TryParse(value, out var objectId))
+        {
+            return objectId;
+        }
+
+        throw new JsonException(
+            $"'{value}' nao e um ObjectId valido.");
+    }
+
+    public override void Write(
+        Utf8JsonWriter writer,
+        ObjectId value,
+        JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value.ToString());
+    }
+}

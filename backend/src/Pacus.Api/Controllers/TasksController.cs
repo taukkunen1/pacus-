@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Bson;
 using Pacus.Api.Auth;
 using Pacus.Application.DTOs;
 using Pacus.Application.Interfaces;
@@ -9,10 +8,6 @@ using Pacus.Domain.Enums;
 
 namespace Pacus.Api.Controllers;
 
-// Gerencia task_templates — as REGRAS PERMANENTES da rotina.
-// Isso e diferente de criar uma tarefa so para o dia atual (autonomia da crianca,
-// tratada em DailyTasksController); aqui e "Adulto: criar/editar/excluir tarefas
-// permanentes" — administrativo por definicao da spec.
 [ApiController]
 [Authorize]
 [RequireRole(UserRole.Adult)]
@@ -36,17 +31,27 @@ public class TasksController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        var templates = await _taskTemplateRepository.GetActiveByUserAsync(_currentUser.FamilyId);
+        var templates = await _taskTemplateRepository
+            .GetActiveByUserAsync(_currentUser.FamilyId);
+
         return Ok(templates);
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateTaskRequest request)
+    public async Task<IActionResult> Create(
+        [FromBody] CreateTaskRequest request)
     {
         try
         {
-            var template = await _taskTemplateService.CreateAsync(_currentUser.FamilyId, _currentUser.UserId, request);
-            return CreatedAtAction(nameof(GetAll), new { }, template);
+            var template = await _taskTemplateService.CreateAsync(
+                _currentUser.FamilyId,
+                _currentUser.UserId,
+                request);
+
+            return CreatedAtAction(
+                nameof(GetAll),
+                new { },
+                template);
         }
         catch (InvalidOperationException ex)
         {
@@ -55,11 +60,17 @@ public class TasksController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(string id, [FromBody] CreateTaskRequest request)
+    public async Task<IActionResult> Update(
+        string id,
+        [FromBody] CreateTaskRequest request)
     {
         try
         {
-            var template = await _taskTemplateService.UpdateAsync(_currentUser.FamilyId, id, request);
+            var template = await _taskTemplateService.UpdateAsync(
+                _currentUser.FamilyId,
+                id,
+                request);
+
             return Ok(template);
         }
         catch (InvalidOperationException ex)
@@ -71,17 +82,28 @@ public class TasksController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id)
     {
-        await _taskTemplateRepository.SoftDeleteAsync(ObjectId.Parse(id));
+        if (!MongoDB.Bson.ObjectId.TryParse(id, out var templateId))
+            return BadRequest(new { error = "Id de tarefa invalido." });
+
+        await _taskTemplateRepository.SoftDeleteAsync(templateId);
+
         return NoContent();
     }
 
-    // "Replicar em outro dia": toda tarefa criada ad-hoc pela crianca (ou adulto) via
-    // DailyTasksController ja nasce com um TaskTemplate inativo por baixo, com os mesmos
-    // dados. Ativa-lo e o que a faz passar a ser gerada todos os dias — sem redigitar nada.
     [HttpPut("{id}/activate")]
     public async Task<IActionResult> Activate(string id)
     {
-        await _taskTemplateRepository.ActivateAsync(ObjectId.Parse(id));
-        return NoContent();
+        try
+        {
+            await _taskTemplateService.ActivateAsync(
+                _currentUser.FamilyId,
+                id);
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 }

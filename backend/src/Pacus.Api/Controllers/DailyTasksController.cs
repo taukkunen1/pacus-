@@ -3,8 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Pacus.Api.Auth;
 using Pacus.Application.DTOs;
 using Pacus.Application.Interfaces;
-using Pacus.Application.Services;
-using Pacus.Domain.Enums;
 
 namespace Pacus.Api.Controllers;
 
@@ -52,29 +50,51 @@ public class DailyTasksController : ControllerBase
     [HttpPost("{id}/complete")]
     public async Task<IActionResult> Complete(string id)
     {
-        var routine =
-            await _dailyRoutineService.ToggleTaskAsync(
-                _currentUser.FamilyId,
-                id,
-                true,
-                _currentUser.UserId,
-                _currentUser.Role.ToString());
+        try
+        {
+            var routine =
+                await _dailyRoutineService.ToggleTaskAsync(
+                    _currentUser.FamilyId,
+                    id,
+                    true,
+                    _currentUser.UserId,
+                    _currentUser.Role.ToString());
 
-        return Ok(routine);
+            return Ok(routine);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(403, new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     [HttpPost("{id}/reopen")]
     public async Task<IActionResult> Reopen(string id)
     {
-        var routine =
-            await _dailyRoutineService.ToggleTaskAsync(
-                _currentUser.FamilyId,
-                id,
-                false,
-                _currentUser.UserId,
-                _currentUser.Role.ToString());
+        try
+        {
+            var routine =
+                await _dailyRoutineService.ToggleTaskAsync(
+                    _currentUser.FamilyId,
+                    id,
+                    false,
+                    _currentUser.UserId,
+                    _currentUser.Role.ToString());
 
-        return Ok(routine);
+            return Ok(routine);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(403, new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     [HttpPut("{id}/points")]

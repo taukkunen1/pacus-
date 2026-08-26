@@ -90,3 +90,26 @@
 }
 .pin-key:active { transform: scale(0.94); background: rgba(234, 246, 243, 0.16); }
 .pin-key--action { font-size: var(--step-md); color: var(--text-on-dark-dim); }
+
+.profile-picker-hint {
+  text-align: center;
+  color: var(--text-on-dark-dim);
+  font-size: var(--step-sm);
+}
+
+.profile-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.profile-picker__item {
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: rgba(234, 246, 243, 0.08);
+  font-family: var(--font-display);
+  font-size: var(--step-lg);
+  color: var(--text-on-dark);
+  text-align: center;
+  transition: background var(--duration-fast) var(--ease-water), transform var(--duration-fast) var(--ease-water);
+}
+.profile-picker__item:active { transform: scale(0.97); background: rgba(234, 246, 243, 0.16); }

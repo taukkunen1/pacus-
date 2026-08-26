@@ -1,6 +1,27 @@
 import { loginAdult, loginChild } from "../api/auth-api.js";
+import { getFamilyChildren } from "../api/family-api.js";
 
 const CHILD_PROFILE_KEY = "pacus.child.profileId"; // so um id, nao e credencial — ok em localStorage
+const CHILDREN_CACHE_KEY = "pacus.family.children"; // so nome + id de cada crianca — mesmo motivo
+
+function getCachedChildren() {
+  try {
+    const raw = localStorage.getItem(CHILDREN_CACHE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function cacheFamilyChildren() {
+  try {
+    const children = await getFamilyChildren();
+    localStorage.setItem(CHILDREN_CACHE_KEY, JSON.stringify(children));
+  } catch {
+    // Melhor esforco — se falhar, a tela de crianca cai no fallback manual.
+  }
+}
 
 export function renderLogin(root, onSuccess) {
   let mode = "adult"; // "adult" | "child"
@@ -53,6 +74,7 @@ export function renderLogin(root, onSuccess) {
       submitting = true;
       try {
         const result = await loginAdult(email, password);
+        await cacheFamilyChildren();
         onSuccess(result);
       } catch (err) {
         errorEl.textContent = err.message;
@@ -64,26 +86,91 @@ export function renderLogin(root, onSuccess) {
   }
 
   function renderChildForm() {
+    const cachedChildren = getCachedChildren();
+    if (cachedChildren.length > 0) {
+      renderProfilePicker(cachedChildren);
+    } else {
+      renderManualProfileEntry();
+    }
+  }
+
+  // Fluxo principal: a crianca so toca no proprio nome. A lista vem do cache
+  // populado no ultimo login de um adulto neste aparelho (ver cacheFamilyChildren).
+  function renderProfilePicker(children) {
+    slot.innerHTML = `
+      <div class="login-form">
+        <p class="profile-picker-hint">Quem e voce?</p>
+        <div class="profile-picker" id="profile-picker">
+          ${children
+            .map(
+              (child) =>
+                `<button type="button" class="profile-picker__item" data-id="${child.id}" data-name="${child.name}">${child.name}</button>`
+            )
+            .join("")}
+        </div>
+        <button type="button" class="btn btn-ghost btn-block" id="use-id-instead-btn">Nao encontrou seu nome?</button>
+      </div>
+    `;
+
+    slot.querySelector("#profile-picker").addEventListener("click", (event) => {
+      const btn = event.target.closest(".profile-picker__item");
+      if (!btn) return;
+      renderPinEntry({ id: btn.dataset.id, name: btn.dataset.name }, { showBackToPicker: true });
+    });
+
+    slot.querySelector("#use-id-instead-btn").addEventListener("click", () => {
+      renderManualProfileEntry();
+    });
+  }
+
+  // Fallback: usado so quando nenhum adulto ainda logou neste aparelho (por isso
+  // nao ha nomes em cache) ou se a crianca nao se encontrar na lista.
+  function renderManualProfileEntry() {
     const savedProfileId = localStorage.getItem(CHILD_PROFILE_KEY) || "";
 
     slot.innerHTML = `
       <div class="login-form">
-        <div class="pin-dots" id="pin-dots"></div>
-        <div class="pin-keypad" id="pin-keypad"></div>
-        <p class="error-text hidden" id="child-error"></p>
-        <button type="button" class="btn btn-ghost btn-block" id="change-profile-btn">Trocar perfil</button>
-        <div class="field hidden" id="profile-field">
+        <p class="profile-picker-hint">Peca para um adulto entrar uma vez neste aparelho — assim seu nome aparece na lista da proxima vez.</p>
+        <div class="field">
           <label for="profile-id">Id do perfil</label>
           <input id="profile-id" type="text" value="${savedProfileId}" placeholder="cole o id do seu perfil" />
         </div>
+        <p class="error-text hidden" id="manual-error"></p>
+        <button type="button" class="btn btn-primary btn-block" id="manual-continue-btn">Continuar</button>
       </div>
     `;
 
+    const errorEl = slot.querySelector("#manual-error");
+    const profileInput = slot.querySelector("#profile-id");
+
+    slot.querySelector("#manual-continue-btn").addEventListener("click", () => {
+      const profileId = profileInput.value.trim();
+      if (!profileId) {
+        errorEl.textContent = "Cole o id do perfil para continuar.";
+        errorEl.classList.remove("hidden");
+        return;
+      }
+      renderPinEntry({ id: profileId, name: "" }, { showBackToPicker: false });
+    });
+  }
+
+  function renderPinEntry(child, { showBackToPicker }) {
+    slot.innerHTML = `
+      <div class="login-form">
+        ${child.name ? `<p class="profile-picker-hint">Ola, ${child.name}! Digite seu PIN.</p>` : ""}
+        <div class="pin-dots" id="pin-dots"></div>
+        <div class="pin-keypad" id="pin-keypad"></div>
+        <p class="error-text hidden" id="child-error"></p>
+        <button type="button" class="btn btn-ghost btn-block" id="back-btn">
+          ${showBackToPicker ? "Nao sou eu" : "Voltar"}
+        </button>
+      </div>
+    `;
+
+    pin = "";
     const dotsEl = slot.querySelector("#pin-dots");
     const keypadEl = slot.querySelector("#pin-keypad");
     const errorEl = slot.querySelector("#child-error");
-    const profileField = slot.querySelector("#profile-field");
-    const profileInput = slot.querySelector("#profile-id");
 
     function renderDots() {
       dotsEl.innerHTML = Array.from({ length: 4 })
@@ -104,19 +191,12 @@ export function renderLogin(root, onSuccess) {
     }
 
     async function trySubmit() {
-      const profileId = profileInput.value.trim() || savedProfileId;
-      if (!profileId) {
-        errorEl.textContent = "Informe o id do perfil primeiro (toque em \"Trocar perfil\").";
-        errorEl.classList.remove("hidden");
-        profileField.classList.remove("hidden");
-        return;
-      }
       if (pin.length === 0) return;
 
       errorEl.classList.add("hidden");
       try {
-        const result = await loginChild(profileId, pin);
-        localStorage.setItem(CHILD_PROFILE_KEY, profileId);
+        const result = await loginChild(child.id, pin);
+        localStorage.setItem(CHILD_PROFILE_KEY, child.id);
         onSuccess(result);
       } catch (err) {
         pin = "";
@@ -142,8 +222,8 @@ export function renderLogin(root, onSuccess) {
       if (pin.length === 4) trySubmit();
     });
 
-    slot.querySelector("#change-profile-btn").addEventListener("click", () => {
-      profileField.classList.toggle("hidden");
+    slot.querySelector("#back-btn").addEventListener("click", () => {
+      renderChildForm();
     });
 
     renderDots();

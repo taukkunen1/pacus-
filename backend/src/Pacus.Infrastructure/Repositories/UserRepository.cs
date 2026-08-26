@@ -2,6 +2,7 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using Pacus.Application.Interfaces;
 using Pacus.Domain.Entities;
+using Pacus.Domain.Enums;
 using Pacus.Infrastructure.Mongo;
 
 namespace Pacus.Infrastructure.Repositories;
@@ -26,4 +27,7 @@ public class UserRepository : IUserRepository
 
     public Task UpdateAsync(User user) =>
         _context.Users.ReplaceOneAsync(u => u.Id == user.Id, user);
+
+    public Task<List<User>> GetByFamilyAndRoleAsync(ObjectId familyId, UserRole role) =>
+        _context.Users.Find(u => u.FamilyId == familyId && u.Role == role).ToListAsync();
 }

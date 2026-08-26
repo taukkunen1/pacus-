@@ -34,11 +34,11 @@
 
   /* Escala */
   --step-xs: 0.75rem;
-  --step-sm: 0.875rem;
-  --step-md: 1rem;
-  --step-lg: 1.25rem;
-  --step-xl: 1.75rem;
-  --step-2xl: 2.25rem;
+  --step-sm: 0.9rem;
+  --step-md: 1.05rem;
+  --step-lg: 1.3rem;
+  --step-xl: 1.85rem;
+  --step-2xl: 2.5rem;
 
   /* Espacamento */
   --space-1: 4px;

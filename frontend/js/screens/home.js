@@ -327,7 +327,7 @@ export async function renderHome(
         </div>
       </div>
 
-      ${renderTank(pacus?.stage)}
+      ${renderTank(pacus)}
 
       ${renderGameTimer()}
 

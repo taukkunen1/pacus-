@@ -8,6 +8,8 @@
   overflow: hidden;
   background: linear-gradient(180deg, #1E7A74 0%, var(--color-lagoon) 45%, var(--color-tide) 100%);
   box-shadow: var(--shadow-card), inset 0 0 0 1px rgba(234, 246, 243, 0.12);
+  /* Da profundidade real para o giro do PACUS (ver @keyframes pacus-swim). */
+  perspective: 560px;
 }
 
 /* Linha d'agua com leve ondulacao continua no topo do tanque */
@@ -142,23 +144,29 @@
   left: 50%;
   width: 90px;
   height: 45px;
-  animation: pacus-swim 16s ease-in-out infinite;
+  transform-style: preserve-3d;
+  animation: pacus-swim var(--swim-duration, 16s) ease-in-out infinite;
 }
 
 /* Trajeto: sai de perto da toca (esquerda), nada com forca pro centro/direita,
-   faz uma pausa quase escondido atras da alga, vira de verdade (flip, nao so
-   balanco) e volta nadando pra esquerda ate sumir de novo perto da toca. */
+   faz uma pausa quase escondido atras da alga e vira de verdade pra voltar —
+   o giro passa por rotateY (de perfil, "de canto", ate mostrar as costas),
+   nao um espelhamento instantaneo, entao parece o corpo virando de verdade. */
 @keyframes pacus-swim {
-  0%   { transform: translate(-128px, 4px)   rotate(-3deg) scale(var(--pacus-scale, 1)); opacity: 0.9; }
-  6%   { transform: translate(-126px, 0px)   rotate(-1deg) scale(var(--pacus-scale, 1)); opacity: 0.85; }
-  14%  { transform: translate(-118px, 4px)   rotate(-4deg) scale(var(--pacus-scale, 1)); opacity: 1; }
-  32%  { transform: translate(-8px, -18px)   rotate(4deg)  scale(var(--pacus-scale, 1)); opacity: 1; }
-  48%  { transform: translate(112px, -8px)   rotate(-2deg) scale(var(--pacus-scale, 1)); opacity: 1; }
-  54%  { transform: translate(116px, -10px)  rotate(0deg)  scale(var(--pacus-scale, 1)); opacity: 0.8; }
-  62%  { transform: translate(108px, -6px)   rotate(2deg)  scale(calc(var(--pacus-scale, 1) * -1), var(--pacus-scale, 1)); opacity: 1; }
-  80%  { transform: translate(-14px, -14px)  rotate(-4deg) scale(calc(var(--pacus-scale, 1) * -1), var(--pacus-scale, 1)); opacity: 1; }
-  94%  { transform: translate(-124px, 3px)   rotate(2deg)  scale(calc(var(--pacus-scale, 1) * -1), var(--pacus-scale, 1)); opacity: 0.85; }
-  100% { transform: translate(-128px, 4px)   rotate(-3deg) scale(var(--pacus-scale, 1)); opacity: 0.9; }
+  0%   { transform: translate(-128px, 4px)   rotate(-3deg) rotateY(0deg)   scale(var(--pacus-scale, 1)); opacity: 0.9; }
+  6%   { transform: translate(-126px, 0px)   rotate(-1deg) rotateY(0deg)   scale(var(--pacus-scale, 1)); opacity: 0.85; }
+  14%  { transform: translate(-118px, 4px)   rotate(-4deg) rotateY(0deg)   scale(var(--pacus-scale, 1)); opacity: 1; }
+  32%  { transform: translate(-8px, -18px)   rotate(4deg)  rotateY(0deg)   scale(var(--pacus-scale, 1)); opacity: 1; }
+  48%  { transform: translate(112px, -8px)   rotate(-2deg) rotateY(0deg)   scale(var(--pacus-scale, 1)); opacity: 1; }
+  53%  { transform: translate(116px, -10px)  rotate(0deg)  rotateY(15deg)  scale(var(--pacus-scale, 1)); opacity: 0.85; }
+  57%  { transform: translate(117px, -10px)  rotate(0deg)  rotateY(95deg) scale(var(--pacus-scale, 1)); opacity: 0.5; }
+  61%  { transform: translate(114px, -9px)   rotate(1deg)  rotateY(180deg) scale(var(--pacus-scale, 1)); opacity: 0.9; }
+  62%  { transform: translate(108px, -6px)   rotate(2deg)  rotateY(180deg) scale(var(--pacus-scale, 1)); opacity: 1; }
+  80%  { transform: translate(-14px, -14px)  rotate(-4deg) rotateY(180deg) scale(var(--pacus-scale, 1)); opacity: 1; }
+  91%  { transform: translate(-122px, 4px)   rotate(1deg)  rotateY(180deg) scale(var(--pacus-scale, 1)); opacity: 0.85; }
+  95%  { transform: translate(-126px, 4px)   rotate(0deg)  rotateY(95deg) scale(var(--pacus-scale, 1)); opacity: 0.5; }
+  99%  { transform: translate(-128px, 4px)   rotate(-2deg) rotateY(0deg)   scale(var(--pacus-scale, 1)); opacity: 0.85; }
+  100% { transform: translate(-128px, 4px)   rotate(-3deg) rotateY(0deg)   scale(var(--pacus-scale, 1)); opacity: 0.9; }
 }
 
 /* Estagios ainda nadando, cada um um pouco maior que o anterior. */
@@ -177,7 +185,8 @@
 .pacus-critter__tail,
 .pacus-critter__body,
 .pacus-critter__head {
-  fill: var(--color-coral);
+  fill: var(--pacus-color, var(--color-coral));
+  transition: fill 900ms var(--ease-water);
 }
 .pacus-critter__body {
   filter: drop-shadow(-2px 3px 3px rgba(15, 61, 58, 0.15));
@@ -194,10 +203,11 @@
 }
 
 .pacus-critter__leg {
-  fill: var(--color-coral);
+  fill: var(--pacus-color, var(--color-coral));
   transform-box: fill-box;
   transform-origin: center;
   animation: pacus-leg-paddle 2.6s ease-in-out infinite;
+  transition: fill 900ms var(--ease-water);
 }
 .pacus-critter__leg:nth-of-type(1) { animation-delay: 0s; }
 .pacus-critter__leg:nth-of-type(2) { animation-delay: 0.7s; }
@@ -225,12 +235,14 @@
 }
 .pacus-critter__gill path {
   fill: none;
-  stroke: var(--color-coral-dark);
+  stroke: var(--pacus-color-dark, var(--color-coral-dark));
   stroke-width: 2.4;
   stroke-linecap: round;
+  transition: stroke 900ms var(--ease-water);
 }
 .pacus-critter__gill circle {
-  fill: var(--color-coral-dark);
+  fill: var(--pacus-color-dark, var(--color-coral-dark));
+  transition: fill 900ms var(--ease-water);
 }
 .pacus-critter__gill--1 { animation-delay: 0s; }
 .pacus-critter__gill--2 { animation-delay: 0.15s; }
@@ -298,7 +310,8 @@
   left: 18%;
   width: 24px;
   height: 16px;
-  background: var(--color-coral);
+  /* Primeira pontinha do PACUS ja mostra a cor com que ele vai nascer. */
+  background: var(--pacus-color, var(--color-coral));
   border-radius: 50% 50% 40% 40%;
   box-shadow: inset -3px -3px 6px rgba(15, 61, 58, 0.15);
 }

@@ -1,6 +1,8 @@
 // Renderiza o tanque (elemento de assinatura). A aparencia muda por estagio:
 // egg/cracking/hatching mostram um ovo (com rachaduras progressivas); baby/young/adult
 // mostram o corpo nadando, crescendo de tamanho a cada estagio (ver habitat.css).
+// A cor do PACUS nasce com ele (ver ./color.js) e so fica mais intensa com o tempo.
+import { getPacusColorStyle } from "./color.js";
 
 const STAGE_ORDER = ["egg", "cracking", "hatching", "baby", "young", "adult"];
 
@@ -18,8 +20,9 @@ function normalizeStage(stage) {
   return STAGE_ORDER.includes(value) ? value : "egg";
 }
 
-export function renderTank(stage) {
-  const normalizedStage = normalizeStage(stage);
+export function renderTank(pacus, stageOverride) {
+  const normalizedStage = normalizeStage(stageOverride ?? pacus?.stage);
+  const colorStyle = getPacusColorStyle(pacus, normalizedStage);
   const isEggPhase = normalizedStage === "egg" || normalizedStage === "cracking" || normalizedStage === "hatching";
 
   const creature = isEggPhase
@@ -71,7 +74,7 @@ export function renderTank(stage) {
     `;
 
   return `
-    <div class="pacus-tank pacus-tank--${normalizedStage}" aria-hidden="true">
+    <div class="pacus-tank pacus-tank--${normalizedStage}" style="${colorStyle}" aria-hidden="true">
       <div class="tank-bubble"></div>
       <div class="tank-bubble"></div>
       <div class="tank-bubble"></div>

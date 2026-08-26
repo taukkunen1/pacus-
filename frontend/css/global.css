@@ -2,11 +2,24 @@
 
 body {
   font-family: var(--font-body);
+  font-size: var(--step-md);
+  line-height: 1.5;
   background: var(--surface-0);
   color: var(--text-on-dark);
 }
 
-h1, h2, h3 { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; }
+/* Titulos em Fredoka (fonte redonda e brincalhona, combinando com o tema do
+   aquario) — mais peso e espacamento positivo em vez de apertado, pra ficar
+   bem legivel e com presenca mesmo em telas pequenas. */
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+}
+h1 { font-size: var(--step-2xl); }
+h2 { font-size: var(--step-xl); }
+h3 { font-size: var(--step-lg); }
 
 .hidden { display: none !important; }
 

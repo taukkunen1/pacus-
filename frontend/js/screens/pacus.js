@@ -82,7 +82,7 @@ export async function renderPacus(root, navigate) {
         </button>
       </div>
 
-      ${renderTank(pacus?.stage)}
+      ${renderTank(pacus)}
 
       <section class="pacus-stats">
         <div>

@@ -36,6 +36,24 @@ const TYPES = [
   "challenge"
 ];
 
+const TYPE_PROMPT_LABELS = "1) Obrigatoria\n2) Deve fazer\n3) Desafio";
+const TYPE_PROMPT_MAP = { "1": "mandatory", "2": "expected", "3": "challenge" };
+const TYPE_PROMPT_DEFAULT = { mandatory: "1", expected: "2", challenge: "3" };
+
+// window.prompt so aceita texto — pede o numero do tipo e traduz pro valor
+// que a API espera. Retorna null se a pessoa cancelar (o chamador deve abortar).
+function promptForType(currentType) {
+  const suggested = TYPE_PROMPT_DEFAULT[currentType] ?? "1";
+  const answer = window.prompt(
+    `Tipo da tarefa:\n${TYPE_PROMPT_LABELS}`,
+    suggested
+  );
+
+  if (answer === null) return null;
+
+  return TYPE_PROMPT_MAP[answer.trim()] ?? currentType;
+}
+
 export async function renderHome(
   root,
   navigate = () => {}
@@ -373,6 +391,12 @@ export async function renderHome(
               return;
             }
 
+            const type = promptForType("challenge");
+
+            if (!type) {
+              return;
+            }
+
             const permanent =
               window.confirm(
                 "Esta tarefa deve se repetir nos próximos dias?\n\n" +
@@ -383,7 +407,7 @@ export async function renderHome(
             const payload = {
               title: title.trim(),
               description: null,
-              type: "challenge",
+              type,
               period: activePeriod,
               points
             };
@@ -479,6 +503,12 @@ export async function renderHome(
                 return;
               }
 
+              const type = promptForType(task.type);
+
+              if (!type) {
+                return;
+              }
+
               try {
                 routine =
                   await updateDailyTask(
@@ -489,8 +519,7 @@ export async function renderHome(
                       description:
                         task.description ??
                         null,
-                      type:
-                        task.type,
+                      type,
                       period:
                         task.period,
                       points

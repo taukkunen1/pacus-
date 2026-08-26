@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Pacus.Api.Auth;
+using Pacus.Application.DTOs;
 using Pacus.Application.Interfaces;
 using Pacus.Domain.Enums;
 
@@ -20,7 +21,7 @@ public class PacusController : ControllerBase
         _currentUser = currentUser;
     }
 
-    // Leitura liberada para os dois papeis â€” a crianÃ§a tambem acompanha o PACUS crescer.
+    // Leitura liberada para os dois papeis - a crianca tambem acompanha o PACUS crescer.
     [HttpGet("me")]
     public async Task<IActionResult> GetMe()
     {
@@ -29,11 +30,37 @@ public class PacusController : ControllerBase
     }
 
     [HttpGet("me/state")]
-    public IActionResult GetState() => Ok(new { state = "idle" });
+    public async Task<IActionResult> GetState()
+    {
+        var pacus = await _pacusRepository.GetByFamilyIdAsync(_currentUser.FamilyId);
+        if (pacus is null) return NotFound();
 
-    // Configuracao de comportamento/habitat e administrativa â€” "Painel Adulto: configurar PACUS".
+        return Ok(new
+        {
+            stage = pacus.Stage,
+            size = pacus.Size,
+            totalClosedDays = pacus.TotalClosedDays,
+            lastGrowthDate = pacus.LastGrowthDate
+        });
+    }
+
+    // Configuracao de comportamento/habitat e administrativa - "Painel Adulto: configurar PACUS".
+    // Tambem usado para corrigir manualmente o estagio/tamanho quando a familia ja tinha
+    // um PACUS em andamento antes deste app (migracao de progresso).
     [RequireRole(UserRole.Adult)]
     [HttpPut("me/state")]
-    public IActionResult UpdateState() => NoContent();
-}
+    public async Task<IActionResult> UpdateState([FromBody] UpdatePacusStateRequest request)
+    {
+        var pacus = await _pacusRepository.GetByFamilyIdAsync(_currentUser.FamilyId);
+        if (pacus is null) return NotFound();
 
+        if (request.Stage is not null) pacus.Stage = request.Stage.Value;
+        if (request.Size is not null) pacus.Size = request.Size.Value;
+        if (request.TotalClosedDays is not null) pacus.TotalClosedDays = request.TotalClosedDays.Value;
+
+        pacus.UpdatedAt = DateTime.UtcNow;
+        await _pacusRepository.UpdateAsync(pacus);
+
+        return Ok(pacus);
+    }
+}

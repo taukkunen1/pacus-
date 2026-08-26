@@ -105,6 +105,12 @@ public class TaskTemplateService : ITaskTemplateService
                 $"Periodo invalido: {request.Period}");
         }
 
+        if (request.Points == 0 || request.Points < -10 || request.Points > 10)
+        {
+            throw new InvalidOperationException(
+                "Cada tarefa deve valer entre 1 e 10 Pacus Points, ou entre -1 e -10 (penalidade). Zero nao e permitido.");
+        }
+
         return (type, period);
     }
 }

@@ -35,6 +35,15 @@
   font-weight: 400;
   color: var(--text-on-dark-dim);
 }
+.task-section__dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--text-on-dark-dim);
+  flex-shrink: 0;
+}
+.task-section--mandatory .task-section__dot { background: var(--color-sky); }
+.task-section--expected .task-section__dot { background: var(--color-lagoon-light); }
+.task-section--challenge .task-section__dot { background: var(--color-coral); }
 
 .task-list { display: flex; flex-direction: column; gap: var(--space-2); }
 
@@ -44,10 +53,14 @@
   gap: var(--space-3);
   background: rgba(234, 246, 243, 0.07);
   border: 1.5px solid rgba(234, 246, 243, 0.1);
+  border-left: 4px solid rgba(234, 246, 243, 0.25);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
   transition: background var(--duration-fast) var(--ease-water), opacity var(--duration-fast) var(--ease-water);
 }
+.task-card--mandatory { border-left-color: var(--color-sky); }
+.task-card--expected { border-left-color: var(--color-lagoon-light); }
+.task-card--challenge { border-left-color: var(--color-coral); }
 .task-card.is-done {
   background: rgba(255, 200, 87, 0.1);
   border-color: rgba(255, 200, 87, 0.25);
@@ -89,10 +102,16 @@
   font-family: var(--font-data);
   font-weight: 600;
   font-size: var(--step-sm);
-  color: var(--color-sun);
-  background: rgba(255, 200, 87, 0.12);
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-pill);
+}
+.task-points--reward {
+  color: var(--color-sun);
+  background: rgba(255, 200, 87, 0.12);
+}
+.task-points--penalty {
+  color: var(--color-danger);
+  background: rgba(224, 102, 90, 0.15);
 }
 
 .task-empty {
@@ -106,3 +125,26 @@
 .task-more:hover { background: rgba(234,246,243,.1); color: var(--text-on-dark); }
 .task-actions-bar { display:flex; gap: var(--space-2); margin: var(--space-5) 0; }
 .task-actions-bar .btn { flex:1; }
+
+.game-timer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-size: var(--step-sm);
+}
+.game-timer--locked {
+  color: var(--text-on-dark-dim);
+  background: rgba(234, 246, 243, 0.06);
+  border: 1.5px dashed rgba(234, 246, 243, 0.2);
+}
+.game-timer--unlocked {
+  color: var(--color-tide-deep);
+  background: linear-gradient(90deg, var(--color-sun), #ffe0a3);
+  box-shadow: var(--shadow-float);
+  font-weight: 600;
+}
+.game-timer__icon { font-size: var(--step-lg); }

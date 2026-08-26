@@ -1,4 +1,4 @@
-﻿import {
+import {
   getTodayRoutine,
   completeTask,
   reopenTask,
@@ -10,7 +10,8 @@ import {
   createDailyTask,
   createTask,
   updateDailyTask,
-  deleteDailyTask
+  deleteDailyTask,
+  reorderDailyTasks
 } from "../api/tasks-api.js";
 
 import { renderTank } from "../pacus/habitat.js";
@@ -23,6 +24,7 @@ import {
 } from "../utils/format.js";
 import { showToast } from "../components/toast.js";
 import { appState } from "../state/app-state.js";
+import { isValidPoints, POINTS_HELP_TEXT } from "../utils/validation.js";
 
 const PERIODS = [
   "morning",
@@ -52,6 +54,35 @@ function promptForType(currentType) {
   if (answer === null) return null;
 
   return TYPE_PROMPT_MAP[answer.trim()] ?? currentType;
+}
+
+// Pede os Pacus Points e valida (-10 a 10, sem zero). Retorna null se invalido
+// ou cancelado — o chamador deve abortar nesse caso.
+function promptForPoints(defaultValue) {
+  const raw = window.prompt(POINTS_HELP_TEXT, String(defaultValue));
+  if (raw === null) return null;
+
+  const points = Number(raw);
+  if (!isValidPoints(points)) {
+    showToast(
+      `Valor invalido. ${POINTS_HELP_TEXT}.`,
+      { error: true }
+    );
+    return null;
+  }
+
+  return points;
+}
+
+function formatGameTimerRemaining(remainingMs) {
+  const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const pad = (n) => String(n).padStart(2, "0");
+  return h > 0
+    ? `${h}h ${pad(m)}m ${pad(s)}s restantes`
+    : `${pad(m)}m ${pad(s)}s restantes`;
 }
 
 export async function renderHome(
@@ -90,6 +121,8 @@ export async function renderHome(
 
   let activePeriod =
     currentPeriodGuess();
+
+  let gameTimerIntervalId = null;
 
   try {
     [routine, balance] =
@@ -135,6 +168,100 @@ export async function renderHome(
         task.period === period &&
         task.type === type
     );
+  }
+
+  // Move uma tarefa uma posicao pra cima/baixo DENTRO da propria secao
+  // (mesmo periodo + tipo), preservando a ordem relativa de todo o resto.
+  // Retorna null quando a tarefa ja esta na ponta da secao (nada a fazer).
+  function computeReorderedIds(taskId, direction) {
+    const active = routine.tasks
+      .filter((t) => !t.deletedAt)
+      .slice()
+      .sort((a, b) => a.order - b.order);
+
+    const idx = active.findIndex(
+      (t) => String(t.id) === String(taskId)
+    );
+    if (idx === -1) return null;
+
+    const task = active[idx];
+    const sameSection = (t) =>
+      t.period === task.period && t.type === task.type;
+
+    let swapWith = -1;
+    if (direction === "up") {
+      for (let i = idx - 1; i >= 0; i--) {
+        if (sameSection(active[i])) { swapWith = i; break; }
+      }
+    } else {
+      for (let i = idx + 1; i < active.length; i++) {
+        if (sameSection(active[i])) { swapWith = i; break; }
+      }
+    }
+
+    if (swapWith === -1) return null;
+
+    const reordered = active.slice();
+    const tmp = reordered[idx];
+    reordered[idx] = reordered[swapWith];
+    reordered[swapWith] = tmp;
+
+    return reordered.map((t) => t.id);
+  }
+
+  function renderGameTimer() {
+    if (!routine?.gameTimerEnabled) return "";
+
+    if (!routine.gameTimerUnlockedAt) {
+      const hours = Math.round((routine.gameTimerMinutes ?? 120) / 60);
+      return `
+        <div class="game-timer game-timer--locked">
+          🔒 Termine as tarefas da manhã pra liberar ${hours}h de jogo hoje.
+        </div>
+      `;
+    }
+
+    return `
+      <div class="game-timer game-timer--unlocked">
+        <span class="game-timer__icon">🎮</span>
+        <span id="game-timer-remaining">calculando...</span>
+      </div>
+    `;
+  }
+
+  function startGameTimerCountdown() {
+    if (gameTimerIntervalId) {
+      clearInterval(gameTimerIntervalId);
+      gameTimerIntervalId = null;
+    }
+
+    if (!routine?.gameTimerUnlockedAt) return;
+
+    const unlockedAt = new Date(routine.gameTimerUnlockedAt).getTime();
+    const durationMs = (routine.gameTimerMinutes ?? 120) * 60 * 1000;
+    const endsAt = unlockedAt + durationMs;
+
+    const tick = () => {
+      const el = content.querySelector("#game-timer-remaining");
+      if (!el) {
+        clearInterval(gameTimerIntervalId);
+        gameTimerIntervalId = null;
+        return;
+      }
+
+      const remainingMs = endsAt - Date.now();
+      if (remainingMs <= 0) {
+        el.textContent = "Tempo de jogo de hoje já acabou. Até amanhã!";
+        clearInterval(gameTimerIntervalId);
+        gameTimerIntervalId = null;
+        return;
+      }
+
+      el.textContent = formatGameTimerRemaining(remainingMs);
+    };
+
+    tick();
+    gameTimerIntervalId = setInterval(tick, 1000);
   }
 
   function draw() {
@@ -202,6 +329,8 @@ export async function renderHome(
 
       ${renderTank(pacus?.stage)}
 
+      ${renderGameTimer()}
+
       <div
         class="period-tabs"
         role="tablist"
@@ -238,37 +367,22 @@ export async function renderHome(
                 type
               ),
               {
-                canManage: isAdult
+                canManage: true,
+                type
               }
             )
         ).join("")}
       </div>
 
-      ${
-        isAdult
-          ? `
-              <div
-                class="task-actions-bar"
-              >
-                <button
-                  class="btn btn-primary"
-                  id="add-task"
-                  type="button"
-                >
-                  + Nova tarefa
-                </button>
-
-                <button
-                  class="btn btn-ghost"
-                  id="reorder-help"
-                  type="button"
-                >
-                  ↕ Reordenar
-                </button>
-              </div>
-            `
-          : ""
-      }
+      <div class="task-actions-bar">
+        <button
+          class="btn btn-primary"
+          id="add-task"
+          type="button"
+        >
+          + Nova tarefa
+        </button>
+      </div>
 
       <div class="points-footer">
         <div>
@@ -322,6 +436,7 @@ export async function renderHome(
     `;
 
     attachHandlers();
+    startGameTimerCountdown();
   }
 
   function attachHandlers() {
@@ -355,85 +470,148 @@ export async function renderHome(
         );
       });
 
-    if (isAdult) {
-      content
-        .querySelector("#add-task")
-        ?.addEventListener(
+    content
+      .querySelector("#add-task")
+      ?.addEventListener(
+        "click",
+        async () => {
+          const title =
+            window.prompt(
+              "Nome da nova tarefa:"
+            );
+
+          if (!title?.trim()) {
+            return;
+          }
+
+          const points = promptForPoints(1);
+          if (points === null) {
+            return;
+          }
+
+          const type = promptForType("challenge");
+
+          if (!type) {
+            return;
+          }
+
+          // So o adulto pode transformar a tarefa em permanente (mexe nas
+          // regras da familia) — o backend tambem bloqueia isso pra crianca.
+          const permanent =
+            isAdult &&
+            window.confirm(
+              "Esta tarefa deve se repetir nos próximos dias?\n\n" +
+                "OK = Sim, tarefa permanente\n" +
+                "Cancelar = Não, somente hoje"
+            );
+
+          const payload = {
+            title: title.trim(),
+            description: null,
+            type,
+            period: activePeriod,
+            points
+          };
+
+          try {
+            if (permanent) {
+              await createTask(
+                payload
+              );
+
+              showToast(
+                "Tarefa permanente criada."
+              );
+
+              routine =
+                await getTodayRoutine();
+            } else {
+              routine =
+                await createDailyTask(
+                  payload
+                );
+
+              showToast(
+                "Tarefa adicionada somente para hoje."
+              );
+            }
+
+            draw();
+          } catch (err) {
+            showToast(
+              err.message,
+              { error: true }
+            );
+          }
+        }
+      );
+
+    content
+      .querySelectorAll(
+        "[data-task-action=edit]"
+      )
+      .forEach((button) => {
+        button.addEventListener(
           "click",
           async () => {
+            const card =
+              button.closest(
+                ".task-card"
+              );
+
+            const task =
+              routine.tasks.find(
+                (item) =>
+                  String(item.id) ===
+                  String(
+                    card?.dataset.taskId
+                  )
+              );
+
+            if (!task) {
+              return;
+            }
+
             const title =
               window.prompt(
-                "Nome da nova tarefa:"
+                "Nome da tarefa:",
+                task.title
               );
 
             if (!title?.trim()) {
               return;
             }
 
-            const pointsRaw =
-              window.prompt(
-                "Pacus Points:",
-                "1"
-              );
-
-            const points =
-              Number(pointsRaw);
-
-            if (
-              !Number.isInteger(points) ||
-              points <= 0
-            ) {
-              showToast(
-                "A tarefa deve ter um valor de pontos maior que zero.",
-                { error: true }
-              );
-
+            const points = promptForPoints(task.points);
+            if (points === null) {
               return;
             }
 
-            const type = promptForType("challenge");
+            const type = promptForType(task.type);
 
             if (!type) {
               return;
             }
 
-            const permanent =
-              window.confirm(
-                "Esta tarefa deve se repetir nos próximos dias?\n\n" +
-                  "OK = Sim, tarefa permanente\n" +
-                  "Cancelar = Não, somente hoje"
-              );
-
-            const payload = {
-              title: title.trim(),
-              description: null,
-              type,
-              period: activePeriod,
-              points
-            };
-
             try {
-              if (permanent) {
-                await createTask(
-                  payload
+              routine =
+                await updateDailyTask(
+                  task.id,
+                  {
+                    title:
+                      title.trim(),
+                    description:
+                      task.description ??
+                      null,
+                    type,
+                    period:
+                      task.period,
+                    points
+                  }
                 );
 
-                showToast(
-                  "Tarefa permanente criada."
-                );
-
-                routine =
-                  await getTodayRoutine();
-              } else {
-                routine =
-                  await createDailyTask(
-                    payload
-                  );
-
-                showToast(
-                  "Tarefa adicionada somente para hoje."
-                );
-              }
+              balance =
+                await getPointsBalance();
 
               draw();
             } catch (err) {
@@ -444,150 +622,125 @@ export async function renderHome(
             }
           }
         );
+      });
 
-      content
-        .querySelectorAll(
-          "[data-task-action=edit]"
-        )
-        .forEach((button) => {
-          button.addEventListener(
-            "click",
-            async () => {
-              const card =
-                button.closest(
+    content
+      .querySelectorAll(
+        "[data-task-action=delete]"
+      )
+      .forEach((button) => {
+        button.addEventListener(
+          "click",
+          async () => {
+            const confirmed =
+              window.confirm(
+                "Remover esta tarefa de hoje?"
+              );
+
+            if (!confirmed) {
+              return;
+            }
+
+            const taskId =
+              button
+                .closest(
                   ".task-card"
-                );
+                )
+                ?.dataset.taskId;
 
-              const task =
-                routine.tasks.find(
-                  (item) =>
-                    String(item.id) ===
-                    String(
-                      card?.dataset.taskId
-                    )
-                );
-
-              if (!task) {
-                return;
-              }
-
-              const title =
-                window.prompt(
-                  "Nome da tarefa:",
-                  task.title
-                );
-
-              if (!title?.trim()) {
-                return;
-              }
-
-              const points =
-                Number(
-                  window.prompt(
-                    "Pacus Points:",
-                    String(
-                      task.points
-                    )
-                  )
-                );
-
-              if (
-                !Number.isInteger(points) ||
-                points <= 0
-              ) {
-                showToast(
-                  "A tarefa deve ter um valor de pontos maior que zero.",
-                  { error: true }
-                );
-
-                return;
-              }
-
-              const type = promptForType(task.type);
-
-              if (!type) {
-                return;
-              }
-
-              try {
-                routine =
-                  await updateDailyTask(
-                    task.id,
-                    {
-                      title:
-                        title.trim(),
-                      description:
-                        task.description ??
-                        null,
-                      type,
-                      period:
-                        task.period,
-                      points
-                    }
-                  );
-
-                balance =
-                  await getPointsBalance();
-
-                draw();
-              } catch (err) {
-                showToast(
-                  err.message,
-                  { error: true }
-                );
-              }
+            if (!taskId) {
+              return;
             }
-          );
-        });
 
-      content
-        .querySelectorAll(
-          "[data-task-action=delete]"
-        )
-        .forEach((button) => {
-          button.addEventListener(
-            "click",
-            async () => {
-              const confirmed =
-                window.confirm(
-                  "Remover esta tarefa de hoje?"
+            try {
+              routine =
+                await deleteDailyTask(
+                  taskId
                 );
 
-              if (!confirmed) {
-                return;
-              }
+              balance =
+                await getPointsBalance();
 
-              const taskId =
-                button
-                  .closest(
-                    ".task-card"
-                  )
-                  ?.dataset.taskId;
-
-              if (!taskId) {
-                return;
-              }
-
-              try {
-                routine =
-                  await deleteDailyTask(
-                    taskId
-                  );
-
-                balance =
-                  await getPointsBalance();
-
-                draw();
-              } catch (err) {
-                showToast(
-                  err.message,
-                  { error: true }
-                );
-              }
+              draw();
+            } catch (err) {
+              showToast(
+                err.message,
+                { error: true }
+              );
             }
-          );
-        });
-    }
+          }
+        );
+      });
+
+    content
+      .querySelectorAll(
+        "[data-task-action=move-up]"
+      )
+      .forEach((button) => {
+        button.addEventListener(
+          "click",
+          async () => {
+            const taskId =
+              button
+                .closest(".task-card")
+                ?.dataset.taskId;
+
+            if (!taskId) return;
+
+            const orderedIds =
+              computeReorderedIds(taskId, "up");
+
+            if (!orderedIds) return;
+
+            try {
+              routine =
+                await reorderDailyTasks(orderedIds);
+
+              draw();
+            } catch (err) {
+              showToast(
+                err.message,
+                { error: true }
+              );
+            }
+          }
+        );
+      });
+
+    content
+      .querySelectorAll(
+        "[data-task-action=move-down]"
+      )
+      .forEach((button) => {
+        button.addEventListener(
+          "click",
+          async () => {
+            const taskId =
+              button
+                .closest(".task-card")
+                ?.dataset.taskId;
+
+            if (!taskId) return;
+
+            const orderedIds =
+              computeReorderedIds(taskId, "down");
+
+            if (!orderedIds) return;
+
+            try {
+              routine =
+                await reorderDailyTasks(orderedIds);
+
+              draw();
+            } catch (err) {
+              showToast(
+                err.message,
+                { error: true }
+              );
+            }
+          }
+        );
+      });
 
     content
       .querySelectorAll(".task-check")

@@ -9,6 +9,7 @@ import {
 } from "../api/tasks-api.js";
 import { periodLabel, typeLabel } from "../utils/format.js";
 import { showToast } from "../components/toast.js";
+import { isValidPoints, POINTS_HELP_TEXT } from "../utils/validation.js";
 
 const PERIODS = ["morning", "afternoon", "evening"];
 const TYPES = ["mandatory", "expected", "challenge"];
@@ -341,14 +342,14 @@ export async function renderPacus(root, navigate) {
 
     const points = Number(
       window.prompt(
-        "Pacus Points (1, 2 ou 3):",
+        POINTS_HELP_TEXT,
         "1"
       )
     );
 
-    if (![1, 2, 3].includes(points)) {
+    if (!isValidPoints(points)) {
       showToast(
-        "A tarefa deve valer 1, 2 ou 3 Pacus Points.",
+        `Valor invalido. ${POINTS_HELP_TEXT}.`,
         { error: true }
       );
 
@@ -440,14 +441,14 @@ export async function renderPacus(root, navigate) {
 
     const points = Number(
       window.prompt(
-        "Pacus Points (1, 2 ou 3):",
+        POINTS_HELP_TEXT,
         String(task.points)
       )
     );
 
-    if (![1, 2, 3].includes(points)) {
+    if (!isValidPoints(points)) {
       showToast(
-        "A tarefa deve valer 1, 2 ou 3 Pacus Points.",
+        `Valor invalido. ${POINTS_HELP_TEXT}.`,
         { error: true }
       );
 

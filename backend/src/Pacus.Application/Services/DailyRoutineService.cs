@@ -36,13 +36,20 @@ public class DailyRoutineService : IDailyRoutineService
         var existing =
             await _dailyRoutineRepository.GetByUserAndDateAsync(userId, today);
 
+        DailyRoutine routine;
         if (existing is null)
-            return await CreateRoutineForDateAsync(userId, today, timezone);
+        {
+            routine = await CreateRoutineForDateAsync(userId, today, timezone);
+        }
+        else
+        {
+            if (existing.Status == RoutineStatus.Open)
+                await SyncMissingTemplatesAsync(existing, userId);
+            routine = existing;
+        }
 
-        if (existing.Status == RoutineStatus.Open)
-            await SyncMissingTemplatesAsync(existing, userId);
-
-        return existing;
+        await SyncGameTimerAsync(routine, userId);
+        return routine;
     }
 
     private async Task SyncMissingTemplatesAsync(
@@ -171,6 +178,7 @@ public class DailyRoutineService : IDailyRoutineService
             .Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null)
             .Sum(t => t.Points);
 
+        await SyncGameTimerAsync(routine, userId);
         await _dailyRoutineRepository.UpdateAsync(routine);
 
         var actorRoleEnum = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
@@ -261,6 +269,7 @@ public class DailyRoutineService : IDailyRoutineService
 
         routine.Tasks.Add(task);
         routine.Stats = BuildStats(routine.Tasks);
+        await SyncGameTimerAsync(routine, userId);
         await _dailyRoutineRepository.UpdateAsync(routine);
 
         await _taskEventRepository.CreateAsync(new TaskEvent
@@ -303,6 +312,7 @@ public class DailyRoutineService : IDailyRoutineService
         }
         routine.Tasks = routine.Tasks.OrderBy(t => t.Order).ToList();
 
+        await SyncGameTimerAsync(routine, userId);
         await _dailyRoutineRepository.UpdateAsync(routine);
 
         var actorRoleEnum = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
@@ -348,6 +358,7 @@ public class DailyRoutineService : IDailyRoutineService
             .Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null)
             .Sum(t => t.Points);
 
+        await SyncGameTimerAsync(routine, userId);
         await _dailyRoutineRepository.UpdateAsync(routine);
 
         var actorRoleEnum = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
@@ -412,6 +423,7 @@ public class DailyRoutineService : IDailyRoutineService
         task.UpdatedAt = DateTime.UtcNow;
         routine.Stats = BuildStats(routine.Tasks);
         routine.PointsEarned = routine.Tasks.Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null).Sum(t => t.Points);
+        await SyncGameTimerAsync(routine, userId);
         await _dailyRoutineRepository.UpdateAsync(routine);
 
         var role = ParseRole(actorRole);
@@ -445,6 +457,7 @@ public class DailyRoutineService : IDailyRoutineService
         task.UpdatedAt = DateTime.UtcNow;
         routine.Stats = BuildStats(routine.Tasks);
         routine.PointsEarned = routine.Tasks.Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null).Sum(t => t.Points);
+        await SyncGameTimerAsync(routine, userId);
         await _dailyRoutineRepository.UpdateAsync(routine);
 
         var role = ParseRole(actorRole);
@@ -478,6 +491,23 @@ public class DailyRoutineService : IDailyRoutineService
                 "Esta acao nao esta permitida no painel infantil.");
     }
 
+    private async Task SyncGameTimerAsync(DailyRoutine routine, ObjectId userId)
+    {
+        var settings = await _settingsRepository.GetByUserIdAsync(userId);
+        routine.GameTimerEnabled = settings?.GameTimerEnabled ?? false;
+        routine.GameTimerMinutes = settings?.GameTimerMinutes ?? 120;
+
+        if (routine.GameTimerUnlockedAt is not null || !routine.GameTimerEnabled)
+            return;
+
+        var morningTasks = routine.Tasks
+            .Where(t => t.DeletedAt is null && t.Period == TaskPeriod.Morning)
+            .ToList();
+
+        if (morningTasks.Count > 0 && morningTasks.All(t => t.Status == TaskItemStatus.Done))
+            routine.GameTimerUnlockedAt = DateTime.UtcNow;
+    }
+
     private static UserRole ParseRole(string actorRole) =>
         actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
             ? UserRole.Adult
@@ -488,9 +518,9 @@ public class DailyRoutineService : IDailyRoutineService
 
     private static void ValidatePoints(int points)
     {
-        if (points is < 1 or > 3)
+        if (points == 0 || points < -10 || points > 10)
             throw new InvalidOperationException(
-                "Cada tarefa deve valer exatamente 1, 2 ou 3 Pacus Points.");
+                "Cada tarefa deve valer entre 1 e 10 Pacus Points, ou entre -1 e -10 (penalidade). Zero nao e permitido.");
     }
 
     private static DailyRoutineStats BuildStats(List<DailyTask> tasks)

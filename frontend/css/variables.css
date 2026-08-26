@@ -11,6 +11,8 @@
   --color-sand: #E8D9B5;
   --color-sun: #FFC857;
   --color-danger: #E0665A;
+  --color-sky: #5FB4E8;
+  --color-sky-dark: #3A8FC4;
 
   /* Superficies */
   --surface-0: var(--color-tide-deep);

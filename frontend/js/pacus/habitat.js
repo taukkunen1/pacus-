@@ -76,7 +76,25 @@ export function renderTank(stage) {
       <div class="tank-bubble"></div>
       <div class="tank-bubble"></div>
       <div class="tank-bubble"></div>
+
+      <div class="tank-cave">
+        <div class="tank-cave__opening"></div>
+      </div>
+      <div class="tank-driftwood"></div>
+
       ${creature}
+
+      <div class="tank-plant tank-plant--left">
+        <span class="tank-plant__blade"></span>
+        <span class="tank-plant__blade"></span>
+        <span class="tank-plant__blade"></span>
+      </div>
+      <div class="tank-plant tank-plant--right">
+        <span class="tank-plant__blade"></span>
+        <span class="tank-plant__blade"></span>
+        <span class="tank-plant__blade"></span>
+      </div>
+
       <div class="tank-rock tank-rock--1"></div>
       <div class="tank-rock tank-rock--2"></div>
       <div class="tank-floor"></div>

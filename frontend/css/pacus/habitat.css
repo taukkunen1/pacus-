@@ -68,6 +68,71 @@
 .tank-rock--1 { left: 10%; width: 30px; height: 14px; }
 .tank-rock--2 { right: 14%; width: 44px; height: 18px; }
 
+/* Toca de pedra — esconderijo no fundo, atras do PACUS (ele nada na frente dela,
+   mas pausa por perto no inicio/fim do trajeto de nado, "quase escondido"). */
+.tank-cave {
+  position: absolute;
+  left: 3%;
+  bottom: 4px;
+  width: 92px;
+  height: 60px;
+  background: linear-gradient(160deg, #8a7a63, #5f5240);
+  border-radius: 50% 50% 14% 14% / 65% 65% 12% 12%;
+  box-shadow: inset -6px -8px 10px rgba(0, 0, 0, 0.25);
+}
+.tank-cave__opening {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 44px;
+  height: 38px;
+  transform: translateX(-50%);
+  background: radial-gradient(circle at 50% 30%, rgba(6, 20, 19, 0.9), rgba(6, 20, 19, 0.55) 70%, transparent 100%);
+  border-radius: 50% 50% 40% 40% / 60% 60% 30% 30%;
+}
+
+/* Tronco decorativo, so paisagem (fica atras do PACUS). */
+.tank-driftwood {
+  position: absolute;
+  left: 40%;
+  bottom: 10px;
+  width: 70px;
+  height: 12px;
+  background: linear-gradient(180deg, #7a5a3c, #55402a);
+  border-radius: 40% 60% 50% 50% / 80% 80% 40% 40%;
+  transform: rotate(-6deg);
+  box-shadow: inset 0 -3px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Tufos de alga — ficam NA FRENTE do PACUS (depois dele no DOM), entao quando
+   o trajeto de nado passa perto, ele visualmente "some" atras das folhas. */
+.tank-plant {
+  position: absolute;
+  bottom: 8px;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+.tank-plant--left { left: 5%; }
+.tank-plant--right { right: 6%; }
+
+.tank-plant__blade {
+  display: block;
+  width: 8px;
+  background: linear-gradient(180deg, #2F8F72, #1D6650);
+  border-radius: 50% 50% 6px 6px / 70% 70% 6px 6px;
+  transform-origin: bottom center;
+  animation: tank-plant-sway 4s ease-in-out infinite;
+}
+.tank-plant__blade:nth-child(1) { height: 46px; animation-delay: 0s; }
+.tank-plant__blade:nth-child(2) { height: 60px; animation-delay: 0.6s; }
+.tank-plant__blade:nth-child(3) { height: 40px; animation-delay: 1.2s; }
+
+@keyframes tank-plant-sway {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(8deg); }
+}
+
 /* O proprio PACUS: forma organica simples, sem pixel art — um corpo oval com
    3 fios de guelra por lado, balancando devagar como se nadasse em suspensao.
    O tamanho cresce por estagio via --pacus-scale (ver modificadores abaixo). */
@@ -77,12 +142,23 @@
   left: 50%;
   width: 90px;
   height: 45px;
-  animation: pacus-swim 6.5s var(--ease-water) infinite;
+  animation: pacus-swim 16s ease-in-out infinite;
 }
 
+/* Trajeto: sai de perto da toca (esquerda), nada com forca pro centro/direita,
+   faz uma pausa quase escondido atras da alga, vira de verdade (flip, nao so
+   balanco) e volta nadando pra esquerda ate sumir de novo perto da toca. */
 @keyframes pacus-swim {
-  0%, 100% { transform: translate(-70px, 0) rotate(-3deg) scale(var(--pacus-scale, 1)); }
-  50% { transform: translate(30px, -14px) rotate(3deg) scale(var(--pacus-scale, 1)); }
+  0%   { transform: translate(-128px, 4px)   rotate(-3deg) scale(var(--pacus-scale, 1)); opacity: 0.9; }
+  6%   { transform: translate(-126px, 0px)   rotate(-1deg) scale(var(--pacus-scale, 1)); opacity: 0.85; }
+  14%  { transform: translate(-118px, 4px)   rotate(-4deg) scale(var(--pacus-scale, 1)); opacity: 1; }
+  32%  { transform: translate(-8px, -18px)   rotate(4deg)  scale(var(--pacus-scale, 1)); opacity: 1; }
+  48%  { transform: translate(112px, -8px)   rotate(-2deg) scale(var(--pacus-scale, 1)); opacity: 1; }
+  54%  { transform: translate(116px, -10px)  rotate(0deg)  scale(var(--pacus-scale, 1)); opacity: 0.8; }
+  62%  { transform: translate(108px, -6px)   rotate(2deg)  scale(calc(var(--pacus-scale, 1) * -1), var(--pacus-scale, 1)); opacity: 1; }
+  80%  { transform: translate(-14px, -14px)  rotate(-4deg) scale(calc(var(--pacus-scale, 1) * -1), var(--pacus-scale, 1)); opacity: 1; }
+  94%  { transform: translate(-124px, 3px)   rotate(2deg)  scale(calc(var(--pacus-scale, 1) * -1), var(--pacus-scale, 1)); opacity: 0.85; }
+  100% { transform: translate(-128px, 4px)   rotate(-3deg) scale(var(--pacus-scale, 1)); opacity: 0.9; }
 }
 
 /* Estagios ainda nadando, cada um um pouco maior que o anterior. */
@@ -105,6 +181,16 @@
 }
 .pacus-critter__body {
   filter: drop-shadow(-2px 3px 3px rgba(15, 61, 58, 0.15));
+}
+.pacus-critter__tail {
+  transform-box: fill-box;
+  transform-origin: 100% 50%;
+  animation: pacus-tail-wag 1.2s ease-in-out infinite;
+}
+
+@keyframes pacus-tail-wag {
+  0%, 100% { transform: rotate(-7deg); }
+  50% { transform: rotate(7deg); }
 }
 
 .pacus-critter__leg {

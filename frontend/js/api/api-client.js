@@ -16,6 +16,20 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+// Decodifica o payload do JWT (sem validar assinatura — so pra ler claims no
+// cliente). Usado no boot do app pra saber quem esta logado apos um refresh de
+// pagina, sem precisar de outra chamada a API.
+export function decodeToken(token) {
+  try {
+    const payload = token.split(".")[1];
+    let base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    while (base64.length % 4) base64 += "=";
+    return JSON.parse(atob(base64));
+  } catch {
+    return null;
+  }
+}
+
 export async function apiClient(path, options = {}) {
   const token = getToken();
   const headers = {

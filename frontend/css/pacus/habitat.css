@@ -75,8 +75,8 @@
   position: absolute;
   bottom: 46px;
   left: 50%;
-  width: 68px;
-  height: 46px;
+  width: 90px;
+  height: 45px;
   animation: pacus-swim 6.5s var(--ease-water) infinite;
 }
 
@@ -90,27 +90,65 @@
 .pacus-tank--young { --pacus-scale: 0.8; }
 .pacus-tank--adult { --pacus-scale: 1; }
 
-.pacus-body__torso {
+.pacus-critter {
   position: absolute;
   inset: 0;
-  background: var(--color-coral);
-  border-radius: 60% 55% 50% 50% / 65% 65% 45% 45%;
-  box-shadow: inset -6px -6px 12px rgba(15, 61, 58, 0.15);
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
-.pacus-body__gill {
-  position: absolute;
-  top: -6px;
-  width: 5px;
-  height: 16px;
-  background: var(--color-coral-dark);
-  border-radius: var(--radius-pill);
-  transform-origin: bottom center;
+.pacus-critter__tail,
+.pacus-critter__body,
+.pacus-critter__head {
+  fill: var(--color-coral);
+}
+.pacus-critter__body {
+  filter: drop-shadow(-2px 3px 3px rgba(15, 61, 58, 0.15));
+}
+
+.pacus-critter__leg {
+  fill: var(--color-coral);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pacus-leg-paddle 2.6s ease-in-out infinite;
+}
+.pacus-critter__leg:nth-of-type(1) { animation-delay: 0s; }
+.pacus-critter__leg:nth-of-type(2) { animation-delay: 0.7s; }
+.pacus-critter__leg:nth-of-type(3) { animation-delay: 0.3s; }
+.pacus-critter__leg:nth-of-type(4) { animation-delay: 1s; }
+
+@keyframes pacus-leg-paddle {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+
+.pacus-critter__eye { fill: #143430; }
+
+.pacus-critter__mouth {
+  fill: none;
+  stroke: #143430;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.pacus-critter__gill {
+  transform-box: fill-box;
+  transform-origin: 0% 100%;
   animation: pacus-gill-wave 1.8s ease-in-out infinite;
 }
-.pacus-body__gill:nth-child(1) { left: 6px; animation-delay: 0s; }
-.pacus-body__gill:nth-child(2) { left: 14px; animation-delay: 0.15s; }
-.pacus-body__gill:nth-child(3) { left: 22px; animation-delay: 0.3s; }
+.pacus-critter__gill path {
+  fill: none;
+  stroke: var(--color-coral-dark);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.pacus-critter__gill circle {
+  fill: var(--color-coral-dark);
+}
+.pacus-critter__gill--1 { animation-delay: 0s; }
+.pacus-critter__gill--2 { animation-delay: 0.15s; }
+.pacus-critter__gill--3 { animation-delay: 0.3s; }
 
 @keyframes pacus-gill-wave {
   0%, 100% { transform: rotate(-8deg); }

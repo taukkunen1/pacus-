@@ -1,5 +1,5 @@
-import { getPacus } from "../api/pacus-api.js";
-import { renderTank, mountPacusBehavior } from "../pacus/pacus.js";
+import { apiClient } from "../api/api-client.js";
+import { renderTank } from "../pacus/habitat.js";
 import {
   getTasks,
   createTask,
@@ -26,7 +26,6 @@ export async function renderPacus(root, navigate) {
 
   let pacus = null;
   let tasks = [];
-  let cleanupPacus = () => {};
 
   try {
     tasks = await getTasks();
@@ -59,7 +58,7 @@ export async function renderPacus(root, navigate) {
   }
 
   try {
-    pacus = await getPacus();
+    pacus = await apiClient("/pacus/me");
   } catch (err) {
     console.warn(
       "PACUS nao encontrado. A tela de tarefas permanentes continuara disponivel.",
@@ -70,8 +69,6 @@ export async function renderPacus(root, navigate) {
   draw();
 
   function draw() {
-    cleanupPacus();
-
     content.innerHTML = `
       <div class="screen-header">
         <div>
@@ -84,7 +81,7 @@ export async function renderPacus(root, navigate) {
         </button>
       </div>
 
-      ${renderTank(pacus)}
+      ${renderTank(pacus?.stage)}
 
       <section class="pacus-stats">
         <div>
@@ -140,11 +137,6 @@ export async function renderPacus(root, navigate) {
         </div>
       </section>
     `;
-
-    cleanupPacus = mountPacusBehavior(
-      content,
-      pacus?.stage
-    );
 
     content
       .querySelector("#back")

@@ -1,56 +1,49 @@
-// Renderiza o tanque (elemento de assinatura). O visual muda por estagio —
-// ver frontend/js/pacus/growth.js para a lista de estagios e
-// frontend/css/pacus/habitat.css para as animacoes de cada um.
-import { getStageInfo } from "./growth.js";
+// Renderiza o tanque (elemento de assinatura). A aparencia muda por estagio:
+// egg/cracking/hatching mostram um ovo (com rachaduras progressivas); baby/young/adult
+// mostram o corpo nadando, crescendo de tamanho a cada estagio (ver habitat.css).
 
-export function renderTank(pacus) {
-  const stage = pacus?.stage ?? "egg";
-  const info = getStageInfo(stage);
-  const caption = info.isEgg
-    ? info.caption
-    : pacus?.name
-    ? `${escapeHtml(pacus.name)} esta por aqui em algum lugar 👀`
-    : info.caption;
+const STAGE_ORDER = ["egg", "cracking", "hatching", "baby", "young", "adult"];
+
+const STAGE_CAPTIONS = {
+  egg: "Um ovo bem quietinho no fundo do tanque...",
+  cracking: "Alguma coisa esta se mexendo ai dentro!",
+  hatching: "O ovo esta rachando... quase la!",
+  baby: "Pacus acabou de nascer, ainda pequenininho.",
+  young: "Pacus esta crescendo bem por aqui 👀",
+  adult: "Pacus esta por aqui em algum lugar 👀",
+};
+
+function normalizeStage(stage) {
+  const value = String(stage ?? "egg").toLowerCase();
+  return STAGE_ORDER.includes(value) ? value : "egg";
+}
+
+export function renderTank(stage) {
+  const normalizedStage = normalizeStage(stage);
+  const isEggPhase = normalizedStage === "egg" || normalizedStage === "cracking" || normalizedStage === "hatching";
+
+  const creature = isEggPhase
+    ? `<div class="pacus-egg"></div>`
+    : `
+      <div class="pacus-body">
+        <div class="pacus-body__gill"></div>
+        <div class="pacus-body__gill"></div>
+        <div class="pacus-body__gill"></div>
+        <div class="pacus-body__torso"></div>
+      </div>
+    `;
 
   return `
-    <div class="pacus-tank" data-stage="${stage}" aria-hidden="true">
+    <div class="pacus-tank pacus-tank--${normalizedStage}" aria-hidden="true">
       <div class="tank-bubble"></div>
       <div class="tank-bubble"></div>
       <div class="tank-bubble"></div>
       <div class="tank-bubble"></div>
-      ${info.isEgg ? renderEgg(stage) : renderCreature(stage)}
+      ${creature}
       <div class="tank-rock tank-rock--1"></div>
       <div class="tank-rock tank-rock--2"></div>
       <div class="tank-floor"></div>
-      <span class="tank-caption">${caption}</span>
+      <span class="tank-caption">${STAGE_CAPTIONS[normalizedStage]}</span>
     </div>
   `;
-}
-
-function renderEgg(stage) {
-  return `
-    <div class="pacus-egg pacus-egg--${stage}">
-      <div class="pacus-egg__shell"></div>
-      <div class="pacus-egg__crack pacus-egg__crack--1"></div>
-      <div class="pacus-egg__crack pacus-egg__crack--2"></div>
-      <div class="pacus-egg__peek"></div>
-    </div>
-  `;
-}
-
-function renderCreature(stage) {
-  return `
-    <div class="pacus-body pacus-body--${stage}">
-      <div class="pacus-body__gill"></div>
-      <div class="pacus-body__gill"></div>
-      <div class="pacus-body__gill"></div>
-      <div class="pacus-body__torso"></div>
-    </div>
-  `;
-}
-
-function escapeHtml(value = "") {
-  const div = document.createElement("div");
-  div.textContent = String(value);
-  return div.innerHTML;
 }

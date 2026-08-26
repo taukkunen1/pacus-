@@ -13,7 +13,7 @@ import {
   deleteDailyTask
 } from "../api/tasks-api.js";
 
-import { renderTank, mountPacusBehavior } from "../pacus/pacus.js";
+import { renderTank } from "../pacus/habitat.js";
 import { renderTaskSection } from "../components/task-list.js";
 import { formatOperationalDate } from "../utils/date.js";
 import {
@@ -62,13 +62,13 @@ export async function renderHome(
     root.querySelector("#home-content");
 
   let routine;
-  let pacus = null;
-  let cleanupPacus = () => {};
 
   let balance = {
     balance: 0,
     brl: 0
   };
+
+  let pacus = null;
 
   let activePeriod =
     currentPeriodGuess();
@@ -94,10 +94,7 @@ export async function renderHome(
   try {
     pacus = await getPacus();
   } catch (err) {
-    console.warn(
-      "PACUS nao encontrado. O tanque mostrara o estagio padrao.",
-      err
-    );
+    console.warn("PACUS nao encontrado. A tela de hoje continuara sem o estagio do PACUS.", err);
   }
 
   function totalTasks() {
@@ -123,8 +120,6 @@ export async function renderHome(
   }
 
   function draw() {
-    cleanupPacus();
-
     const total = totalTasks();
     const done = doneTasks();
 
@@ -187,7 +182,7 @@ export async function renderHome(
         </div>
       </div>
 
-      ${renderTank(pacus)}
+      ${renderTank(pacus?.stage)}
 
       <div
         class="period-tabs"
@@ -307,11 +302,6 @@ export async function renderHome(
         </button>
       </nav>
     `;
-
-    cleanupPacus = mountPacusBehavior(
-      content,
-      pacus?.stage
-    );
 
     attachHandlers();
   }

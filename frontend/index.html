@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pacus</title>
 
+  <!-- PACUS 3D usa Three.js 0.185.1 via ESM CDN; sem build step obrigatorio. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js"
+      }
+    }
+  </script>
+
   <!-- Detecta automaticamente onde a API esta rodando: localhost em dev, Render em producao. -->
   <script>
     window.PACUS_API_BASE_URL =

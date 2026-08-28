@@ -117,14 +117,19 @@ function addMesh(parent, geometry, material, bone = parent) {
 function addGill(parent, material, side, index) {
   const bone = new THREE.Bone();
   bone.name = `${side}_gill_${index + 1}`;
-  bone.position.set(side === "left" ? -0.33 : 0.33, 0.08 + index * 0.02, 0.08);
+  bone.position.set(side === "left" ? -0.38 : 0.38, 0.14 + index * 0.05, 0.1 - index * 0.05);
   parent.add(bone);
 
-  const geometry = new THREE.CapsuleGeometry(0.025, 0.16 + index * 0.015, 4, 6);
+  // Fronde principal, mais grossa e vistosa que antes.
+  const geometry = new THREE.CapsuleGeometry(0.045, 0.24 + index * 0.03, 5, 8);
   const gill = addMesh(bone, geometry, material, bone);
-  gill.position.y = 0.08;
-  gill.rotation.z = side === "left" ? -0.66 : 0.66;
-  gill.scale.z = 0.72;
+  gill.position.y = 0.12;
+  gill.rotation.z = side === "left" ? -0.78 - index * 0.12 : 0.78 + index * 0.12;
+  gill.scale.z = 0.62;
+
+  // Bolinhas na ponta (frisado), como nas guelras externas de um axolote de verdade.
+  const tip = addMesh(bone, new THREE.SphereGeometry(0.05, 8, 6), material, bone);
+  tip.position.set(0, 0.12 + (0.24 + index * 0.03) * 0.92 * (side === "left" ? -Math.sin(0.78 + index * 0.12) : Math.sin(0.78 + index * 0.12)), 0);
   return bone;
 }
 
@@ -147,9 +152,32 @@ function addLimb(parent, material, side, index) {
 }
 
 function addEye(parent, x) {
-  const eye = addMesh(parent, new THREE.SphereGeometry(0.09, 16, 12), makeMaterial(0x101217, 0.25), parent);
-  eye.position.set(x, 0.18, 0.44);
+  const eye = addMesh(parent, new THREE.SphereGeometry(0.1, 16, 12), makeMaterial(0x0d0f14, 0.15), parent);
+  eye.position.set(x, 0.2, 0.46);
+
+  // Brilho pequeno no olho — sem isso o axolote parece "morto"/sem vida.
+  const highlight = addMesh(
+    parent,
+    new THREE.SphereGeometry(0.03, 8, 6),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.1, emissive: 0x333333 }),
+    parent
+  );
+  highlight.position.set(x + (x < 0 ? 0.03 : -0.03), 0.23, 0.51);
   return eye;
+}
+
+function addCheekBlush(parent, x, belly) {
+  // Bochecha rosada logo abaixo do olho — traço bem caracteristico do axolote fofo.
+  const blushMaterial = new THREE.MeshStandardMaterial({
+    color: belly.color.getHex(),
+    roughness: 0.8,
+    transparent: true,
+    opacity: 0.55,
+  });
+  const blush = addMesh(parent, new THREE.SphereGeometry(0.1, 12, 8), blushMaterial, parent);
+  blush.position.set(x * 1.15, 0.03, 0.42);
+  blush.scale.set(1.15, 0.7, 0.55);
+  return blush;
 }
 
 function createRiggedAxolotl() {
@@ -212,20 +240,25 @@ function createRiggedAxolotl() {
   bellyMesh.position.set(0, -0.02, 0.22);
   bellyMesh.scale.set(0.9, 0.58, 0.82);
 
-  const headMesh = addMesh(head, new THREE.SphereGeometry(0.41, 20, 16), skin, head);
-  headMesh.position.z = 0.16;
-  headMesh.scale.set(1.05, 0.94, 1.0);
+  // Cabeca larga e achatada: a marca registrada do axolote (bem diferente
+  // da cabeca quase redonda de antes).
+  const headMesh = addMesh(head, new THREE.SphereGeometry(0.44, 24, 18), skin, head);
+  headMesh.position.z = 0.14;
+  headMesh.scale.set(1.32, 0.72, 1.05);
 
-  const snout = addMesh(head, new THREE.SphereGeometry(0.25, 16, 12), belly, head);
-  snout.position.set(0, -0.02, 0.5);
-  snout.scale.set(1.12, 0.74, 0.75);
+  const snout = addMesh(head, new THREE.SphereGeometry(0.27, 16, 12), belly, head);
+  snout.position.set(0, -0.05, 0.52);
+  snout.scale.set(1.18, 0.6, 0.68);
 
-  const mouth = addMesh(head, new THREE.TorusGeometry(0.1, 0.018, 8, 16, Math.PI), mouthMat, head);
-  mouth.position.set(0, -0.06, 0.72);
-  mouth.rotation.x = Math.PI / 2;
+  // Sorriso mais largo e curvado pra cima (o "smile" caracteristico do axolote).
+  const mouth = addMesh(head, new THREE.TorusGeometry(0.15, 0.02, 8, 20, Math.PI * 0.92), mouthMat, head);
+  mouth.position.set(0, -0.09, 0.7);
+  mouth.rotation.set(Math.PI / 2, 0, Math.PI * 0.04);
 
-  addEye(head, -0.2);
-  addEye(head, 0.2);
+  addEye(head, -0.24);
+  addEye(head, 0.24);
+  addCheekBlush(head, -0.24, belly);
+  addCheekBlush(head, 0.24, belly);
 
   const leftGill = [];
   const rightGill = [];
@@ -306,10 +339,13 @@ function createAnimationClips(bones) {
     quatTrack("PACUS_RIG_ROOT/spine/right_arm_2.quaternion", values(q(0, 0, 0.28), q(0, 0, -0.28), q(0, 0, 0.28)), [0, 0.55, 1.1]),
   ]);
 
-  clips.swim = new THREE.AnimationClip("swim", 1.8, [
-    quatTrack("PACUS_RIG_ROOT/tail.quaternion", values(q(0, 0.16, 0), q(0, -0.16, 0), q(0, 0.16, 0)), [0, 0.9, 1.8]),
-    quatTrack("PACUS_RIG_ROOT/tail/tail_02.quaternion", values(q(0, -0.22, 0), q(0, 0.22, 0), q(0, -0.22, 0)), [0, 0.9, 1.8]),
-    quatTrack("PACUS_RIG_ROOT/tail/tail_02/tail_03.quaternion", values(q(0, 0.28, 0), q(0, -0.28, 0), q(0, 0.28, 0)), [0, 0.9, 1.8]),
+  // Nado mais vigoroso: amplitude maior + um pouco mais rapido, pra ficar
+  // claramente animado em vez de so balancar de leve.
+  clips.swim = new THREE.AnimationClip("swim", 1.4, [
+    quatTrack("PACUS_RIG_ROOT/tail.quaternion", values(q(0, 0.32, 0), q(0, -0.32, 0), q(0, 0.32, 0)), [0, 0.7, 1.4]),
+    quatTrack("PACUS_RIG_ROOT/tail/tail_02.quaternion", values(q(0, -0.4, 0), q(0, 0.4, 0), q(0, -0.4, 0)), [0, 0.7, 1.4]),
+    quatTrack("PACUS_RIG_ROOT/tail/tail_02/tail_03.quaternion", values(q(0, 0.5, 0), q(0, -0.5, 0), q(0, 0.5, 0)), [0, 0.7, 1.4]),
+    quatTrack("PACUS_RIG_ROOT/spine.quaternion", values(q(0, 0.06, 0), q(0, -0.06, 0), q(0, 0.06, 0)), [0, 0.7, 1.4]),
   ]);
 
   clips.happy = new THREE.AnimationClip("happy", 0.95, [
@@ -443,6 +479,18 @@ export function configureSoftLighting(scene) {
   key.castShadow = true;
   key.shadow.mapSize.set(512, 512);
   scene.add(key);
+
+  // Luz de preenchimento suave do lado oposto: sem ela o lado escuro do
+  // corpo (guelras/bochechas/braços) fica achatado e sem volume.
+  const fill = new THREE.DirectionalLight(0xbfe9ff, 0.65);
+  fill.position.set(-2.0, 0.6, 1.4);
+  scene.add(fill);
+
+  // Leve luz de contorno por tras, pra separar o personagem do fundo do
+  // tanque (dá aquele "brilho" de silhueta que ajuda a leitura da forma).
+  const rim = new THREE.DirectionalLight(0xfff2da, 0.5);
+  rim.position.set(0, 1.2, -2.4);
+  scene.add(rim);
 }
 
 // Habitat fixo (não varia por estágio — ver HABITAT_DIMENSIONS_CM em

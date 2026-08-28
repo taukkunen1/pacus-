@@ -44,9 +44,9 @@ export function mountPacus3D(host, pacus = {}) {
   if (!host) return null;
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 100);
-  camera.position.set(0, 0.12, 5.2);
-  camera.lookAt(0, -0.08, 0);
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
+  camera.position.set(0, 0.22, 3.4);
+  camera.lookAt(0, -0.02, 0);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));

@@ -14,11 +14,15 @@ export function updateMovement(character, delta, elapsed) {
   if (!state) return;
 
   state.phase += delta * state.speed;
-  const sway = state.roam ? Math.sin(state.phase) * 0.82 : 0;
+  // Camera mais proxima agora (ver renderer.js) — amplitude horizontal um
+  // pouco menor pra nao sair do enquadramento, mas com mais vida no
+  // giro/flutuacao vertical, que e o que mais "le" como nado animado.
+  const sway = state.roam ? Math.sin(state.phase) * 0.5 : 0;
   character.position.x = sway;
-  character.position.z = Math.cos(state.phase * 0.55) * 0.18;
-  character.position.y += Math.sin(elapsed * 2.0) * 0.0009;
-  character.rotation.y = Math.sin(state.phase * 0.55) * 0.28;
+  character.position.z = Math.cos(state.phase * 0.55) * 0.14;
+  character.position.y += Math.sin(elapsed * 1.6) * 0.006;
+  character.rotation.y = Math.sin(state.phase * 0.5) * 0.42;
+  character.rotation.z = Math.sin(state.phase * 0.7 + 1) * 0.05;
 }
 
 export function stopMovement(character) {

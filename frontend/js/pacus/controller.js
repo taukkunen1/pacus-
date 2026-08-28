@@ -85,7 +85,9 @@ export function createPacusController(THREE, gltf, transformTarget) {
   let preset = MOTION_PRESETS.IDLE;
   let presetTransitionUntil = 0;
   let currentGrowth = 1;
-  const baseScale = new THREE.Vector3(1, 1, 1);
+  let targetScale = 1;
+  let animatedScale = 1; // valor atual, caminha suavemente ate targetScale
+  const GROWTH_SPEED = 0.6; // fracao da distancia percorrida por segundo (ver update())
 
   // point: THREE.Vector3 mundo, ou null. Aproximado: gira o corpo todo
   // suavemente na direcao do alvo (nao tem cabeca separada pra girar so ela).
@@ -122,10 +124,15 @@ export function createPacusController(THREE, gltf, transformTarget) {
     hasLookTarget = true;
   }
 
-  function grow(value) {
+  // Anima suavemente do tamanho atual ate o novo estagio (jovem -> adulto
+  // etc), em vez de saltar direto — enquanto nao temos um rig de verdade,
+  // essa transicao de escala E a "animacao de crescimento" do PACUS.
+  // immediate:true pula a transicao (usado so no primeiro mount, pra nao
+  // nascer do tamanho errado).
+  function grow(value, { immediate = false } = {}) {
     currentGrowth = Math.min(1, Math.max(0, value));
-    const scale = 0.35 + currentGrowth * 0.65;
-    baseScale.setScalar(scale);
+    targetScale = 0.35 + currentGrowth * 0.65;
+    if (immediate) animatedScale = targetScale;
   }
 
   function react(kind, point) {
@@ -149,8 +156,13 @@ export function createPacusController(THREE, gltf, transformTarget) {
     if (preset.tilt) root.rotation.x = preset.tilt * Math.sin(elapsed * 2);
     if (preset.tiltDown) root.rotation.x += preset.tiltDown;
 
+    // Aproxima animatedScale de targetScale a uma taxa proporcional a
+    // distancia restante (ease-out) — leva ~1.5-2s pra crescer/encolher de
+    // um estagio pro outro, sem depender de framerate.
+    animatedScale += (targetScale - animatedScale) * Math.min(1, delta * GROWTH_SPEED * 5);
+
     const pop = preset.popScale ? 1 + (preset.popScale - 1) * Math.max(0, 1 - elapsed % 1) : 1;
-    root.scale.set(baseScale.x * pop, baseScale.y * pop, baseScale.z * pop);
+    root.scale.setScalar(animatedScale * pop);
   }
 
   return {

@@ -4,6 +4,15 @@
 // isso é compensado com animacao procedural). Devolve {dispose()} no
 // mesmo formato que o habitat 2D usava, pra encaixar direto em
 // home.js/pacus.js sem mudar a chamada.
+//
+// IMPORTANTE: a cena/renderer/glb sao um SINGLETON em memoria (modulo).
+// home.js/pacus.js chamam mountTank3D a cada draw() (toda vez que o
+// usuario marca uma tarefa, troca de aba, etc), o que recria o <div
+// data-pacus-3d-host> do zero no DOM. Sem esse singleton, cada draw()
+// recarregaria o .glb inteiro da rede de novo (lento, pisca) e qualquer
+// animacao de transicao (crescimento jovem->adulto) nunca teria tempo de
+// aparecer. Com o singleton, so o <canvas> muda de "pai" (reparent) entre
+// hosts — o WebGLRenderer, a cena e o controller continuam vivos.
 
 import { createPacusController } from "./controller.js";
 import { createBehavior } from "./behavior.js";
@@ -33,6 +42,9 @@ function normalizeStage(stage) {
 // growth 0..1 por estagio (secao 3 da espec) — usado por controller.grow()
 // ate termos um modelo por fase; por enquanto so o adulto foi gerado, entao
 // os estagios anteriores aparecem menores (grow) mas com a mesma malha.
+// A transicao entre estagios agora e animada (ver controller.js grow()) —
+// e essa animacao de escala QUE FAZ as vezes de "animacao de crescimento"
+// enquanto nao existe um modelo/rig por fase.
 const STAGE_GROWTH = { egg: 0.1, cracking: 0.2, hatching: 0.35, baby: 0.55, young: 0.75, adult: 1 };
 
 // Mesmo "shell" visual do habitat 2D (tanque, ondas, bolhas, pill de
@@ -63,150 +75,169 @@ async function loadThree() {
   return { THREE, GLTFLoader };
 }
 
-export async function mountPacus3D(host, { onReady, stage } = {}) {
-  const currentStage = normalizeStage(stage);
-  const { THREE, GLTFLoader } = await loadThree();
+// --- singleton da cena (ver comentario no topo do arquivo) ---
+let singleton = null; // { THREE, scene, camera, renderer, orbitGroup, pivot, controller, behavior, clock, raf, currentHost, ...handlers }
+let singletonLoading = null; // Promise em andamento, pra nao iniciar duas cargas do glb em paralelo
 
-  const width = host.clientWidth || 320;
-  const height = host.clientHeight || 320;
+function detachFromCurrentHost() {
+  if (!singleton?.currentHost) return;
+  const s = singleton;
+  s.currentHost.removeEventListener("pointerdown", s.onPointerDown);
+  s.currentHost.removeEventListener("pointermove", s.onPointerMove);
+  s.currentHost.removeEventListener("pointerup", s.endDrag);
+  s.currentHost.removeEventListener("pointercancel", s.endDrag);
+  window.removeEventListener("resize", s.onResize);
+  s.renderer.domElement.remove();
+  s.currentHost = null;
+}
 
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(30, width / height, 0.05, 100);
-  camera.position.set(0, 0.75, 2.6);
-  camera.lookAt(0, 0.55, 0);
-
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setSize(width, height);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  host.appendChild(renderer.domElement);
-
-  const hemi = new THREE.HemisphereLight(0xeafaf6, 0x0a2b29, 1.0);
-  const key = new THREE.DirectionalLight(0xffffff, 1.3);
-  key.position.set(2, 3, 4);
-  const fill = new THREE.DirectionalLight(0xbfe9e3, 0.5);
-  fill.position.set(-3, 1.5, -2);
-  scene.add(hemi, key, fill);
-
-  // orbitGroup: rotacao livre controlada por arrastar (mouse/touch) — o
-  // pivot continua recebendo bob/sway/tilt do controller por dentro, sem
-  // conflitar com o giro manual do usuario.
-  const orbitGroup = new THREE.Group();
-  scene.add(orbitGroup);
-
-  const pivot = new THREE.Group();
-  orbitGroup.add(pivot);
-
-  let controller = null;
-  let behavior = null;
-  let disposed = false;
-
-  const loader = new GLTFLoader();
-  loader.load(
-    GLB_URL,
-    (gltf) => {
-      if (disposed) return;
-      // O mesh do Rodin vem "deitado": Y de 0 a ~1.23 (altura), cauda se
-      // estendendo em -Z. Centraliza no pivot pra bob/sway girarem em
-      // torno do centro do corpo, nao da origem do mesh.
-      const box = new THREE.Box3().setFromObject(gltf.scene);
-      const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3());
-      const normScale = 1.6 / Math.max(size.x, size.y, size.z);
-      gltf.scene.position.set(-center.x, -box.min.y, -center.z);
-      gltf.scene.scale.setScalar(normScale);
-
-      pivot.add(gltf.scene);
-      pivot.position.y = 0.05;
-
-      controller = createPacusController(THREE, gltf, pivot);
-      controller.grow(STAGE_GROWTH[currentStage] ?? 1);
-      behavior = createBehavior(controller);
-      behavior.start();
-      onReady?.(controller);
-    },
-    undefined,
-    (err) => {
-      console.error("[pacus3d] falha ao carregar pacus.glb", err);
-    }
-  );
-
-  // Arrastar gira o PACUS livremente (rotacao 360 - secao 16 da espec,
-  // "rotacao 360"). Um toque/clique curto, sem arrastar, continua contando
-  // como interacao (behavior.onTouch / controller.react).
-  const DRAG_THRESHOLD_PX = 6;
-  const DRAG_SENSITIVITY = 0.012; // radianos por pixel arrastado
-  let pointerId = null;
-  let dragStartX = 0;
-  let dragStartRotY = 0;
-  let didDrag = false;
-
-  function onPointerDown(event) {
-    pointerId = event.pointerId;
-    dragStartX = event.clientX;
-    dragStartRotY = orbitGroup.rotation.y;
-    didDrag = false;
-    host.setPointerCapture?.(pointerId);
-    host.style.cursor = "grabbing";
-  }
-
-  function onPointerMove(event) {
-    if (pointerId === null || event.pointerId !== pointerId) return;
-    const dx = event.clientX - dragStartX;
-    if (!didDrag && Math.abs(dx) > DRAG_THRESHOLD_PX) didDrag = true;
-    if (didDrag) orbitGroup.rotation.y = dragStartRotY + dx * DRAG_SENSITIVITY;
-  }
-
-  function endDrag(event) {
-    if (pointerId === null || event.pointerId !== pointerId) return;
-    host.releasePointerCapture?.(pointerId);
-    host.style.cursor = "grab";
-    if (!didDrag) {
-      behavior?.onTouch();
-      controller?.react("touch");
-    }
-    pointerId = null;
-  }
-
+function attachToHost(host) {
+  const s = singleton;
+  detachFromCurrentHost();
+  s.currentHost = host;
+  host.appendChild(s.renderer.domElement);
   host.style.cursor = "grab";
-  host.addEventListener("pointerdown", onPointerDown);
-  host.addEventListener("pointermove", onPointerMove);
-  host.addEventListener("pointerup", endDrag);
-  host.addEventListener("pointercancel", endDrag);
+  host.addEventListener("pointerdown", s.onPointerDown);
+  host.addEventListener("pointermove", s.onPointerMove);
+  host.addEventListener("pointerup", s.endDrag);
+  host.addEventListener("pointercancel", s.endDrag);
+  window.addEventListener("resize", s.onResize);
+  s.onResize(); // ajusta pro tamanho do novo host imediatamente
+}
 
-  let raf = null;
-  const clock = new THREE.Clock();
-  function tick() {
-    raf = requestAnimationFrame(tick);
-    const delta = Math.min(clock.getDelta(), 0.1);
-    controller?.update(delta);
-    renderer.render(scene, camera);
-  }
-  tick();
+async function ensureSingleton(initialStage) {
+  if (singleton) return singleton;
+  if (singletonLoading) return singletonLoading;
 
-  function onResize() {
-    const w = host.clientWidth || width;
-    const h = host.clientHeight || height;
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-    renderer.setSize(w, h);
-  }
-  window.addEventListener("resize", onResize);
+  singletonLoading = (async () => {
+    const { THREE, GLTFLoader } = await loadThree();
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 100);
+    camera.position.set(0, 0.75, 2.6);
+    camera.lookAt(0, 0.55, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const hemi = new THREE.HemisphereLight(0xeafaf6, 0x0a2b29, 1.0);
+    const key = new THREE.DirectionalLight(0xffffff, 1.3);
+    key.position.set(2, 3, 4);
+    const fill = new THREE.DirectionalLight(0xbfe9e3, 0.5);
+    fill.position.set(-3, 1.5, -2);
+    scene.add(hemi, key, fill);
+
+    const orbitGroup = new THREE.Group();
+    scene.add(orbitGroup);
+    const pivot = new THREE.Group();
+    orbitGroup.add(pivot);
+
+    const s = {
+      THREE, scene, camera, renderer, orbitGroup, pivot,
+      controller: null, behavior: null, currentHost: null,
+      clock: new THREE.Clock(), raf: null,
+    };
+    singleton = s;
+
+    // --- interacao: arrastar gira (rotacao 360), toque curto = reacao ---
+    const DRAG_THRESHOLD_PX = 6;
+    const DRAG_SENSITIVITY = 0.012;
+    let pointerId = null;
+    let dragStartX = 0;
+    let dragStartRotY = 0;
+    let didDrag = false;
+
+    s.onPointerDown = (event) => {
+      pointerId = event.pointerId;
+      dragStartX = event.clientX;
+      dragStartRotY = orbitGroup.rotation.y;
+      didDrag = false;
+      s.currentHost?.setPointerCapture?.(pointerId);
+      if (s.currentHost) s.currentHost.style.cursor = "grabbing";
+    };
+    s.onPointerMove = (event) => {
+      if (pointerId === null || event.pointerId !== pointerId) return;
+      const dx = event.clientX - dragStartX;
+      if (!didDrag && Math.abs(dx) > DRAG_THRESHOLD_PX) didDrag = true;
+      if (didDrag) orbitGroup.rotation.y = dragStartRotY + dx * DRAG_SENSITIVITY;
+    };
+    s.endDrag = (event) => {
+      if (pointerId === null || event.pointerId !== pointerId) return;
+      s.currentHost?.releasePointerCapture?.(pointerId);
+      if (s.currentHost) s.currentHost.style.cursor = "grab";
+      if (!didDrag) {
+        s.behavior?.onTouch();
+        s.controller?.react("touch");
+      }
+      pointerId = null;
+    };
+    s.onResize = () => {
+      if (!s.currentHost) return;
+      const w = s.currentHost.clientWidth || 320;
+      const h = s.currentHost.clientHeight || 320;
+      s.camera.aspect = w / h;
+      s.camera.updateProjectionMatrix();
+      s.renderer.setSize(w, h);
+    };
+
+    function tick() {
+      s.raf = requestAnimationFrame(tick);
+      const delta = Math.min(s.clock.getDelta(), 0.1);
+      s.controller?.update(delta);
+      if (s.currentHost) s.renderer.render(scene, camera);
+    }
+    tick();
+
+    const loader = new GLTFLoader();
+    await new Promise((resolve) => {
+      loader.load(
+        GLB_URL,
+        (gltf) => {
+          const box = new THREE.Box3().setFromObject(gltf.scene);
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+          const normScale = 1.6 / Math.max(size.x, size.y, size.z);
+          gltf.scene.position.set(-center.x, -box.min.y, -center.z);
+          gltf.scene.scale.setScalar(normScale);
+
+          pivot.add(gltf.scene);
+          pivot.position.y = 0.05;
+
+          s.controller = createPacusController(THREE, gltf, pivot);
+          s.controller.grow(STAGE_GROWTH[initialStage] ?? 1, { immediate: true });
+          s.behavior = createBehavior(s.controller);
+          s.behavior.start();
+          resolve();
+        },
+        undefined,
+        (err) => {
+          console.error("[pacus3d] falha ao carregar pacus.glb", err);
+          resolve(); // nao trava o app — so fica sem o modelo
+        }
+      );
+    });
+
+    return s;
+  })();
+
+  return singletonLoading;
+}
+
+export async function mountPacus3D(host, { onReady, stage } = {}) {
+  const targetStage = normalizeStage(stage);
+  const s = await ensureSingleton(targetStage);
+  attachToHost(host);
+  s.controller?.grow(STAGE_GROWTH[targetStage] ?? 1); // anima ate o estagio atual, se ja tinha carregado com outro
+  onReady?.(s.controller);
 
   return {
     dispose() {
-      disposed = true;
-      if (raf) cancelAnimationFrame(raf);
-      window.removeEventListener("resize", onResize);
-      host.removeEventListener("pointerdown", onPointerDown);
-      host.removeEventListener("pointermove", onPointerMove);
-      host.removeEventListener("pointerup", endDrag);
-      host.removeEventListener("pointercancel", endDrag);
-      behavior?.dispose();
-      renderer.dispose();
-      renderer.domElement.remove();
+      // Nao destroi o WebGL/glb (singleton) — so tira o canvas desse host.
+      // A proxima chamada a mountPacus3D reaproveita tudo.
+      if (singleton?.currentHost === host) detachFromCurrentHost();
     },
-    get controller() { return controller; },
+    get controller() { return singleton?.controller ?? null; },
   };
 }
 
@@ -221,8 +252,6 @@ export function mountTank3D(root, pacus = {}) {
 
   return {
     dispose() {
-      // Se o dispose acontecer antes do load/mount terminar (troca rapida
-      // de tela), ainda assim desmonta assim que o runtime ficar pronto.
       runtimePromise.then((runtime) => runtime.dispose());
     },
   };

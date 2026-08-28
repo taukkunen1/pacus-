@@ -1,16 +1,15 @@
 // Maquina de estados do comportamento automatico do PACUS (secoes 9 e 10 da
-// espec): IDLE (respiracao, cauda, branquias, piscar aleatorio, olhar pros
-// lados), INTERACTION (reage a toque/clique) e NEEDS (fica cansado e dorme
-// depois de tempo parado). Escrita sem depender de nada alem do
-// PacusController (play/expression/lookAt) pra ficar facil de testar e de
-// religar quando o glb final trocar.
+// espec): IDLE (respiracao/bob/sway/cauda contínuos), INTERACTION (reage a
+// toque/clique) e sono depois de tempo parado. Escrita sem depender de
+// nada alem do PacusController (play/lookAt/react) — funciona tanto com a
+// versao procedural atual (sem rig) quanto com uma versao futura baseada
+// em clipes de verdade, contanto que os presets IDLE/SWIM/CURIOUS/HAPPY/
+// SURPRISED/SLEEP/WAKE_UP existam (ver controller.js).
 
 const IDLE_GLANCE_MIN_MS = 4000;
 const IDLE_GLANCE_MAX_MS = 9000;
-const BLINK_MIN_MS = 2500;
-const BLINK_MAX_MS = 6000;
-const SLEEP_AFTER_MS = 45000; // tempo parado ate cochilar
-const INTERACTION_HOLD_MS = 1600; // quanto tempo fica na expressao de reacao antes de voltar pro IDLE
+const SLEEP_AFTER_MS = 45000;
+const INTERACTION_HOLD_MS = 1400;
 
 function randomBetween(min, max) {
   return min + Math.random() * (max - min);
@@ -35,16 +34,9 @@ export function createBehavior(controller) {
     timers.clear();
   }
 
-  function scheduleBlink() {
-    schedule(() => {
-      if (state !== "SLEEP") controller.play("BLINK", { loop: false });
-      scheduleBlink();
-    }, randomBetween(BLINK_MIN_MS, BLINK_MAX_MS));
-  }
-
   function scheduleGlance() {
     schedule(() => {
-      if (state === "IDLE") controller.play("LOOK_AROUND", { loop: false, returnTo: "IDLE" });
+      if (state === "IDLE") controller.play("CURIOUS", { returnTo: "IDLE", holdMs: 1200 });
       scheduleGlance();
     }, randomBetween(IDLE_GLANCE_MIN_MS, IDLE_GLANCE_MAX_MS));
   }
@@ -62,7 +54,6 @@ export function createBehavior(controller) {
   function enterIdle() {
     state = "IDLE";
     controller.play("IDLE");
-    controller.expression("neutral");
   }
 
   function enterSleep() {
@@ -70,21 +61,12 @@ export function createBehavior(controller) {
     controller.play("SLEEP");
   }
 
-  // Seção 9: usuário abre o PACUS enquanto ele "estava dormindo" — acorda,
-  // olha pro usuário e sorri. Chame isso uma vez ao montar a cena.
   function wakeUpGreeting() {
     state = "INTERACTION";
-    controller.play("WAKE_UP", {
-      loop: false,
-      onFinish: () => {
-        controller.expression("happy");
-        schedule(() => enterIdle(), INTERACTION_HOLD_MS);
-      },
-    });
+    controller.play("WAKE_UP");
+    schedule(() => enterIdle(), INTERACTION_HOLD_MS);
   }
 
-  // Seção 9: toque/clique — olha pro ponto tocado, expressão curiosa,
-  // reação, volta pro IDLE.
   function onTouch(point) {
     lastInteractionAt = Date.now();
     if (state === "SLEEP") {
@@ -93,12 +75,8 @@ export function createBehavior(controller) {
     }
     state = "INTERACTION";
     if (point) controller.lookAt(point);
-    controller.expression("curious");
-    controller.play("CURIOUS", { loop: false });
-    schedule(() => {
-      controller.expression("happy");
-      schedule(() => enterIdle(), INTERACTION_HOLD_MS);
-    }, 500);
+    controller.play("HAPPY", { returnTo: "IDLE", holdMs: INTERACTION_HOLD_MS });
+    schedule(() => enterIdle(), INTERACTION_HOLD_MS + 100);
   }
 
   function markActivity() {
@@ -108,7 +86,6 @@ export function createBehavior(controller) {
 
   function start() {
     enterIdle();
-    scheduleBlink();
     scheduleGlance();
     checkSleep();
   }

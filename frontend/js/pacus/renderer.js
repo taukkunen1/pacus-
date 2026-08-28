@@ -1,19 +1,59 @@
-// Monta a cena Three.js do PACUS 3D dentro de um elemento host. Carrega
-// frontend/assets/pacus/pacus.glb (troque pelo arquivo novo assim que ele
-// chegar — mesmo caminho, mesmo nome, zero mudanca de codigo necessaria) e
-// devolve um runtime com {dispose()} pra ficar compativel com o que
-// home.js/pacus.js ja chamam hoje (pacusRuntime?.dispose()).
-//
-// IMPORTANTE: este modulo ainda nao esta ligado nas telas (home.js/
-// pacus.js continuam usando o habitat 2D via mountTank3D em habitat.js).
-// Ele fica pronto pra ligar assim que o pacus.glb novo, gerado a partir da
-// PACUS_3D_Especificacao_Completa.docx, chegar e for validado (malha,
-// skin weights, nomes de osso/clipe/morph). Ver frontend/js/pacus/README.md.
+// Monta a cena Three.js do PACUS 3D dentro de um elemento host, usando o
+// pacus.glb atual (Rodin: geometria + material PBR de alta qualidade, sem
+// rig/skin/animacoes — ver README.md e controller.js pra o porque e como
+// isso é compensado com animacao procedural). Devolve {dispose()} no
+// mesmo formato que o habitat 2D usava, pra encaixar direto em
+// home.js/pacus.js sem mudar a chamada.
 
 import { createPacusController } from "./controller.js";
 import { createBehavior } from "./behavior.js";
 
 const GLB_URL = new URL("../../assets/pacus/pacus.glb", import.meta.url).href;
+
+const STAGE_LABEL = {
+  egg: "Ovo",
+  cracking: "Rachando",
+  hatching: "Nascendo",
+  baby: "Filhote",
+  young: "Jovem",
+  adult: "Adulto",
+};
+
+function normalizeStage(stage) {
+  const value = String(stage ?? "adult").trim().toLowerCase();
+  if (value.includes("egg") || value.includes("ovo")) return "egg";
+  if (value.includes("crack") || value.includes("rach")) return "cracking";
+  if (value.includes("hatch") || value.includes("eclos") || value.includes("nasc")) return "hatching";
+  if (value.includes("baby") || value.includes("filh")) return "baby";
+  if (value.includes("young") || value.includes("jov")) return "young";
+  if (value.includes("adult")) return "adult";
+  return STAGE_LABEL[value] ? value : "adult";
+}
+
+// growth 0..1 por estagio (secao 3 da espec) — usado por controller.grow()
+// ate termos um modelo por fase; por enquanto so o adulto foi gerado, entao
+// os estagios anteriores aparecem menores (grow) mas com a mesma malha.
+const STAGE_GROWTH = { egg: 0.1, cracking: 0.2, hatching: 0.35, baby: 0.55, young: 0.75, adult: 1 };
+
+// Mesmo "shell" visual do habitat 2D (tanque, ondas, bolhas, pill de
+// estagio) — so troca o sprite <img> por um host onde o Three.js desenha.
+export function renderTank(pacus = {}) {
+  const stage = normalizeStage(pacus?.stage);
+  const label = STAGE_LABEL[stage];
+  return `
+    <section class="pacus-tank pacus-tank--3d pacus-tank--${stage}" data-pacus-stage="${stage}" aria-label="Habitat do PACUS">
+      <div class="pacus-waterline" aria-hidden="true"></div>
+      <div class="pacus-bubbles" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <div class="pacus-3d-host" data-pacus-3d-host></div>
+      <div class="pacus-overlay">
+        <span class="pacus-stage-pill">${label}</span>
+        <span class="pacus-interaction-hint">Toque no PACUS</span>
+      </div>
+    </section>
+  `;
+}
 
 async function loadThree() {
   const [THREE, { GLTFLoader }] = await Promise.all([
@@ -23,16 +63,17 @@ async function loadThree() {
   return { THREE, GLTFLoader };
 }
 
-export async function mountPacus3D(host, { onReady } = {}) {
+export async function mountPacus3D(host, { onReady, stage } = {}) {
+  const currentStage = normalizeStage(stage);
   const { THREE, GLTFLoader } = await loadThree();
 
   const width = host.clientWidth || 320;
   const height = host.clientHeight || 320;
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(28, width / height, 0.1, 100);
-  camera.position.set(0, 0.12, 5.2);
-  camera.lookAt(0, -0.08, 0);
+  const camera = new THREE.PerspectiveCamera(30, width / height, 0.05, 100);
+  camera.position.set(0, 0.75, 2.6);
+  camera.lookAt(0, 0.55, 0);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setSize(width, height);
@@ -40,12 +81,15 @@ export async function mountPacus3D(host, { onReady } = {}) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   host.appendChild(renderer.domElement);
 
-  const hemi = new THREE.HemisphereLight(0xeafaf6, 0x0a2b29, 0.9);
-  const key = new THREE.DirectionalLight(0xffffff, 1.1);
+  const hemi = new THREE.HemisphereLight(0xeafaf6, 0x0a2b29, 1.0);
+  const key = new THREE.DirectionalLight(0xffffff, 1.3);
   key.position.set(2, 3, 4);
-  const fill = new THREE.DirectionalLight(0xbfe9e3, 0.4);
-  fill.position.set(-3, 1, -2);
+  const fill = new THREE.DirectionalLight(0xbfe9e3, 0.5);
+  fill.position.set(-3, 1.5, -2);
   scene.add(hemi, key, fill);
+
+  const pivot = new THREE.Group();
+  scene.add(pivot);
 
   let controller = null;
   let behavior = null;
@@ -56,9 +100,21 @@ export async function mountPacus3D(host, { onReady } = {}) {
     GLB_URL,
     (gltf) => {
       if (disposed) return;
-      scene.add(gltf.scene);
-      controller = createPacusController(THREE, gltf);
-      controller.grow(1);
+      // O mesh do Rodin vem "deitado": Y de 0 a ~1.23 (altura), cauda se
+      // estendendo em -Z. Centraliza no pivot pra bob/sway girarem em
+      // torno do centro do corpo, nao da origem do mesh.
+      const box = new THREE.Box3().setFromObject(gltf.scene);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const normScale = 1.6 / Math.max(size.x, size.y, size.z);
+      gltf.scene.position.set(-center.x, -box.min.y, -center.z);
+      gltf.scene.scale.setScalar(normScale);
+
+      pivot.add(gltf.scene);
+      pivot.position.y = 0.05;
+
+      controller = createPacusController(THREE, gltf, pivot);
+      controller.grow(STAGE_GROWTH[currentStage] ?? 1);
       behavior = createBehavior(controller);
       behavior.start();
       onReady?.(controller);
@@ -69,10 +125,9 @@ export async function mountPacus3D(host, { onReady } = {}) {
     }
   );
 
-  function onPointerDown(event) {
+  function onPointerDown() {
     behavior?.onTouch();
     controller?.react("touch");
-    void event;
   }
   host.addEventListener("pointerdown", onPointerDown);
 
@@ -80,7 +135,7 @@ export async function mountPacus3D(host, { onReady } = {}) {
   const clock = new THREE.Clock();
   function tick() {
     raf = requestAnimationFrame(tick);
-    const delta = clock.getDelta();
+    const delta = Math.min(clock.getDelta(), 0.1);
     controller?.update(delta);
     renderer.render(scene, camera);
   }
@@ -106,5 +161,23 @@ export async function mountPacus3D(host, { onReady } = {}) {
       renderer.domElement.remove();
     },
     get controller() { return controller; },
+  };
+}
+
+// Drop-in pro mesmo formato que home.js/pacus.js ja chamam:
+// mountTank3D(root, pacus) -> { dispose() }. Acha o host 3D dentro do
+// markup gerado por renderTank() e monta a cena nele.
+export function mountTank3D(root, pacus = {}) {
+  const host = root?.querySelector?.("[data-pacus-3d-host]");
+  if (!host) return { dispose() {} };
+
+  const runtimePromise = mountPacus3D(host, { stage: pacus?.stage });
+
+  return {
+    dispose() {
+      // Se o dispose acontecer antes do load/mount terminar (troca rapida
+      // de tela), ainda assim desmonta assim que o runtime ficar pronto.
+      runtimePromise.then((runtime) => runtime.dispose());
+    },
   };
 }

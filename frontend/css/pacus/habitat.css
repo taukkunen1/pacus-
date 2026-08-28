@@ -179,3 +179,24 @@
     animation: none;
   }
 }
+
+/* Host do PACUS 3D (Three.js) dentro do mesmo "tanque" visual do habitat 2D
+   (.pacus-tank, .pacus-waterline, .pacus-bubbles, .pacus-overlay ja
+   existem acima). So o miolo (sprite <img>) muda pra um canvas. */
+
+.pacus-3d-host {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  touch-action: manipulation;
+}
+
+.pacus-3d-host canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.pacus-tank--3d {
+  cursor: pointer;
+}

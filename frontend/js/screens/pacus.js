@@ -1,5 +1,5 @@
 import { apiClient } from "../api/api-client.js";
-import { renderTank, mountTank3D } from "../pacus/habitat.js";
+import { renderTank, mountTank3D } from "../pacus/renderer.js";
 import {
   getTasks,
   createTask,

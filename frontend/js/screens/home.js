@@ -14,7 +14,7 @@ import {
   reorderDailyTasks
 } from "../api/tasks-api.js";
 
-import { renderTank, mountTank3D } from "../pacus/habitat.js";
+import { renderTank, mountTank3D } from "../pacus/renderer.js";
 import { renderTaskSection } from "../components/task-list.js";
 import { formatOperationalDate } from "../utils/date.js";
 import {

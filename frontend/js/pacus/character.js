@@ -240,25 +240,24 @@ function createRiggedAxolotl() {
   bellyMesh.position.set(0, -0.02, 0.22);
   bellyMesh.scale.set(0.9, 0.58, 0.82);
 
-  // Cabeca larga e achatada: a marca registrada do axolote (bem diferente
-  // da cabeca quase redonda de antes).
-  const headMesh = addMesh(head, new THREE.SphereGeometry(0.44, 24, 18), skin, head);
-  headMesh.position.z = 0.14;
-  headMesh.scale.set(1.32, 0.72, 1.05);
+  // Cabeca oval (proporcao mais proxima do axolote de referencia — nao tao
+  // achatada/larga quanto a primeira tentativa, que ficou com cara de porco).
+  const headMesh = addMesh(head, new THREE.SphereGeometry(0.41, 24, 18), skin, head);
+  headMesh.position.z = 0.16;
+  headMesh.scale.set(1.05, 0.92, 1.05);
 
-  const snout = addMesh(head, new THREE.SphereGeometry(0.27, 16, 12), belly, head);
-  snout.position.set(0, -0.05, 0.52);
-  snout.scale.set(1.18, 0.6, 0.68);
+  const snout = addMesh(head, new THREE.SphereGeometry(0.24, 16, 12), belly, head);
+  snout.position.set(0, -0.03, 0.5);
+  snout.scale.set(1.05, 0.68, 0.72);
 
-  // Sorriso mais largo e curvado pra cima (o "smile" caracteristico do axolote).
-  const mouth = addMesh(head, new THREE.TorusGeometry(0.15, 0.02, 8, 20, Math.PI * 0.92), mouthMat, head);
-  mouth.position.set(0, -0.09, 0.7);
-  mouth.rotation.set(Math.PI / 2, 0, Math.PI * 0.04);
+  const mouth = addMesh(head, new THREE.TorusGeometry(0.12, 0.017, 8, 18, Math.PI * 0.85), mouthMat, head);
+  mouth.position.set(0, -0.08, 0.7);
+  mouth.rotation.set(Math.PI / 2, 0, Math.PI * 0.03);
 
-  addEye(head, -0.24);
-  addEye(head, 0.24);
-  addCheekBlush(head, -0.24, belly);
-  addCheekBlush(head, 0.24, belly);
+  addEye(head, -0.2);
+  addEye(head, 0.2);
+  addCheekBlush(head, -0.2, belly);
+  addCheekBlush(head, 0.2, belly);
 
   const leftGill = [];
   const rightGill = [];

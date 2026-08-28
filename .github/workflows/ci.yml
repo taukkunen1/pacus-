@@ -16,7 +16,19 @@ jobs:
           dotnet-version: '10.0.x'
       - run: dotnet restore backend/Pacus.sln
       - run: dotnet build backend/Pacus.sln --configuration Release --no-restore
-      - run: dotnet test backend/Pacus.sln --configuration Release --no-build
+      - name: dotnet test
+        run: |
+          set -o pipefail
+          dotnet test backend/Pacus.sln --configuration Release --no-build --logger "console;verbosity=detailed" 2>&1 | tee /tmp/test-output.txt
+      - name: Emit test failures as annotations (debug aid)
+        if: failure()
+        run: |
+          grep -B2 -A40 -E "Failed |Error Message|Stack Trace|error CS" /tmp/test-output.txt | head -c 60000 > /tmp/test-fail-excerpt.txt || true
+          if [ -s /tmp/test-fail-excerpt.txt ]; then
+            echo "::error::$(cat /tmp/test-fail-excerpt.txt | tr '\n' '~' | sed 's/~/%0A/g' | cut -c1-60000)"
+          else
+            echo "::error::$(tail -c 60000 /tmp/test-output.txt | tr '\n' '~' | sed 's/~/%0A/g')"
+          fi
 
   frontend:
     runs-on: ubuntu-latest

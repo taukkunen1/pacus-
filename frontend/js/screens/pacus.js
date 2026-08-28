@@ -1,5 +1,5 @@
 import { apiClient } from "../api/api-client.js";
-import { renderTank, mountTank3D } from "../pacus/renderer.js";
+import { renderTank } from "../pacus/habitat.js";
 import {
   getTasks,
   createTask,
@@ -15,7 +15,6 @@ const PERIODS = ["morning", "afternoon", "evening"];
 const TYPES = ["mandatory", "expected", "challenge"];
 
 export async function renderPacus(root, navigate) {
-  let pacusRuntime = null;
   root.innerHTML = `
     <div class="screen">
       <div class="container">
@@ -139,9 +138,6 @@ export async function renderPacus(root, navigate) {
         </div>
       </section>
     `;
-
-    pacusRuntime?.dispose();
-    pacusRuntime = mountTank3D(content, pacus);
 
     content
       .querySelector("#back")

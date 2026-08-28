@@ -17,7 +17,7 @@ import {
   reorderDailyTasks
 } from "../api/tasks-api.js";
 
-import { renderTank, mountTank3D } from "../pacus/renderer.js";
+import { renderTank } from "../pacus/habitat.js";
 import { renderTaskSection } from "../components/task-list.js";
 import { formatOperationalDate } from "../utils/date.js";
 import {
@@ -151,7 +151,6 @@ export async function renderHome(
     console.warn("PACUS nao encontrado. A tela de hoje continuara sem o estagio do PACUS.", err);
   }
 
-  let pacusRuntime = null;
 
   function totalTasks() {
     return routine.tasks.filter(
@@ -469,14 +468,8 @@ export async function renderHome(
       </nav>
     `;
 
-    mountPacusScene();
     attachHandlers();
     startGameTimerCountdown();
-  }
-
-  function mountPacusScene() {
-    pacusRuntime?.dispose();
-    pacusRuntime = mountTank3D(content, pacus);
   }
 
   async function handleGameTimerAction(action) {

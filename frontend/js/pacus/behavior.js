@@ -1,98 +1,42 @@
-// Maquina de estados do comportamento automatico do PACUS (secoes 9 e 10 da
-// espec): IDLE (respiracao/bob/sway/cauda contínuos), INTERACTION (reage a
-// toque/clique) e sono depois de tempo parado. Escrita sem depender de
-// nada alem do PacusController (play/lookAt/react) — funciona tanto com a
-// versao procedural atual (sem rig) quanto com uma versao futura baseada
-// em clipes de verdade, contanto que os presets IDLE/SWIM/CURIOUS/HAPPY/
-// SURPRISED/SLEEP/WAKE_UP existam (ver controller.js).
+// Comportamento "idle" do tanque — pequenos gestos aleatorios para o PACUS
+// nao parecer um sprite parado. Cada attachBehavior() devolve um cleanup:
+// SEMPRE chame o cleanup anterior antes de re-renderizar o tanque, senao os
+// timers do estagio antigo continuam rodando contra um elemento desmontado.
+import { getStageInfo } from "./growth.js";
+import { createRandomLoop, pulse, prefersReducedMotion } from "./animation.js";
 
-const IDLE_GLANCE_MIN_MS = 4000;
-const IDLE_GLANCE_MAX_MS = 9000;
-const SLEEP_AFTER_MS = 45000;
-const INTERACTION_HOLD_MS = 1400;
+// [estagio]: [minMs, maxMs] entre gestos
+const DART_INTERVAL = {
+  baby: [9000, 16000],
+  young: [6000, 11000],
+  adult: [4000, 9000]
+};
 
-function randomBetween(min, max) {
-  return min + Math.random() * (max - min);
-}
+const SHAKE_INTERVAL = {
+  cracking: [4000, 8000],
+  hatching: [2000, 5000]
+};
 
-export function createBehavior(controller) {
-  let state = "IDLE";
-  let lastInteractionAt = Date.now();
-  const timers = new Set();
+export function attachBehavior(tankEl, stage) {
+  if (!tankEl || prefersReducedMotion()) return () => {};
 
-  function schedule(fn, delay) {
-    const id = window.setTimeout(() => {
-      timers.delete(id);
-      fn();
-    }, delay);
-    timers.add(id);
-    return id;
+  const { isEgg } = getStageInfo(stage);
+
+  if (isEgg) {
+    const interval = SHAKE_INTERVAL[stage];
+    const eggEl = tankEl.querySelector(".pacus-egg");
+    if (!interval || !eggEl) return () => {};
+
+    return createRandomLoop(interval, () => {
+      pulse(eggEl, "pacus-egg--shake", 500);
+    });
   }
 
-  function clearTimers() {
-    for (const id of timers) window.clearTimeout(id);
-    timers.clear();
-  }
+  const bodyEl = tankEl.querySelector(".pacus-body");
+  const interval = DART_INTERVAL[stage] ?? DART_INTERVAL.adult;
+  if (!bodyEl) return () => {};
 
-  function scheduleGlance() {
-    schedule(() => {
-      if (state === "IDLE") controller.play("CURIOUS", { returnTo: "IDLE", holdMs: 1200 });
-      scheduleGlance();
-    }, randomBetween(IDLE_GLANCE_MIN_MS, IDLE_GLANCE_MAX_MS));
-  }
-
-  function checkSleep() {
-    schedule(() => {
-      if (state === "IDLE" && Date.now() - lastInteractionAt >= SLEEP_AFTER_MS) {
-        enterSleep();
-      } else {
-        checkSleep();
-      }
-    }, 2000);
-  }
-
-  function enterIdle() {
-    state = "IDLE";
-    controller.play("IDLE");
-  }
-
-  function enterSleep() {
-    state = "SLEEP";
-    controller.play("SLEEP");
-  }
-
-  function wakeUpGreeting() {
-    state = "INTERACTION";
-    controller.play("WAKE_UP");
-    schedule(() => enterIdle(), INTERACTION_HOLD_MS);
-  }
-
-  function onTouch(point) {
-    lastInteractionAt = Date.now();
-    if (state === "SLEEP") {
-      wakeUpGreeting();
-      return;
-    }
-    state = "INTERACTION";
-    if (point) controller.lookAt(point);
-    controller.play("HAPPY", { returnTo: "IDLE", holdMs: INTERACTION_HOLD_MS });
-    schedule(() => enterIdle(), INTERACTION_HOLD_MS + 100);
-  }
-
-  function markActivity() {
-    lastInteractionAt = Date.now();
-    if (state === "SLEEP") wakeUpGreeting();
-  }
-
-  function start() {
-    enterIdle();
-    scheduleGlance();
-    checkSleep();
-  }
-
-  function dispose() {
-    clearTimers();
-  }
-
-  return { start, dispose, onTouch, markActivity, get state() { return state; } };
+  return createRandomLoop(interval, () => {
+    pulse(bodyEl, "pacus-body--dart", 700);
+  });
 }

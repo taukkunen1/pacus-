@@ -3,7 +3,10 @@ import {
   completeTask,
   reopenTask,
   getPointsBalance,
-  getPacus
+  getPacus,
+  pauseGameTimer,
+  resumeGameTimer,
+  adjustGameTimer
 } from "../api/pacus-api.js";
 
 import {
@@ -223,12 +226,36 @@ export async function renderHome(
       `;
     }
 
+    const isPaused = Boolean(routine.gameTimerPausedAt);
+
     return `
-      <div class="game-timer game-timer--unlocked">
-        <span class="game-timer__icon">🎮</span>
+      <div class="game-timer game-timer--unlocked ${isPaused ? "game-timer--paused" : ""}">
+        <span class="game-timer__icon">${isPaused ? "⏸️" : "🎮"}</span>
         <span id="game-timer-remaining">calculando...</span>
+        <div class="game-timer__controls">
+          ${isAdult ? `
+            <button type="button" class="game-timer__btn" id="game-timer-minus-hour" title="Remover 1 hora">−1h</button>
+          ` : ""}
+          <button type="button" class="game-timer__btn game-timer__btn--toggle" id="game-timer-toggle" title="${isPaused ? "Despausar" : "Pausar"}">
+            ${isPaused ? "▶️ Despausar" : "⏸️ Pausar"}
+          </button>
+          ${isAdult ? `
+            <button type="button" class="game-timer__btn" id="game-timer-plus-hour" title="Adicionar 1 hora">+1h</button>
+          ` : ""}
+        </div>
       </div>
     `;
+  }
+
+  // Quanto do tempo total ja foi "consumido" desde que liberou, descontando
+  // pausas (passadas + a atual, se ainda estiver pausado agora).
+  function computeGameTimerElapsedMs(now = Date.now()) {
+    const unlockedAt = new Date(routine.gameTimerUnlockedAt).getTime();
+    const pausedMs = routine.gameTimerPausedMs ?? 0;
+    const currentPauseMs = routine.gameTimerPausedAt
+      ? now - new Date(routine.gameTimerPausedAt).getTime()
+      : 0;
+    return now - unlockedAt - pausedMs - currentPauseMs;
   }
 
   function startGameTimerCountdown() {
@@ -239,9 +266,9 @@ export async function renderHome(
 
     if (!routine?.gameTimerUnlockedAt) return;
 
-    const unlockedAt = new Date(routine.gameTimerUnlockedAt).getTime();
-    const durationMs = (routine.gameTimerMinutes ?? 120) * 60 * 1000;
-    const endsAt = unlockedAt + durationMs;
+    const totalMinutes = (routine.gameTimerMinutes ?? 120) + (routine.gameTimerExtraMinutes ?? 0);
+    const durationMs = Math.max(0, totalMinutes) * 60 * 1000;
+    const isPaused = Boolean(routine.gameTimerPausedAt);
 
     const tick = () => {
       const el = content.querySelector("#game-timer-remaining");
@@ -251,7 +278,7 @@ export async function renderHome(
         return;
       }
 
-      const remainingMs = endsAt - Date.now();
+      const remainingMs = durationMs - computeGameTimerElapsedMs();
       if (remainingMs <= 0) {
         el.textContent = "Tempo de jogo de hoje já acabou. Até amanhã!";
         clearInterval(gameTimerIntervalId);
@@ -259,10 +286,15 @@ export async function renderHome(
         return;
       }
 
-      el.textContent = formatGameTimerRemaining(remainingMs);
+      el.textContent = isPaused
+        ? `${formatGameTimerRemaining(remainingMs)} (pausado)`
+        : formatGameTimerRemaining(remainingMs);
     };
 
     tick();
+    // Enquanto pausado o valor nao muda sozinho, mas mantem o intervalo
+    // rodando mesmo assim — mais simples que ligar/desligar, e o custo e
+    // irrelevante (so recalcula o mesmo texto a cada segundo).
     gameTimerIntervalId = setInterval(tick, 1000);
   }
 
@@ -447,7 +479,41 @@ export async function renderHome(
     pacusRuntime = mountTank3D(content, pacus);
   }
 
+  async function handleGameTimerAction(action) {
+    try {
+      routine = await action();
+      draw();
+    } catch (err) {
+      showToast(
+        `Não foi possível atualizar o tempo de jogo: ${escapeHtml(err.message)}`,
+        { error: true }
+      );
+    }
+  }
+
   function attachHandlers() {
+    const toggleBtn = content.querySelector("#game-timer-toggle");
+    if (toggleBtn) {
+      toggleBtn.addEventListener("click", () => {
+        const isPaused = Boolean(routine.gameTimerPausedAt);
+        handleGameTimerAction(isPaused ? resumeGameTimer : pauseGameTimer);
+      });
+    }
+
+    const plusBtn = content.querySelector("#game-timer-plus-hour");
+    if (plusBtn) {
+      plusBtn.addEventListener("click", () => {
+        handleGameTimerAction(() => adjustGameTimer(60));
+      });
+    }
+
+    const minusBtn = content.querySelector("#game-timer-minus-hour");
+    if (minusBtn) {
+      minusBtn.addEventListener("click", () => {
+        handleGameTimerAction(() => adjustGameTimer(-60));
+      });
+    }
+
     content
       .querySelectorAll(".period-tab")
       .forEach((button) => {

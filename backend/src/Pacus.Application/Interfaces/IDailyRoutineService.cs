@@ -36,4 +36,15 @@ public interface IDailyRoutineService
     Task<DailyRoutine> AdjustTaskPointsAsync(ObjectId userId, string taskId, int newPoints, ObjectId actorId, string actorRole);
     Task<DailyRoutine> UpdateTaskAsync(ObjectId userId, string taskId, DailyTaskUpdateRequest request, ObjectId actorId, string actorRole);
     Task<DailyRoutine> DeleteTaskAsync(ObjectId userId, string taskId, ObjectId actorId, string actorRole);
+
+    // Pausa/despausa o game timer do dia atual — qualquer papel pode chamar
+    // (adulto ou crianca). No-op se ja estiver no estado pedido, ou se o
+    // timer nunca foi liberado (GameTimerUnlockedAt null).
+    Task<DailyRoutine> PauseGameTimerAsync(ObjectId userId, ObjectId actorId, string actorRole);
+    Task<DailyRoutine> ResumeGameTimerAsync(ObjectId userId, ObjectId actorId, string actorRole);
+
+    // Ajusta o tempo total (+1h/-1h etc) — restrito a adulto; o controller
+    // ja aplica [RequireRole(Adult)], mas o service tambem confere por
+    // seguranca (nunca confiar so no frontend/controller).
+    Task<DailyRoutine> AdjustGameTimerAsync(ObjectId userId, int deltaMinutes, ObjectId actorId, string actorRole);
 }

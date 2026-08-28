@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Pacus.Api.Auth;
+using Pacus.Application.DTOs;
 using Pacus.Application.Interfaces;
 using Pacus.Application.Services;
+using Pacus.Domain.Enums;
 
 namespace Pacus.Api.Controllers;
 
@@ -63,6 +65,60 @@ public class DailyRoutinesController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    // Pausar/despausar e acao de qualquer papel (adulto ou crianca) —
+    // sem RequireRole aqui de proposito, igual o reorder acima.
+    [HttpPut("today/game-timer/pause")]
+    public async Task<IActionResult> PauseGameTimer()
+    {
+        try
+        {
+            var routine = await _dailyRoutineService.PauseGameTimerAsync(
+                _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString());
+            return Ok(routine);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPut("today/game-timer/resume")]
+    public async Task<IActionResult> ResumeGameTimer()
+    {
+        try
+        {
+            var routine = await _dailyRoutineService.ResumeGameTimerAsync(
+                _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString());
+            return Ok(routine);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    // +1h/-1h etc. Restrito ao painel adulto — a crianca recebe 403 direto
+    // do RequireRole, nunca chega a bater no service.
+    [RequireRole(UserRole.Adult)]
+    [HttpPut("today/game-timer/adjust")]
+    public async Task<IActionResult> AdjustGameTimer([FromBody] AdjustGameTimerRequest request)
+    {
+        try
+        {
+            var routine = await _dailyRoutineService.AdjustGameTimerAsync(
+                _currentUser.FamilyId, request.DeltaMinutes, _currentUser.UserId, _currentUser.Role.ToString());
+            return Ok(routine);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = ex.Message });
         }
     }
 }

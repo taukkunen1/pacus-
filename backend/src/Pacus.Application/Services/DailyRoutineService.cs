@@ -493,6 +493,54 @@ public class DailyRoutineService : IDailyRoutineService
                 "Esta acao nao esta permitida no painel infantil.");
     }
 
+    public async Task<DailyRoutine> PauseGameTimerAsync(ObjectId userId, ObjectId actorId, string actorRole)
+    {
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new InvalidOperationException("Nenhuma rotina em aberto para este usuario.");
+
+        if (routine.GameTimerUnlockedAt is null || routine.GameTimerPausedAt is not null)
+            return routine; // nada pra pausar, ou ja esta pausado
+
+        routine.GameTimerPausedAt = DateTime.UtcNow;
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        return routine;
+    }
+
+    public async Task<DailyRoutine> ResumeGameTimerAsync(ObjectId userId, ObjectId actorId, string actorRole)
+    {
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new InvalidOperationException("Nenhuma rotina em aberto para este usuario.");
+
+        if (routine.GameTimerPausedAt is null)
+            return routine; // ja esta rodando
+
+        routine.GameTimerPausedMs += (long)(DateTime.UtcNow - routine.GameTimerPausedAt.Value).TotalMilliseconds;
+        routine.GameTimerPausedAt = null;
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        return routine;
+    }
+
+    public async Task<DailyRoutine> AdjustGameTimerAsync(ObjectId userId, int deltaMinutes, ObjectId actorId, string actorRole)
+    {
+        if (!actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase))
+            throw new UnauthorizedAccessException("Ajustar o tempo do game timer e restrito ao painel adulto.");
+
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new InvalidOperationException("Nenhuma rotina em aberto para este usuario.");
+
+        await SyncGameTimerAsync(routine, userId); // garante GameTimerMinutes atualizado antes do clamp
+
+        var proposedExtra = routine.GameTimerExtraMinutes + deltaMinutes;
+        var totalMinutes = routine.GameTimerMinutes + proposedExtra;
+        // nunca deixa o total ficar negativo (so trava em 0, nao impede reduzir o resto)
+        routine.GameTimerExtraMinutes = totalMinutes < 0
+            ? -routine.GameTimerMinutes
+            : proposedExtra;
+
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        return routine;
+    }
+
     private async Task SyncGameTimerAsync(DailyRoutine routine, ObjectId userId)
     {
         var settings = await _settingsRepository.GetByUserIdAsync(userId);

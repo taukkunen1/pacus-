@@ -26,3 +26,19 @@ export function getPointsBalance() {
 export function getPacus() {
   return apiClient("/pacus/me");
 }
+
+export function pauseGameTimer() {
+  return apiClient("/daily-routines/today/game-timer/pause", { method: "PUT" });
+}
+
+export function resumeGameTimer() {
+  return apiClient("/daily-routines/today/game-timer/resume", { method: "PUT" });
+}
+
+// deltaMinutes: positivo soma tempo, negativo remove (ex: -60 pra tirar 1h).
+export function adjustGameTimer(deltaMinutes) {
+  return apiClient("/daily-routines/today/game-timer/adjust", {
+    method: "PUT",
+    body: JSON.stringify({ deltaMinutes }),
+  });
+}

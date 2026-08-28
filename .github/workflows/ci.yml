@@ -32,12 +32,15 @@ jobs:
       - name: Emit test failures as annotations (debug aid)
         if: failure()
         run: |
-          grep -B2 -A40 -E "Failed |Error Message|Stack Trace|error CS" /tmp/test-output.txt | head -c 60000 > /tmp/test-fail-excerpt.txt || true
-          if [ -s /tmp/test-fail-excerpt.txt ]; then
-            echo "::error::$(cat /tmp/test-fail-excerpt.txt | tr '\n' '~' | sed 's/~/%0A/g' | cut -c1-60000)"
-          else
-            echo "::error::$(tail -c 60000 /tmp/test-output.txt | tr '\n' '~' | sed 's/~/%0A/g')"
-          fi
+          grep -nE "^\s*(Failed|Passed)\s|\[FAIL\]|Total tests:|Passed:|Failed:|error CS" /tmp/test-output.txt > /tmp/test-summary.txt || true
+          grep -B1 -A25 -E "^\s*Failed\s" /tmp/test-output.txt > /tmp/test-fail-detail.txt || true
+          {
+            echo "=== SUMMARY ==="
+            cat /tmp/test-summary.txt
+            echo "=== FAILURE DETAIL ==="
+            cat /tmp/test-fail-detail.txt
+          } > /tmp/test-fail-excerpt.txt
+          echo "::error::$(cat /tmp/test-fail-excerpt.txt | tr '\n' '~' | sed 's/~/%0A/g' | cut -c1-60000)"
 
   frontend:
     runs-on: ubuntu-latest

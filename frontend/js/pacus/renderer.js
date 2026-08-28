@@ -115,6 +115,16 @@ export function mountPacus3D(host, pacus = {}) {
   };
   activeRuntimes.add(runtime);
 
+  // TEMPORARIO: o pacus.glb atual tem um problema de skinning (todas as
+  // malhas, inclusive o eggShell, estao vinculadas ao mesmo skin/skeleton
+  // com pesos aparentemente quebrados) que faz o corpo renderizar como uma
+  // bolha lisa em vez do axolote articulado, em qualquer estagio. Ate o
+  // asset ser reexportado corretamente, ficamos so no personagem
+  // procedural (formas THREE.js simples, sem skinning, com bracos/cauda/
+  // guelras/olhos de verdade). Para reativar o glb assim que ele for
+  // corrigido, descomente o bloco abaixo.
+  assetLoadInFlight = false;
+  /*
   loadRiggedPacus().then((gltf) => {
     if (disposed) return;
     const nextCharacter = prepareLoadedPacusCharacter(gltf.scene, gltf, pacus);
@@ -132,6 +142,7 @@ export function mountPacus3D(host, pacus = {}) {
   }).finally(() => {
     assetLoadInFlight = false;
   });
+  */
 
   function tick() {
     if (disposed || !document.body.contains(host)) {

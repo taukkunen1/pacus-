@@ -84,6 +84,26 @@ public class TaskTemplateService : ITaskTemplateService
         await _taskTemplateRepository.ActivateAsync(templateId);
     }
 
+    public async Task DeleteAsync(
+        ObjectId familyId,
+        string id)
+    {
+        if (!ObjectId.TryParse(id, out var templateId))
+            throw new InvalidOperationException("Id de tarefa invalido.");
+
+        var template = await _taskTemplateRepository.GetByIdAsync(templateId);
+
+        // Mesma checagem de posse usada em Update/Activate: sem isso, qualquer adulto
+        // autenticado (independente da familia) poderia excluir o template de outra
+        // familia so sabendo (ou adivinhando) o ObjectId. Achado em auditoria de
+        // seguranca (isolamento por FamilyId) — nunca chamar o repositorio direto
+        // a partir do controller para operacoes que envolvem posse.
+        if (template is null || template.UserId != familyId)
+            throw new InvalidOperationException("Tarefa permanente nao encontrada.");
+
+        await _taskTemplateRepository.SoftDeleteAsync(templateId);
+    }
+
     private static (TaskType Type, TaskPeriod Period) ParseTypeAndPeriod(
         CreateTaskRequest request)
     {

@@ -82,12 +82,20 @@ public class TasksController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id)
     {
-        if (!MongoDB.Bson.ObjectId.TryParse(id, out var templateId))
-            return BadRequest(new { error = "Id de tarefa invalido." });
+        try
+        {
+            // Passa pelo Service (verifica posse via FamilyId) em vez de chamar o
+            // repositorio direto — a versao anterior fazia SoftDeleteAsync(templateId)
+            // sem checar de quem era o template, permitindo excluir tarefas de
+            // qualquer familia so sabendo o id.
+            await _taskTemplateService.DeleteAsync(_currentUser.FamilyId, id);
 
-        await _taskTemplateRepository.SoftDeleteAsync(templateId);
-
-        return NoContent();
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     [HttpPut("{id}/activate")]

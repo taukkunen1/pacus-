@@ -19,4 +19,8 @@ public interface ITaskTemplateService
     Task ActivateAsync(
         ObjectId familyId,
         string id);
+
+    Task DeleteAsync(
+        ObjectId familyId,
+        string id);
 }

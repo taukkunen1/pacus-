@@ -97,14 +97,35 @@ public class TaskManagementTests
     }
 
     [Fact]
-    public async Task CriarTarefa_Com4Pontos_LancaExcecao()
+    public async Task CriarTarefa_Com4Pontos_NaoLancaExcecao()
+    {
+        // Regressao: este teste esperava excecao para 4 pontos porque a regra
+        // de negocio antiga so aceitava 1, 2 ou 3 (ver commit historico). A
+        // regra atual (DailyRoutineService.ValidatePoints) aceita qualquer
+        // valor entre -10 e 10, exceto zero — 4 pontos e valido. Teste
+        // atualizado para refletir a regra vigente em vez de travar o CI com
+        // uma expectativa desatualizada. A cobertura de valores realmente
+        // invalidos continua em CriarTarefa_ComZeroPontos_LancaExcecao e nos
+        // testes de fora do range em TaskTemplateService/TasksController.
+        var (dailyRoutine, _) = BuildSystem();
+        var userId = ObjectId.GenerateNewId();
+        await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-24", "America/Sao_Paulo");
+
+        var routine = await dailyRoutine.CreateAdHocTaskAsync(
+            userId, new CreateTaskRequest("Tarefa", null, "challenge", "evening", 4), userId, "child");
+
+        Assert.Equal(4, routine.Tasks.Last().Points);
+    }
+
+    [Fact]
+    public async Task CriarTarefa_Com11Pontos_LancaExcecao()
     {
         var (dailyRoutine, _) = BuildSystem();
         var userId = ObjectId.GenerateNewId();
         await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-24", "America/Sao_Paulo");
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => dailyRoutine.CreateAdHocTaskAsync(
-            userId, new CreateTaskRequest("Tarefa", null, "challenge", "evening", 4), userId, "child"));
+            userId, new CreateTaskRequest("Tarefa", null, "challenge", "evening", 11), userId, "child"));
     }
 
     [Fact]

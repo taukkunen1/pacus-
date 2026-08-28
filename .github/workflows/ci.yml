@@ -32,10 +32,10 @@ jobs:
       - name: Emit test failures as annotations (debug aid)
         if: failure()
         run: |
-          grep -nE "^\s*(Failed|Passed)\s|\[FAIL\]|Total tests:|Passed:|Failed:|error CS" /tmp/test-output.txt > /tmp/test-summary.txt || true
-          grep -B1 -A25 -E "^\s*Failed\s" /tmp/test-output.txt > /tmp/test-fail-detail.txt || true
+          grep -nE "^\s*Failed\s|\[FAIL\]|Total tests:|Passed:|Failed:|error CS" /tmp/test-output.txt > /tmp/test-summary.txt || true
+          grep -B1 -A30 -E "^\s*Failed\s" /tmp/test-output.txt > /tmp/test-fail-detail.txt || true
           {
-            echo "=== SUMMARY ==="
+            echo "=== SUMMARY (so linhas Failed/contadores) ==="
             cat /tmp/test-summary.txt
             echo "=== FAILURE DETAIL ==="
             cat /tmp/test-fail-detail.txt

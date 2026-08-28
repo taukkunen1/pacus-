@@ -49,7 +49,7 @@ export function renderTank(pacus = {}) {
       <div class="pacus-3d-host" data-pacus-3d-host></div>
       <div class="pacus-overlay">
         <span class="pacus-stage-pill">${label}</span>
-        <span class="pacus-interaction-hint">Toque no PACUS</span>
+        <span class="pacus-interaction-hint">Arraste pra girar · toque pra interagir</span>
       </div>
     </section>
   `;
@@ -88,8 +88,14 @@ export async function mountPacus3D(host, { onReady, stage } = {}) {
   fill.position.set(-3, 1.5, -2);
   scene.add(hemi, key, fill);
 
+  // orbitGroup: rotacao livre controlada por arrastar (mouse/touch) — o
+  // pivot continua recebendo bob/sway/tilt do controller por dentro, sem
+  // conflitar com o giro manual do usuario.
+  const orbitGroup = new THREE.Group();
+  scene.add(orbitGroup);
+
   const pivot = new THREE.Group();
-  scene.add(pivot);
+  orbitGroup.add(pivot);
 
   let controller = null;
   let behavior = null;
@@ -125,11 +131,48 @@ export async function mountPacus3D(host, { onReady, stage } = {}) {
     }
   );
 
-  function onPointerDown() {
-    behavior?.onTouch();
-    controller?.react("touch");
+  // Arrastar gira o PACUS livremente (rotacao 360 - secao 16 da espec,
+  // "rotacao 360"). Um toque/clique curto, sem arrastar, continua contando
+  // como interacao (behavior.onTouch / controller.react).
+  const DRAG_THRESHOLD_PX = 6;
+  const DRAG_SENSITIVITY = 0.012; // radianos por pixel arrastado
+  let pointerId = null;
+  let dragStartX = 0;
+  let dragStartRotY = 0;
+  let didDrag = false;
+
+  function onPointerDown(event) {
+    pointerId = event.pointerId;
+    dragStartX = event.clientX;
+    dragStartRotY = orbitGroup.rotation.y;
+    didDrag = false;
+    host.setPointerCapture?.(pointerId);
+    host.style.cursor = "grabbing";
   }
+
+  function onPointerMove(event) {
+    if (pointerId === null || event.pointerId !== pointerId) return;
+    const dx = event.clientX - dragStartX;
+    if (!didDrag && Math.abs(dx) > DRAG_THRESHOLD_PX) didDrag = true;
+    if (didDrag) orbitGroup.rotation.y = dragStartRotY + dx * DRAG_SENSITIVITY;
+  }
+
+  function endDrag(event) {
+    if (pointerId === null || event.pointerId !== pointerId) return;
+    host.releasePointerCapture?.(pointerId);
+    host.style.cursor = "grab";
+    if (!didDrag) {
+      behavior?.onTouch();
+      controller?.react("touch");
+    }
+    pointerId = null;
+  }
+
+  host.style.cursor = "grab";
   host.addEventListener("pointerdown", onPointerDown);
+  host.addEventListener("pointermove", onPointerMove);
+  host.addEventListener("pointerup", endDrag);
+  host.addEventListener("pointercancel", endDrag);
 
   let raf = null;
   const clock = new THREE.Clock();
@@ -156,6 +199,9 @@ export async function mountPacus3D(host, { onReady, stage } = {}) {
       if (raf) cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
       host.removeEventListener("pointerdown", onPointerDown);
+      host.removeEventListener("pointermove", onPointerMove);
+      host.removeEventListener("pointerup", endDrag);
+      host.removeEventListener("pointercancel", endDrag);
       behavior?.dispose();
       renderer.dispose();
       renderer.domElement.remove();

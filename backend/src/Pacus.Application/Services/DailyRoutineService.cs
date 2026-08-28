@@ -502,6 +502,7 @@ public class DailyRoutineService : IDailyRoutineService
             return routine; // nada pra pausar, ou ja esta pausado
 
         routine.GameTimerPausedAt = DateTime.UtcNow;
+        await SyncGameTimerAsync(routine, userId); // repopula GameTimerEnabled/Minutes (BsonIgnore, nao persistidos)
         await _dailyRoutineRepository.UpdateAsync(routine);
         return routine;
     }
@@ -516,6 +517,7 @@ public class DailyRoutineService : IDailyRoutineService
 
         routine.GameTimerPausedMs += (long)(DateTime.UtcNow - routine.GameTimerPausedAt.Value).TotalMilliseconds;
         routine.GameTimerPausedAt = null;
+        await SyncGameTimerAsync(routine, userId); // repopula GameTimerEnabled/Minutes (BsonIgnore, nao persistidos)
         await _dailyRoutineRepository.UpdateAsync(routine);
         return routine;
     }

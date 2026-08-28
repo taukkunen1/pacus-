@@ -234,13 +234,13 @@ export async function renderHome(
         <span id="game-timer-remaining">calculando...</span>
         <div class="game-timer__controls">
           ${isAdult ? `
-            <button type="button" class="game-timer__btn" id="game-timer-minus-hour" title="Remover 1 hora">−1h</button>
+            <button type="button" class="game-timer__btn" id="game-timer-minus-5" title="Remover 5 minutos">−5</button>
           ` : ""}
           <button type="button" class="game-timer__btn game-timer__btn--toggle" id="game-timer-toggle" title="${isPaused ? "Despausar" : "Pausar"}">
             ${isPaused ? "▶️ Despausar" : "⏸️ Pausar"}
           </button>
           ${isAdult ? `
-            <button type="button" class="game-timer__btn" id="game-timer-plus-hour" title="Adicionar 1 hora">+1h</button>
+            <button type="button" class="game-timer__btn" id="game-timer-plus-5" title="Adicionar 5 minutos">+5</button>
           ` : ""}
         </div>
       </div>
@@ -500,17 +500,17 @@ export async function renderHome(
       });
     }
 
-    const plusBtn = content.querySelector("#game-timer-plus-hour");
+    const plusBtn = content.querySelector("#game-timer-plus-5");
     if (plusBtn) {
       plusBtn.addEventListener("click", () => {
-        handleGameTimerAction(() => adjustGameTimer(60));
+        handleGameTimerAction(() => adjustGameTimer(5));
       });
     }
 
-    const minusBtn = content.querySelector("#game-timer-minus-hour");
+    const minusBtn = content.querySelector("#game-timer-minus-5");
     if (minusBtn) {
       minusBtn.addEventListener("click", () => {
-        handleGameTimerAction(() => adjustGameTimer(-60));
+        handleGameTimerAction(() => adjustGameTimer(-5));
       });
     }
 

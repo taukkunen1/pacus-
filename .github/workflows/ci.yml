@@ -2,7 +2,7 @@ name: PACUS CI
 
 on:
   push:
-    branches: ["main", "feature/next-migration"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
 
@@ -26,21 +26,7 @@ jobs:
         # CI, nunca usado em producao (isso continua vindo do Render).
         env:
           JWT_SECRET: ci-placeholder-secret-nao-usar-em-producao-0123456789
-        run: |
-          set -o pipefail
-          dotnet test backend/Pacus.sln --configuration Release --no-build --logger "console;verbosity=detailed" 2>&1 | tee /tmp/test-output.txt
-      - name: Emit test failures as annotations (debug aid)
-        if: failure()
-        run: |
-          grep -nE "^\s*Failed\s|\[FAIL\]|Total tests:|Passed:|Failed:|error CS" /tmp/test-output.txt > /tmp/test-summary.txt || true
-          grep -B1 -A30 -E "^\s*Failed\s" /tmp/test-output.txt > /tmp/test-fail-detail.txt || true
-          {
-            echo "=== SUMMARY (so linhas Failed/contadores) ==="
-            cat /tmp/test-summary.txt
-            echo "=== FAILURE DETAIL ==="
-            cat /tmp/test-fail-detail.txt
-          } > /tmp/test-fail-excerpt.txt
-          echo "::error::$(cat /tmp/test-fail-excerpt.txt | tr '\n' '~' | sed 's/~/%0A/g' | cut -c1-60000)"
+        run: dotnet test backend/Pacus.sln --configuration Release --no-build
 
   frontend:
     runs-on: ubuntu-latest

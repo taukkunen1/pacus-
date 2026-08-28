@@ -17,6 +17,15 @@ jobs:
       - run: dotnet restore backend/Pacus.sln
       - run: dotnet build backend/Pacus.sln --configuration Release --no-restore
       - name: dotnet test
+        # JWT_SECRET precisa existir no ambiente porque Program.cs le essa
+        # variavel de forma eager (fora de qualquer DI), antes do
+        # WebApplicationFactory dos testes de integracao ter chance de
+        # injetar a propria config de teste (Jwt:Secret) -- sem isso o app
+        # nunca sobe em CI e todo teste de integracao falha com
+        # "JWT_SECRET nao configurada.". Valor aqui e so um placeholder de
+        # CI, nunca usado em producao (isso continua vindo do Render).
+        env:
+          JWT_SECRET: ci-placeholder-secret-nao-usar-em-producao-0123456789
         run: |
           set -o pipefail
           dotnet test backend/Pacus.sln --configuration Release --no-build --logger "console;verbosity=detailed" 2>&1 | tee /tmp/test-output.txt

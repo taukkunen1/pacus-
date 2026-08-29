@@ -30,4 +30,7 @@ public class UserRepository : IUserRepository
 
     public Task<List<User>> GetByFamilyAndRoleAsync(ObjectId familyId, UserRole role) =>
         _context.Users.Find(u => u.FamilyId == familyId && u.Role == role).ToListAsync();
+
+    public Task<List<User>> GetByFamilyAsync(ObjectId familyId) =>
+        _context.Users.Find(u => u.FamilyId == familyId).ToListAsync();
 }

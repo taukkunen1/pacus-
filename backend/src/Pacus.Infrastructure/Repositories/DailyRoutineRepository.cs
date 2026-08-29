@@ -45,4 +45,9 @@ public class DailyRoutineRepository : IDailyRoutineRepository
             .Find(r => r.FamilyId == userId && r.Status == Domain.Enums.RoutineStatus.Open)
             .SortByDescending(r => r.Date)
             .FirstOrDefaultAsync();
+
+    public Task<List<DailyRoutine>> GetAllByFamilyAsync(ObjectId familyId) =>
+        _context.DailyRoutines.Find(r => r.FamilyId == familyId)
+            .SortByDescending(r => r.Date)
+            .ToListAsync();
 }

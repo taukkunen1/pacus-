@@ -17,6 +17,11 @@ public class TaskTemplateRepository : ITaskTemplateRepository
             .SortBy(t => t.Order)
             .ToListAsync();
 
+    public Task<List<TaskTemplate>> GetAllByFamilyAsync(ObjectId familyId) =>
+        _context.TaskTemplates.Find(t => t.FamilyId == familyId)
+            .SortBy(t => t.Order)
+            .ToListAsync();
+
     public Task<TaskTemplate?> GetByIdAsync(ObjectId id) =>
         _context.TaskTemplates.Find(t => t.Id == id).FirstOrDefaultAsync();
 

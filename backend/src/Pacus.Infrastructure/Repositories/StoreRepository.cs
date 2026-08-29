@@ -40,4 +40,14 @@ public class StoreRepository : IStoreRepository
 
     public Task UpdateRedemptionAsync(Redemption redemption) =>
         _context.Redemptions.ReplaceOneAsync(r => r.Id == redemption.Id, redemption);
+
+    public Task<List<StoreItem>> GetAllItemsByFamilyAsync(ObjectId familyId) =>
+        _context.StoreItems.Find(i => i.FamilyId == familyId)
+            .SortBy(i => i.Cost)
+            .ToListAsync();
+
+    public Task<List<Redemption>> GetAllRedemptionsByFamilyAsync(ObjectId familyId) =>
+        _context.Redemptions.Find(r => r.FamilyId == familyId)
+            .SortByDescending(r => r.RequestedAt)
+            .ToListAsync();
 }

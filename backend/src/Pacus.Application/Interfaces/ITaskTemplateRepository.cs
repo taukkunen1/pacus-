@@ -6,6 +6,9 @@ namespace Pacus.Application.Interfaces;
 public interface ITaskTemplateRepository
 {
     Task<List<TaskTemplate>> GetActiveByUserAsync(ObjectId userId);
+
+    // Todos os templates (ativos, inativos e soft-deletados), para exportacao de dados (B2).
+    Task<List<TaskTemplate>> GetAllByFamilyAsync(ObjectId familyId);
     Task<TaskTemplate?> GetByIdAsync(ObjectId id);
     Task<TaskTemplate> CreateAsync(TaskTemplate template);
     Task UpdateAsync(TaskTemplate template);

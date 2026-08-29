@@ -31,4 +31,9 @@ public class PointTransactionRepository : IPointTransactionRepository
             .SortByDescending(t => t.CreatedAt)
             .Limit(limit)
             .ToListAsync();
+
+    public Task<List<PointTransaction>> GetAllByFamilyAsync(ObjectId familyId) =>
+        _context.PointTransactions.Find(t => t.FamilyId == familyId)
+            .SortByDescending(t => t.CreatedAt)
+            .ToListAsync();
 }

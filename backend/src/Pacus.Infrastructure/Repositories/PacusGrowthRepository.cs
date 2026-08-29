@@ -31,4 +31,9 @@ public class PacusGrowthRepository : IPacusGrowthRepository
         }
         return log;
     }
+
+    public Task<List<PacusGrowthLog>> GetAllByFamilyAsync(ObjectId familyId) =>
+        _context.PacusGrowthLogs.Find(l => l.UserId == familyId)
+            .SortByDescending(l => l.Date)
+            .ToListAsync();
 }

@@ -159,6 +159,7 @@ builder.Services.AddScoped<IDailyRoutineService, DailyRoutineService>();
 builder.Services.AddScoped<IDayClosingService, DayClosingService>();
 builder.Services.AddScoped<IStoreService, StoreService>();
 builder.Services.AddScoped<ITaskTemplateService, TaskTemplateService>();
+builder.Services.AddScoped<IDataExportService, DataExportService>();
 
 builder.Services
     .AddControllers()

@@ -12,4 +12,9 @@ public interface IStoreRepository
     Task<Redemption?> GetRedemptionByIdAsync(ObjectId id);
     Task<Redemption> CreateRedemptionAsync(Redemption redemption);
     Task UpdateRedemptionAsync(Redemption redemption);
+
+    // Todos os itens (ativos e inativos) e todos os resgates da familia, para
+    // exportacao de dados (B2).
+    Task<List<StoreItem>> GetAllItemsByFamilyAsync(ObjectId familyId);
+    Task<List<Redemption>> GetAllRedemptionsByFamilyAsync(ObjectId familyId);
 }

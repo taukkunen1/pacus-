@@ -91,6 +91,14 @@ public class FakeDailyRoutineRepository : IDailyRoutineRepository
                 .OrderByDescending(
                     r => r.Date)
                 .FirstOrDefault());
+
+    public Task<List<DailyRoutine>> GetAllByFamilyAsync(
+        ObjectId familyId) =>
+        Task.FromResult(
+            _routines
+                .Where(r => r.FamilyId == familyId)
+                .OrderByDescending(r => r.Date)
+                .ToList());
 }
 
 public class FakeTaskTemplateRepository
@@ -178,6 +186,14 @@ public class FakeTaskTemplateRepository
 
         return Task.CompletedTask;
     }
+
+    public Task<List<TaskTemplate>> GetAllByFamilyAsync(
+        ObjectId familyId) =>
+        Task.FromResult(
+            _templates
+                .Where(t => t.FamilyId == familyId)
+                .OrderBy(t => t.Order)
+                .ToList());
 }
 
 public class FakePointTransactionRepository
@@ -213,6 +229,14 @@ public class FakePointTransactionRepository
                     t => t.CreatedAt)
                 .Take(limit)
                 .ToList());
+
+    public Task<List<PointTransaction>> GetAllByFamilyAsync(
+        ObjectId familyId) =>
+        Task.FromResult(
+            Transactions
+                .Where(t => t.FamilyId == familyId)
+                .OrderByDescending(t => t.CreatedAt)
+                .ToList());
 }
 
 public class FakeTaskEventRepository
@@ -227,6 +251,14 @@ public class FakeTaskEventRepository
 
         return Task.FromResult(taskEvent);
     }
+
+    public Task<List<TaskEvent>> GetAllByFamilyAsync(
+        ObjectId familyId) =>
+        Task.FromResult(
+            Events
+                .Where(e => e.UserId == familyId)
+                .OrderByDescending(e => e.CreatedAt)
+                .ToList());
 }
 
 public class FakePacusRepository
@@ -299,6 +331,14 @@ public class FakePacusGrowthRepository
 
         return Task.FromResult(log);
     }
+
+    public Task<List<PacusGrowthLog>> GetAllByFamilyAsync(
+        ObjectId familyId) =>
+        Task.FromResult(
+            Logs
+                .Where(l => l.UserId == familyId)
+                .OrderByDescending(l => l.Date)
+                .ToList());
 }
 
 public class FakeSettingsRepository
@@ -400,6 +440,22 @@ public class FakeStoreRepository
 
         return Task.CompletedTask;
     }
+
+    public Task<List<StoreItem>> GetAllItemsByFamilyAsync(
+        ObjectId familyId) =>
+        Task.FromResult(
+            _items
+                .Where(i => i.FamilyId == familyId)
+                .OrderBy(i => i.Cost)
+                .ToList());
+
+    public Task<List<Redemption>> GetAllRedemptionsByFamilyAsync(
+        ObjectId familyId) =>
+        Task.FromResult(
+            _redemptions
+                .Where(r => r.FamilyId == familyId)
+                .OrderByDescending(r => r.RequestedAt)
+                .ToList());
 }
 
 public class FakeAuditLogRepository
@@ -414,4 +470,12 @@ public class FakeAuditLogRepository
 
         return Task.FromResult(log);
     }
+
+    public Task<List<AuditLog>> GetAllByFamilyAsync(
+        ObjectId familyId) =>
+        Task.FromResult(
+            Logs
+                .Where(l => l.FamilyId == familyId)
+                .OrderByDescending(l => l.CreatedAt)
+                .ToList());
 }

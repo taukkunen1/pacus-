@@ -1,3 +1,5 @@
+using MongoDB.Bson;
+using MongoDB.Driver;
 using Pacus.Application.Interfaces;
 using Pacus.Domain.Entities;
 using Pacus.Infrastructure.Mongo;
@@ -15,4 +17,9 @@ public class AuditLogRepository : IAuditLogRepository
         await _context.AuditLogs.InsertOneAsync(log);
         return log;
     }
+
+    public Task<List<AuditLog>> GetAllByFamilyAsync(ObjectId familyId) =>
+        _context.AuditLogs.Find(a => a.FamilyId == familyId)
+            .SortByDescending(a => a.CreatedAt)
+            .ToListAsync();
 }

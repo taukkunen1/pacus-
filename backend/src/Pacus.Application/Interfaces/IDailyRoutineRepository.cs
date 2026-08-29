@@ -10,6 +10,9 @@ public interface IDailyRoutineRepository
     Task UpdateAsync(DailyRoutine routine);
     Task<List<DailyRoutine>> GetHistoryAsync(ObjectId userId, string? from, string? to);
 
+    // Todas as rotinas (abertas e fechadas, sem filtro de data), para exportacao de dados (B2).
+    Task<List<DailyRoutine>> GetAllByFamilyAsync(ObjectId familyId);
+
     // A qualquer momento so deve existir no maximo uma rotina com status Open por usuario.
     // Usado pelo fechamento do dia para achar o que precisa ser fechado (pode estar atrasado varios dias).
     Task<DailyRoutine?> GetLatestOpenAsync(ObjectId userId);

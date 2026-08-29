@@ -52,6 +52,18 @@ Conta de cada membro da família — um documento por adulto e por criança.
 - **Destino em exclusão:** hard delete do documento (nome, e-mail e hash não têm valor fora do contexto da conta — ver B3).
 - **Controles de segurança:** hashing PBKDF2 (nunca texto puro), rate limiting no login (item A1), nunca exposto em resposta de API.
 
+### Revisão de necessidade de coleta (checklist de segurança, item C1)
+
+Passando campo a campo: `_id`, `role`, `name`, `familyId`, `createdAt`/`updatedAt` são estruturais (sem eles o app não funciona). `email`/`passwordHash` (adulto) e `pinHash` (criança) são o mecanismo de autenticação em si — não há como remover sem remover login. Nenhum desses tem alternativa mais minimalista dado o modelo atual do produto.
+
+O único campo que não passa no teste de necessidade hoje é **`timezone`**: o bootstrap sempre grava `"America/Sao_Paulo"` para adulto e criança (`BootstrapService.cs`), não existe nenhum endpoint que permita alterar esse valor depois, e as quatro únicas leituras de fuso horário no código (`DailyRoutinesController.GetToday`, `PointsController.AdjustBalance`, `StoreService.ApproveRedemptionAsync`, e o cálculo do dia operacional em geral) **ignoram o campo salvo e usam a mesma string fixa `"America/Sao_Paulo"` diretamente no código** — o valor gravado no banco nunca é lido de volta para decidir nada. Os comentários `TODO` já existentes no código (`DailyRoutinesController.cs`, `StoreService.cs`) confirmam que isso é uma lacuna conhecida, não um acidente desta auditoria.
+
+**Recomendação:** o campo hoje é peso morto — coletado, mas sem nenhum papel funcional, o que não atende ao princípio de necessidade/minimização da LGPD (art. 6º, III). Duas saídas razoáveis, e a escolha é uma decisão de produto:
+- **(a) Implementar de verdade** — adicionar um jeito do adulto configurar o fuso da família (ex. em `settings`) e trocar os quatro pontos hardcoded para ler esse valor. Aí o campo passa a ter propósito real.
+- **(b) Remover o campo** até que (a) seja priorizado — simples de reverter depois, já que o Mongo é schemaless (nenhuma migração necessária para tirar um campo não usado).
+
+Não removi o campo nesta auditoria: é uma decisão de produto (vocês já sinalizaram a intenção de dar suporte a fuso por família via os `TODO`s existentes), não um bug de segurança — ficou registrado aqui para vocês decidirem. Fora esse ponto, **nenhum outro campo de `users` foi coletado sem necessidade clara**, e nenhum dado sensível (art. 5º, II) está presente.
+
 ## 2. `pacus`
 
 O bichinho de estimação virtual da família — um documento por família.
@@ -353,3 +365,4 @@ Esta tabela é o ponto de partida direto para o **B3** (endpoint de exclusão de
 2. **`pacus_growth` e `task_events` não têm endpoint de leitura na UI normal do app** — são logs internos. O endpoint de exportação (`GET /api/v1/export`, item B2) já inclui os dois, então o adulto consegue ver esses dados via exportação mesmo sem uma tela dedicada no app.
 3. **`redemptions.itemTitle`/`cost` são cópias congeladas no momento do pedido** — bom para consistência histórica, mas significa que a exportação (B2) precisa considerar que o item pode não existir mais (`storeItemId` órfão) sem que isso seja um erro.
 4. **Nenhum dado sensível (LGPD art. 5º, II) é coletado hoje** — nenhuma collection tem saúde, biometria, dado racial, religioso, etc. O C1 (revisão de necessidade de coleta em `users`) deve confirmar isso e propor remoção de qualquer campo desnecessário encontrado.
+5. **`users.timezone` é coletado mas nunca lido de volta (achado do C1)** — o bootstrap grava sempre `"America/Sao_Paulo"`, não há endpoint para alterar, e as quatro leituras de fuso horário no código ignoram o valor salvo e usam a mesma string fixa. Ver seção 1 (`users`) para o detalhamento e as duas opções de encaminhamento (implementar de verdade vs. remover por ora) -- decisão de produto pendente.

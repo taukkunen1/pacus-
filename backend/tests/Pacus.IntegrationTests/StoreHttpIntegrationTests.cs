@@ -177,6 +177,41 @@ public class StoreHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
             response.StatusCode);
     }
 
+    // Checklist de seguranca e LGPD, item C2: RequestRedemption nao tem [RequireRole] --
+    // e a propria crianca que resgata itens da loja. Verifica que ela nao consegue usar
+    // o id de um item de OUTRA familia para gerar um resgate (item nunca encontrado
+    // porque a checagem de posse compara FamilyId, nao so o id do item).
+    [Fact]
+    public async Task RequestRedemption_WithAnotherFamilysStoreItemId_AsChild_ShouldNotBeAllowed()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var familyA = await BootstrapAsync(client);
+        await LoginAdultAsync(client, familyA);
+
+        var itemIdFromFamilyA =
+            await CreateStoreItemAsync(
+                client,
+                "Recompensa da Familia A",
+                1,
+                1);
+
+        var familyB = await BootstrapAsync(client);
+        await LoginChildAsync(client, familyB);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/store/redemptions",
+            new
+            {
+                storeItemId = itemIdFromFamilyA
+            });
+
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            response.StatusCode);
+    }
+
     [Fact]
     public async Task ApproveRedemption_ShouldApproveAndConsumeFiniteStock()
     {

@@ -191,6 +191,51 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
         Assert.Equal(HttpStatusCode.BadRequest, deleteResponse.StatusCode);
     }
 
+    // Checklist de seguranca e LGPD, item C2: a crianca tem acesso estrutural a estes
+    // mesmos endpoints (complete/update/delete nao tem [RequireRole], e autonomia da
+    // crianca sobre o dia atual e proposital -- ver comentarios no controller). O teste
+    // acima ja cobre o adulto; este cobre a crianca tentando o mesmo ataque de id.
+    [Fact]
+    public async Task TaskOperations_WithAnotherFamilysTaskId_AsChild_ShouldNotBeAllowed()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var familyA = await BootstrapAsync(client);
+        await LoginAdultAsync(client, familyA);
+        await EnsureTodayRoutineAsync(client);
+
+        var taskIdFromFamilyA = await CreateTaskAndGetIdAsync(client);
+
+        var familyB = await BootstrapAsync(client);
+        await LoginChildAsync(client, familyB);
+        await EnsureTodayRoutineAsync(client);
+
+        var completeResponse = await client.PostAsync(
+            $"/api/v1/daily-tasks/{taskIdFromFamilyA}/complete",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, completeResponse.StatusCode);
+
+        var updateResponse = await client.PutAsJsonAsync(
+            $"/api/v1/daily-tasks/{taskIdFromFamilyA}",
+            new
+            {
+                title = "Sequestrada pela crianca da Familia B",
+                description = (string?)null,
+                type = "expected",
+                period = "afternoon",
+                points = 3
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, updateResponse.StatusCode);
+
+        var deleteResponse = await client.DeleteAsync(
+            $"/api/v1/daily-tasks/{taskIdFromFamilyA}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, deleteResponse.StatusCode);
+    }
+
     [Fact]
     public async Task AdjustPoints_ShouldChangeTaskPoints_ThroughHttp()
     {

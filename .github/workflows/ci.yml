@@ -2,7 +2,7 @@ name: PACUS CI
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "feature/next-migration"]
   pull_request:
     branches: ["main"]
 

@@ -1,5 +1,7 @@
 using System.Text;
 using System.Text.Json;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
@@ -90,6 +92,44 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+
+// Rate limiting -- protege login (adulto/crianca) e criacao de familia contra
+// forca bruta. PIN da crianca tem so 4 digitos (10.000 combinacoes), entao sem
+// limite de tentativas da pra forcar bruta sem nenhum bloqueio. Particionado por
+// IP (X-Forwarded-For quando atras de proxy/Render, senao RemoteIpAddress).
+// Auditoria de seguranca, Fase A item A1.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("auth", httpContext =>
+    {
+        var partitionKey = GetClientIp(httpContext);
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ =>
+            new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(5),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            });
+    });
+
+    options.AddPolicy("bootstrap", httpContext =>
+    {
+        var partitionKey = GetClientIp(httpContext);
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ =>
+            new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(15),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            });
+    });
+});
 
 builder.Services.AddHttpContextAccessor();
 
@@ -202,11 +242,37 @@ app.UseHttpsRedirection();
 
 app.UseCors();
 
+// So aplica rate limiting fora de Development -- os testes de integracao
+// (PacusApiFactory) sobem o app em ambiente Development e fazem varias
+// chamadas de bootstrap/login em sequencia no mesmo host; com o limiter
+// ativo ali os testes comecariam a tomar 429 sem nenhuma relacao com o que
+// estao validando. Em producao (Render) o ambiente nao e Development, entao
+// o limite continua valendo de verdade.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseRateLimiter();
+}
+
 app.UseAuthentication();
 
 app.UseAuthorization();
 
 app.MapControllers();
+
+// X-Forwarded-For vem primeiro porque em producao (Render) a API fica atras de
+// proxy reverso -- sem isso, todo cliente apareceria com o mesmo IP do proxy e o
+// rate limit ficaria compartilhado entre todo mundo (ou bloquearia todo mundo
+// junto). RemoteIpAddress e o fallback pra execucao local/direta.
+static string GetClientIp(HttpContext context)
+{
+    var forwarded = context.Request.Headers["X-Forwarded-For"].ToString();
+    if (!string.IsNullOrWhiteSpace(forwarded))
+    {
+        return forwarded.Split(',')[0].Trim();
+    }
+
+    return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+}
 
 app.Run();
 

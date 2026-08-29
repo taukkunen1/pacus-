@@ -35,7 +35,7 @@ public class PacusHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
 
-        Assert.Equal("Young", body.GetProperty("stage").GetString());
+        Assert.Equal("young", body.GetProperty("stage").GetString());
         Assert.Equal(10, body.GetProperty("totalClosedDays").GetInt32());
     }
 

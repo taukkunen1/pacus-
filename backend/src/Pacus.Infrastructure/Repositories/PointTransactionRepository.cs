@@ -21,13 +21,13 @@ public class PointTransactionRepository : IPointTransactionRepository
     // Fonte da verdade: soma de todos os deltas. balanceAfter em cada doc e so um snapshot de leitura rapida.
     public async Task<int> GetBalanceAsync(ObjectId userId)
     {
-        var filter = Builders<PointTransaction>.Filter.Eq(t => t.UserId, userId);
+        var filter = Builders<PointTransaction>.Filter.Eq(t => t.FamilyId, userId);
         var transactions = await _context.PointTransactions.Find(filter).ToListAsync();
         return transactions.Sum(t => t.Points);
     }
 
     public Task<List<PointTransaction>> GetHistoryAsync(ObjectId userId, int limit = 100) =>
-        _context.PointTransactions.Find(t => t.UserId == userId)
+        _context.PointTransactions.Find(t => t.FamilyId == userId)
             .SortByDescending(t => t.CreatedAt)
             .Limit(limit)
             .ToListAsync();

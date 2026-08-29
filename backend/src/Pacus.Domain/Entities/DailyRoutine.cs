@@ -8,7 +8,11 @@ namespace Pacus.Domain.Entities;
 public class DailyRoutine
 {
     public ObjectId Id { get; set; }
-    public ObjectId UserId { get; set; }
+    // Renomeado de UserId -> FamilyId (checklist de seguranca, item A4): o valor sempre
+    // foi o id da familia, nunca de um usuario individual. BsonElement("userId") preserva
+    // o nome do campo ja gravado no Mongo (convencao camelCase), sem precisar de migracao.
+    [BsonElement("userId")]
+    public ObjectId FamilyId { get; set; }
     // Data operacional no timezone do usuario, formato YYYY-MM-DD.
     public string Date { get; set; } = string.Empty;
     public string Timezone { get; set; } = "America/Sao_Paulo";

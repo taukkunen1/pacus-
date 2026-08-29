@@ -14,7 +14,7 @@ public class FakeDailyRoutineRepository : IDailyRoutineRepository
     public Task<DailyRoutine?> GetByUserAndDateAsync(ObjectId userId, string date) =>
         Task.FromResult(
             _routines.FirstOrDefault(
-                r => r.UserId == userId &&
+                r => r.FamilyId == userId &&
                      r.Date == date));
 
     public Task<DailyRoutine> CreateAsync(
@@ -48,7 +48,7 @@ public class FakeDailyRoutineRepository : IDailyRoutineRepository
         var query =
             _routines.Where(
                 r =>
-                    r.UserId == userId &&
+                    r.FamilyId == userId &&
                     r.Status == RoutineStatus.Closed);
 
         if (from is not null)
@@ -86,7 +86,7 @@ public class FakeDailyRoutineRepository : IDailyRoutineRepository
             _routines
                 .Where(
                     r =>
-                        r.UserId == userId &&
+                        r.FamilyId == userId &&
                         r.Status == RoutineStatus.Open)
                 .OrderByDescending(
                     r => r.Date)
@@ -110,7 +110,7 @@ public class FakeTaskTemplateRepository
             _templates
                 .Where(
                     t =>
-                        t.UserId == userId &&
+                        t.FamilyId == userId &&
                         t.Active &&
                         t.DeletedAt is null)
                 .OrderBy(
@@ -198,7 +198,7 @@ public class FakePointTransactionRepository
         Task.FromResult(
             Transactions
                 .Where(
-                    t => t.UserId == userId)
+                    t => t.FamilyId == userId)
                 .Sum(
                     t => t.Points));
 
@@ -208,7 +208,7 @@ public class FakePointTransactionRepository
         Task.FromResult(
             Transactions
                 .Where(
-                    t => t.UserId == userId)
+                    t => t.FamilyId == userId)
                 .OrderByDescending(
                     t => t.CreatedAt)
                 .Take(limit)
@@ -337,7 +337,7 @@ public class FakeStoreRepository
             _items
                 .Where(
                     i =>
-                        i.UserId == userId &&
+                        i.FamilyId == userId &&
                         i.Active)
                 .OrderBy(
                     i => i.Cost)

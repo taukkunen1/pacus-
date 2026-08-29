@@ -469,7 +469,7 @@ public class StoreHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
     // Isolamento por familia (checklist de seguranca, item A2) -- Familia B
     // nao pode aprovar/rejeitar um resgate que pertence a Familia A so por
     // saber o ObjectId. StoreService.GetOwnedPendingRedemptionAsync ja faz
-    // essa checagem (redemption.UserId != familyId), este teste so prova
+    // essa checagem (redemption.FamilyId != familyId), este teste so prova
     // a garantia via HTTP e evita regressao.
     [Fact]
     public async Task ApproveRedemption_FromAnotherFamily_ShouldNotBeAllowed()

@@ -218,7 +218,7 @@ public class DayClosingServiceTests
                 new()
                 {
                     Id = ObjectId.GenerateNewId(),
-                    UserId = ObjectId.Empty,
+                    FamilyId = ObjectId.Empty,
                     Title = "Escovar dentes",
                     Type = TaskType.Mandatory,
                     Period = TaskPeriod.Morning,
@@ -233,7 +233,7 @@ public class DayClosingServiceTests
         var userId =
             ObjectId.GenerateNewId();
 
-        templates[0].UserId =
+        templates[0].FamilyId =
             userId;
 
         var (
@@ -338,7 +338,7 @@ public class DayClosingServiceTests
                 new()
                 {
                     Id = ObjectId.GenerateNewId(),
-                    UserId = ObjectId.Empty,
+                    FamilyId = ObjectId.Empty,
                     Title = "Ler livro",
                     Type = TaskType.Expected,
                     Period = TaskPeriod.Evening,
@@ -353,7 +353,7 @@ public class DayClosingServiceTests
         var userId =
             ObjectId.GenerateNewId();
 
-        templates[0].UserId =
+        templates[0].FamilyId =
             userId;
 
         var (
@@ -401,7 +401,7 @@ public class DayClosingServiceTests
         Assert.Equal(
             2,
             pointsRepo.Transactions.Count(
-                t => t.UserId == userId));
+                t => t.FamilyId == userId));
     }
 
     [Fact]
@@ -413,7 +413,7 @@ public class DayClosingServiceTests
                 new()
                 {
                     Id = ObjectId.GenerateNewId(),
-                    UserId = ObjectId.Empty,
+                    FamilyId = ObjectId.Empty,
                     Title = "Beber agua",
                     Type = TaskType.Mandatory,
                     Period = TaskPeriod.Morning,
@@ -428,7 +428,7 @@ public class DayClosingServiceTests
         var userId =
             ObjectId.GenerateNewId();
 
-        templates[0].UserId =
+        templates[0].FamilyId =
             userId;
 
         var (
@@ -471,7 +471,7 @@ public class DayClosingServiceTests
 
         Assert.Single(
             pointsRepo.Transactions.Where(
-                t => t.UserId == userId));
+                t => t.FamilyId == userId));
     }
 
     [Fact]
@@ -483,7 +483,7 @@ public class DayClosingServiceTests
                 new()
                 {
                     Id = ObjectId.GenerateNewId(),
-                    UserId = ObjectId.Empty,
+                    FamilyId = ObjectId.Empty,
                     Title = "Arrumar cama",
                     Type = TaskType.Mandatory,
                     Period = TaskPeriod.Morning,
@@ -498,7 +498,7 @@ public class DayClosingServiceTests
         var userId =
             ObjectId.GenerateNewId();
 
-        templates[0].UserId =
+        templates[0].FamilyId =
             userId;
 
         var (

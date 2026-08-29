@@ -642,14 +642,14 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
 
         var settings =
             await settingsCollection
-                .Find(s => s.UserId == familyObjectId)
+                .Find(s => s.FamilyId == familyObjectId)
                 .FirstOrDefaultAsync();
 
         settings ??=
             new Pacus.Domain.Entities.Settings
             {
                 Id = MongoDB.Bson.ObjectId.GenerateNewId(),
-                UserId = familyObjectId,
+                FamilyId = familyObjectId,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -676,7 +676,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
         settings.UpdatedAt = DateTime.UtcNow;
 
         await settingsCollection.ReplaceOneAsync(
-            s => s.UserId == familyObjectId,
+            s => s.FamilyId == familyObjectId,
             settings,
             new ReplaceOptions
             {

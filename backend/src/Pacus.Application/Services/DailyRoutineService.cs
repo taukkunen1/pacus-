@@ -144,7 +144,7 @@ public class DailyRoutineService : IDailyRoutineService
         var routine = new DailyRoutine
         {
             Id = ObjectId.GenerateNewId(),
-            UserId = userId,
+            FamilyId = userId,
             Date = date,
             Timezone = timezone,
             Status = RoutineStatus.Open,
@@ -236,7 +236,7 @@ public class DailyRoutineService : IDailyRoutineService
         var template = new TaskTemplate
         {
             Id = ObjectId.GenerateNewId(),
-            UserId = userId,
+            FamilyId = userId,
             Title = request.Title,
             Description = request.Description,
             Type = type,

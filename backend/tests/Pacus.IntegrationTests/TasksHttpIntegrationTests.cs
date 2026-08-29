@@ -8,7 +8,7 @@ namespace Pacus.IntegrationTests;
 // Cobertura do TasksController (templates permanentes de tarefa), com foco em
 // isolamento por familia — auditoria de seguranca encontrou Delete() chamando o
 // repositorio direto, sem checar FamilyId (corrigido para passar por
-// TaskTemplateService.DeleteAsync, que verifica template.UserId == familyId).
+// TaskTemplateService.DeleteAsync, que verifica template.FamilyId == familyId).
 public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
 {
     private readonly MongoIntegrationFixture _mongo;

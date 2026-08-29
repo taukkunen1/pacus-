@@ -13,11 +13,11 @@ public class SettingsRepository : ISettingsRepository
     public SettingsRepository(MongoDbContext context) => _context = context;
 
     public Task<Settings?> GetByUserIdAsync(ObjectId userId) =>
-        _context.Settings.Find(s => s.UserId == userId).FirstOrDefaultAsync();
+        _context.Settings.Find(s => s.FamilyId == userId).FirstOrDefaultAsync();
 
     public Task UpsertAsync(Settings settings) =>
         _context.Settings.ReplaceOneAsync(
-            s => s.UserId == settings.UserId,
+            s => s.FamilyId == settings.FamilyId,
             settings,
             new ReplaceOptions { IsUpsert = true });
 }

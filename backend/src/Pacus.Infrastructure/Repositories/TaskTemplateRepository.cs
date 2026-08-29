@@ -13,7 +13,7 @@ public class TaskTemplateRepository : ITaskTemplateRepository
     public TaskTemplateRepository(MongoDbContext context) => _context = context;
 
     public Task<List<TaskTemplate>> GetActiveByUserAsync(ObjectId userId) =>
-        _context.TaskTemplates.Find(t => t.UserId == userId && t.Active && t.DeletedAt == null)
+        _context.TaskTemplates.Find(t => t.FamilyId == userId && t.Active && t.DeletedAt == null)
             .SortBy(t => t.Order)
             .ToListAsync();
 

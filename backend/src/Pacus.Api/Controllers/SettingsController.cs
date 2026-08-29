@@ -47,7 +47,7 @@ public class SettingsController : ControllerBase
             ?? new Settings
             {
                 Id = ObjectId.GenerateNewId(),
-                UserId = _currentUser.FamilyId,
+                FamilyId = _currentUser.FamilyId,
                 CreatedAt = DateTime.UtcNow,
             };
 

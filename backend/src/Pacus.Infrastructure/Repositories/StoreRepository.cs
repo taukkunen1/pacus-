@@ -13,7 +13,7 @@ public class StoreRepository : IStoreRepository
     public StoreRepository(MongoDbContext context) => _context = context;
 
     public Task<List<StoreItem>> GetActiveItemsAsync(ObjectId userId) =>
-        _context.StoreItems.Find(i => i.UserId == userId && i.Active)
+        _context.StoreItems.Find(i => i.FamilyId == userId && i.Active)
             .SortBy(i => i.Cost)
             .ToListAsync();
 

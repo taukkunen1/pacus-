@@ -35,7 +35,7 @@ public class PointsService : IPointsService
         var transaction = new PointTransaction
         {
             Id = ObjectId.GenerateNewId(),
-            UserId = userId,
+            FamilyId = userId,
             Date = date,
             DailyRoutineId = dailyRoutineId,
             TaskId = taskId,

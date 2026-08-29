@@ -136,7 +136,7 @@ public class StoreController : ControllerBase
     {
         return new StoreItemResponse(
             item.Id.ToString(),
-            item.UserId.ToString(),
+            item.FamilyId.ToString(),
             item.Title,
             item.Description,
             item.Cost,
@@ -153,7 +153,7 @@ public class StoreController : ControllerBase
     {
         return new RedemptionResponse(
             redemption.Id.ToString(),
-            redemption.UserId.ToString(),
+            redemption.FamilyId.ToString(),
             redemption.StoreItemId.ToString(),
             redemption.ItemTitle,
             redemption.Cost,

@@ -208,7 +208,7 @@ public sealed class PointsHttpIntegrationTests
             new PointTransaction
             {
                 Id = ObjectId.GenerateNewId(),
-                UserId = familyObjectId,
+                FamilyId = familyObjectId,
                 Date = "2026-08-24",
                 TaskId = ObjectId.GenerateNewId().ToString(),
                 TaskTitle = taskTitle,

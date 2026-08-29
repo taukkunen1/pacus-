@@ -81,7 +81,7 @@ public class DayClosingIntegrationTests : IClassFixture<MongoIntegrationFixture>
             new DailyRoutine
             {
                 Id = ObjectId.GenerateNewId(),
-                UserId = userId,
+                FamilyId = userId,
                 Date = yesterday,
                 Timezone = "America/Sao_Paulo",
                 Status = RoutineStatus.Open,
@@ -268,7 +268,7 @@ public class DayClosingIntegrationTests : IClassFixture<MongoIntegrationFixture>
             new DailyRoutine
             {
                 Id = ObjectId.GenerateNewId(),
-                UserId = userId,
+                FamilyId = userId,
                 Date = missed1,
                 Timezone = "America/Sao_Paulo",
                 Status = RoutineStatus.Open,

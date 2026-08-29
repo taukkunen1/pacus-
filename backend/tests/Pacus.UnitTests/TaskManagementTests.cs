@@ -93,7 +93,7 @@ public class TaskManagementTests
         await dailyRoutine.AdjustTaskPointsAsync(userId, taskId, 2, userId, "adult"); // adulto aprova so 2
 
         Assert.Equal(2, await pointsRepo.GetBalanceAsync(userId)); // saldo reflete o valor final
-        Assert.Equal(2, pointsRepo.Transactions.Count(t => t.UserId == userId)); // award + adjustment
+        Assert.Equal(2, pointsRepo.Transactions.Count(t => t.FamilyId == userId)); // award + adjustment
     }
 
     [Fact]

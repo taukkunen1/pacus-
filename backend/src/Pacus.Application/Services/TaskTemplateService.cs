@@ -25,7 +25,7 @@ public class TaskTemplateService : ITaskTemplateService
         var template = new TaskTemplate
         {
             Id = ObjectId.GenerateNewId(),
-            UserId = familyId,
+            FamilyId = familyId,
             Title = request.Title,
             Description = request.Description,
             Type = type,
@@ -52,7 +52,7 @@ public class TaskTemplateService : ITaskTemplateService
 
         var template = await _taskTemplateRepository.GetByIdAsync(templateId);
 
-        if (template is null || template.UserId != familyId)
+        if (template is null || template.FamilyId != familyId)
             throw new InvalidOperationException("Tarefa permanente nao encontrada.");
 
         var (type, period) = ParseTypeAndPeriod(request);
@@ -78,7 +78,7 @@ public class TaskTemplateService : ITaskTemplateService
 
         var template = await _taskTemplateRepository.GetByIdAsync(templateId);
 
-        if (template is null || template.UserId != familyId)
+        if (template is null || template.FamilyId != familyId)
             throw new InvalidOperationException("Tarefa permanente nao encontrada.");
 
         await _taskTemplateRepository.ActivateAsync(templateId);
@@ -98,7 +98,7 @@ public class TaskTemplateService : ITaskTemplateService
         // familia so sabendo (ou adivinhando) o ObjectId. Achado em auditoria de
         // seguranca (isolamento por FamilyId) — nunca chamar o repositorio direto
         // a partir do controller para operacoes que envolvem posse.
-        if (template is null || template.UserId != familyId)
+        if (template is null || template.FamilyId != familyId)
             throw new InvalidOperationException("Tarefa permanente nao encontrada.");
 
         await _taskTemplateRepository.SoftDeleteAsync(templateId);

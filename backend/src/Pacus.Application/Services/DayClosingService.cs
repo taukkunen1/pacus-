@@ -82,7 +82,7 @@ public class DayClosingService : IDayClosingService
 
     private async Task GrowPacusOnceAsync(DailyRoutine routine)
     {
-        var pacus = await _pacusRepository.GetByFamilyIdAsync(routine.UserId);
+        var pacus = await _pacusRepository.GetByFamilyIdAsync(routine.FamilyId);
         if (pacus is null) return; // Usuario ainda nao tem um PACUS configurado â€” nada a crescer.
 
         // Guarda primaria: lastGrowthDate. Se ja processado, sai sem tocar em nada.
@@ -90,13 +90,13 @@ public class DayClosingService : IDayClosingService
 
         // Guarda secundaria (defesa em profundidade): indice unico {userId, date} em pacus_growth.
         // Cobre corridas onde duas requisicoes tentam fechar o mesmo dia ao mesmo tempo.
-        var alreadyLogged = await _pacusGrowthRepository.GetByUserAndDateAsync(routine.UserId, routine.Date);
+        var alreadyLogged = await _pacusGrowthRepository.GetByUserAndDateAsync(routine.FamilyId, routine.Date);
         if (alreadyLogged is not null) return;
 
         var stageBefore = pacus.Stage;
         var sizeBefore = pacus.Size;
 
-        var settings = await _settingsRepository.GetByUserIdAsync(routine.UserId);
+        var settings = await _settingsRepository.GetByUserIdAsync(routine.FamilyId);
         var newStage = DetermineStage(settings?.GrowthStages, routine.Date, stageBefore);
 
         pacus.TotalClosedDays += 1;
@@ -121,7 +121,7 @@ public class DayClosingService : IDayClosingService
         await _pacusGrowthRepository.CreateAsync(new PacusGrowthLog
         {
             Id = ObjectId.GenerateNewId(),
-            UserId = routine.UserId,
+            UserId = routine.FamilyId,
             PacusId = pacus.Id,
             Date = routine.Date,
             DailyRoutineId = routine.Id,

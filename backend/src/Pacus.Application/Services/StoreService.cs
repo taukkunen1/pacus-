@@ -27,7 +27,7 @@ public class StoreService : IStoreService
         var item = new StoreItem
         {
             Id = ObjectId.GenerateNewId(),
-            UserId = familyId,
+            FamilyId = familyId,
             Title = request.Title,
             Description = request.Description,
             Cost = request.Cost,
@@ -46,7 +46,7 @@ public class StoreService : IStoreService
     public async Task<Redemption> RequestRedemptionAsync(ObjectId familyId, ObjectId childId, ObjectId storeItemId)
     {
         var item = await _storeRepository.GetItemByIdAsync(storeItemId);
-        if (item is null || item.UserId != familyId || !item.Active)
+        if (item is null || item.FamilyId != familyId || !item.Active)
             throw new InvalidOperationException("Item da loja nao encontrado ou indisponivel.");
 
         if (item.Stock is not null && item.Stock <= 0)
@@ -55,7 +55,7 @@ public class StoreService : IStoreService
         var redemption = new Redemption
         {
             Id = ObjectId.GenerateNewId(),
-            UserId = familyId,
+            FamilyId = familyId,
             StoreItemId = item.Id,
             ItemTitle = item.Title,
             Cost = item.Cost,
@@ -126,7 +126,7 @@ public class StoreService : IStoreService
             throw new InvalidOperationException("Id de resgate invalido.");
 
         var redemption = await _storeRepository.GetRedemptionByIdAsync(id);
-        if (redemption is null || redemption.UserId != familyId)
+        if (redemption is null || redemption.FamilyId != familyId)
             throw new InvalidOperationException("Resgate nao encontrado.");
 
         if (redemption.Status != RedemptionStatus.Pending)

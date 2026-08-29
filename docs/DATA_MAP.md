@@ -366,3 +366,12 @@ Esta tabela é o ponto de partida direto para o **B3** (endpoint de exclusão de
 3. **`redemptions.itemTitle`/`cost` são cópias congeladas no momento do pedido** — bom para consistência histórica, mas significa que a exportação (B2) precisa considerar que o item pode não existir mais (`storeItemId` órfão) sem que isso seja um erro.
 4. **Nenhum dado sensível (LGPD art. 5º, II) é coletado hoje** — nenhuma collection tem saúde, biometria, dado racial, religioso, etc. O C1 (revisão de necessidade de coleta em `users`) deve confirmar isso e propor remoção de qualquer campo desnecessário encontrado.
 5. **`users.timezone` é coletado mas nunca lido de volta (achado do C1)** — o bootstrap grava sempre `"America/Sao_Paulo"`, não há endpoint para alterar, e as quatro leituras de fuso horário no código ignoram o valor salvo e usam a mesma string fixa. Ver seção 1 (`users`) para o detalhamento e as duas opções de encaminhamento (implementar de verdade vs. remover por ora) -- decisão de produto pendente.
+
+### Melhorias de banco de dados (fora do checklist original, sugeridas na revisão pós-auditoria)
+
+O Mongo não tem chave estrangeira nem `ON DELETE CASCADE` -- toda a integridade entre collections depende só da aplicação. Duas lacunas concretas foram fechadas com uma segunda barreira no próprio banco, verificadas contra um MongoDB 8 real antes de entrar (nenhum dos dois scripts roda em CI hoje, então a verificação manual era a única rede de segurança):
+
+- **`database/mongodb/indexes/create-indexes.js`** -- novo índice único parcial `one_open_routine_per_family` em `daily_routines`. A invariante "no máximo uma rotina Open por família" só era garantida pelo `DayClosingService`, nunca pelo banco -- agora o próprio Mongo recusa a segunda. Testado: bloqueia uma segunda rotina Open da mesma família, permite rotina Closed e permite Open de outra família.
+- **`database/mongodb/validators/apply-validators.js`** (novo arquivo) -- `$jsonSchema` validator na collection `users`, em `validationAction: "warn"` (só registra em log, não bloqueia -- trocar para `"error"` depois de observar produção por um tempo sem warnings). Testado: aceita o formato real que a aplicação grava, rejeita um documento malformado quando em modo `error`.
+
+Nenhum dos dois muda o comportamento da aplicação -- são scripts manuais que você roda contra o Atlas quando quiser (mesmo fluxo do `create-indexes.js` já existente).

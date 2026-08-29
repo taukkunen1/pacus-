@@ -11,6 +11,21 @@ db.task_templates.createIndex({ userId: 1, active: 1 });
 db.daily_routines.createIndex({ userId: 1, date: 1 }, { unique: true });
 db.daily_routines.createIndex({ userId: 1, status: 1 });
 
+// Melhoria de banco (revisao pos-auditoria): a invariante "no maximo uma rotina
+// com status Open por familia" so era garantida pela aplicacao (DayClosingService),
+// nunca pelo banco -- ver comentario em IDailyRoutineRepository.cs. Este indice unico
+// parcial faz o proprio Mongo recusar uma segunda rotina Open da mesma familia, em vez
+// de confiar so na logica do servico. status: 0 = RoutineStatus.Open (enum gravado como
+// int, sem [BsonRepresentation(BsonType.String)] -- ver RoutineStatus.cs).
+db.daily_routines.createIndex(
+  { userId: 1, status: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: 0 },
+    name: "one_open_routine_per_family",
+  }
+);
+
 db.point_transactions.createIndex({ userId: 1, createdAt: -1 });
 db.point_transactions.createIndex({ userId: 1, date: 1 });
 db.point_transactions.createIndex({ dailyRoutineId: 1 });

@@ -36,4 +36,7 @@ public class PacusGrowthRepository : IPacusGrowthRepository
         _context.PacusGrowthLogs.Find(l => l.UserId == familyId)
             .SortByDescending(l => l.Date)
             .ToListAsync();
+
+    public Task DeleteAllByFamilyAsync(ObjectId familyId) =>
+        _context.PacusGrowthLogs.DeleteManyAsync(l => l.UserId == familyId);
 }

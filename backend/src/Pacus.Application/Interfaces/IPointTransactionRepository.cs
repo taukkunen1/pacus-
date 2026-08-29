@@ -11,4 +11,7 @@ public interface IPointTransactionRepository
 
     // Todas as transacoes, sem limite, para exportacao de dados (B2).
     Task<List<PointTransaction>> GetAllByFamilyAsync(ObjectId familyId);
+
+    // Remove todas as transacoes da familia -- exclusao de conta (LGPD, item B3).
+    Task DeleteAllByFamilyAsync(ObjectId familyId);
 }

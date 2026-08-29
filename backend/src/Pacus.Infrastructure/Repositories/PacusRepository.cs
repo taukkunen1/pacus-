@@ -23,4 +23,7 @@ public class PacusRepository : IPacusRepository
 
     public Task UpdateAsync(PacusEntity pacus) =>
         _context.Pacus.ReplaceOneAsync(p => p.Id == pacus.Id, pacus);
+
+    public Task DeleteByFamilyIdAsync(ObjectId familyId) =>
+        _context.Pacus.DeleteManyAsync(p => p.FamilyId == familyId);
 }

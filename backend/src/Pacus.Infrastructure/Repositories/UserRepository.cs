@@ -33,4 +33,7 @@ public class UserRepository : IUserRepository
 
     public Task<List<User>> GetByFamilyAsync(ObjectId familyId) =>
         _context.Users.Find(u => u.FamilyId == familyId).ToListAsync();
+
+    public Task DeleteAllByFamilyAsync(ObjectId familyId) =>
+        _context.Users.DeleteManyAsync(u => u.FamilyId == familyId);
 }

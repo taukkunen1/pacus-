@@ -50,4 +50,7 @@ public class DailyRoutineRepository : IDailyRoutineRepository
         _context.DailyRoutines.Find(r => r.FamilyId == familyId)
             .SortByDescending(r => r.Date)
             .ToListAsync();
+
+    public Task DeleteAllByFamilyAsync(ObjectId familyId) =>
+        _context.DailyRoutines.DeleteManyAsync(r => r.FamilyId == familyId);
 }

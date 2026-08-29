@@ -99,6 +99,14 @@ public class FakeDailyRoutineRepository : IDailyRoutineRepository
                 .Where(r => r.FamilyId == familyId)
                 .OrderByDescending(r => r.Date)
                 .ToList());
+
+    public Task DeleteAllByFamilyAsync(
+        ObjectId familyId)
+    {
+        _routines.RemoveAll(r => r.FamilyId == familyId);
+
+        return Task.CompletedTask;
+    }
 }
 
 public class FakeTaskTemplateRepository
@@ -194,6 +202,14 @@ public class FakeTaskTemplateRepository
                 .Where(t => t.FamilyId == familyId)
                 .OrderBy(t => t.Order)
                 .ToList());
+
+    public Task DeleteAllByFamilyAsync(
+        ObjectId familyId)
+    {
+        _templates.RemoveAll(t => t.FamilyId == familyId);
+
+        return Task.CompletedTask;
+    }
 }
 
 public class FakePointTransactionRepository
@@ -237,6 +253,14 @@ public class FakePointTransactionRepository
                 .Where(t => t.FamilyId == familyId)
                 .OrderByDescending(t => t.CreatedAt)
                 .ToList());
+
+    public Task DeleteAllByFamilyAsync(
+        ObjectId familyId)
+    {
+        Transactions.RemoveAll(t => t.FamilyId == familyId);
+
+        return Task.CompletedTask;
+    }
 }
 
 public class FakeTaskEventRepository
@@ -259,6 +283,14 @@ public class FakeTaskEventRepository
                 .Where(e => e.UserId == familyId)
                 .OrderByDescending(e => e.CreatedAt)
                 .ToList());
+
+    public Task DeleteAllByFamilyAsync(
+        ObjectId familyId)
+    {
+        Events.RemoveAll(e => e.UserId == familyId);
+
+        return Task.CompletedTask;
+    }
 }
 
 public class FakePacusRepository
@@ -292,6 +324,14 @@ public class FakePacusRepository
         {
             _pacus[index] = pacus;
         }
+
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteByFamilyIdAsync(
+        ObjectId familyId)
+    {
+        _pacus.RemoveAll(p => p.FamilyId == familyId);
 
         return Task.CompletedTask;
     }
@@ -339,6 +379,14 @@ public class FakePacusGrowthRepository
                 .Where(l => l.UserId == familyId)
                 .OrderByDescending(l => l.Date)
                 .ToList());
+
+    public Task DeleteAllByFamilyAsync(
+        ObjectId familyId)
+    {
+        Logs.RemoveAll(l => l.UserId == familyId);
+
+        return Task.CompletedTask;
+    }
 }
 
 public class FakeSettingsRepository
@@ -360,6 +408,17 @@ public class FakeSettingsRepository
         Settings settings)
     {
         _settings = settings;
+
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteByFamilyIdAsync(
+        ObjectId familyId)
+    {
+        if (_settings is not null && _settings.FamilyId == familyId)
+        {
+            _settings = null;
+        }
 
         return Task.CompletedTask;
     }
@@ -456,6 +515,22 @@ public class FakeStoreRepository
                 .Where(r => r.FamilyId == familyId)
                 .OrderByDescending(r => r.RequestedAt)
                 .ToList());
+
+    public Task DeleteAllItemsByFamilyAsync(
+        ObjectId familyId)
+    {
+        _items.RemoveAll(i => i.FamilyId == familyId);
+
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAllRedemptionsByFamilyAsync(
+        ObjectId familyId)
+    {
+        _redemptions.RemoveAll(r => r.FamilyId == familyId);
+
+        return Task.CompletedTask;
+    }
 }
 
 public class FakeAuditLogRepository
@@ -478,4 +553,18 @@ public class FakeAuditLogRepository
                 .Where(l => l.FamilyId == familyId)
                 .OrderByDescending(l => l.CreatedAt)
                 .ToList());
+
+    public Task AnonymizeByFamilyAsync(
+        ObjectId familyId,
+        DateTime purgeAt)
+    {
+        foreach (var log in Logs.Where(l => l.FamilyId == familyId))
+        {
+            log.ActorId = ObjectId.Empty;
+            log.Anonymized = true;
+            log.PurgeAt = purgeAt;
+        }
+
+        return Task.CompletedTask;
+    }
 }

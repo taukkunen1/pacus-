@@ -22,4 +22,7 @@ public class TaskEventRepository : ITaskEventRepository
         _context.TaskEvents.Find(e => e.UserId == familyId)
             .SortByDescending(e => e.CreatedAt)
             .ToListAsync();
+
+    public Task DeleteAllByFamilyAsync(ObjectId familyId) =>
+        _context.TaskEvents.DeleteManyAsync(e => e.UserId == familyId);
 }

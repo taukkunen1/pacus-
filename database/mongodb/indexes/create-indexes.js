@@ -31,4 +31,12 @@ db.pacus_growth.createIndex({ pacusId: 1, createdAt: -1 });
 
 db.settings.createIndex({ userId: 1 }, { unique: true });
 
+db.audit_logs.createIndex({ familyId: 1, createdAt: -1 });
+
+// Exclusao de conta (LGPD, item B3): logs de auditoria anonimizados sao apagados
+// automaticamente quando purgeAt e alcancado (expireAfterSeconds: 0 = expira no
+// proprio valor do campo). Logs nao anonimizados nao tem purgeAt (null), entao
+// nunca expiram por este indice.
+db.audit_logs.createIndex({ purgeAt: 1 }, { expireAfterSeconds: 0 });
+
 print("Indices criados com sucesso.");

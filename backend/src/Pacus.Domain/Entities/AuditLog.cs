@@ -28,4 +28,11 @@ public class AuditLog
     public ObjectId ActorId { get; set; }
     public UserRole ActorRole { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    // Anonimizacao pos-exclusao de conta (LGPD, item B3): quando a familia e excluida, o
+    // log em si e preservado por um periodo (legitimo interesse -- responsabilizacao /
+    // prevencao a fraude, art. 7 IX), mas o vinculo direto com a pessoa (ActorId) e
+    // removido. PurgeAt marca quando o log pode ser definitivamente apagado (indice TTL).
+    public bool Anonymized { get; set; }
+    public DateTime? PurgeAt { get; set; }
 }

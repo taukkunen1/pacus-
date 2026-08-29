@@ -22,4 +22,12 @@ public class AuditLogRepository : IAuditLogRepository
         _context.AuditLogs.Find(a => a.FamilyId == familyId)
             .SortByDescending(a => a.CreatedAt)
             .ToListAsync();
+
+    public Task AnonymizeByFamilyAsync(ObjectId familyId, DateTime purgeAt) =>
+        _context.AuditLogs.UpdateManyAsync(
+            a => a.FamilyId == familyId,
+            Builders<AuditLog>.Update
+                .Set(a => a.ActorId, ObjectId.Empty)
+                .Set(a => a.Anonymized, true)
+                .Set(a => a.PurgeAt, purgeAt));
 }

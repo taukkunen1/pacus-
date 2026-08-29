@@ -36,4 +36,7 @@ public class PointTransactionRepository : IPointTransactionRepository
         _context.PointTransactions.Find(t => t.FamilyId == familyId)
             .SortByDescending(t => t.CreatedAt)
             .ToListAsync();
+
+    public Task DeleteAllByFamilyAsync(ObjectId familyId) =>
+        _context.PointTransactions.DeleteManyAsync(t => t.FamilyId == familyId);
 }

@@ -7,4 +7,7 @@ public interface IHabitatRepository
 {
     Task<Habitat?> GetByFamilyIdAsync(ObjectId familyId);
     Task<Habitat> UpsertAsync(Habitat habitat);
+
+    // Remove o habitat da familia -- exclusao de conta (LGPD, item B3).
+    Task DeleteByFamilyIdAsync(ObjectId familyId);
 }

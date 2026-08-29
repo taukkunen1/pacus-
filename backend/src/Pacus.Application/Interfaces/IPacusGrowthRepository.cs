@@ -12,4 +12,8 @@ public interface IPacusGrowthRepository
 
     // Todos os logs de crescimento, para exportacao de dados (B2).
     Task<List<PacusGrowthLog>> GetAllByFamilyAsync(ObjectId familyId);
+
+    // Remove todos os logs de crescimento da familia -- exclusao de conta (LGPD, item B3).
+    // Nota: o campo se chama UserId mas guarda o FamilyId (nao foi renomeado no A4) -- ver docs/DATA_MAP.md.
+    Task DeleteAllByFamilyAsync(ObjectId familyId);
 }

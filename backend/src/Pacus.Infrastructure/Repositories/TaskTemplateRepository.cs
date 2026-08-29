@@ -49,4 +49,7 @@ public class TaskTemplateRepository : ITaskTemplateRepository
                 .Set(t => t.Active, true)
                 .Set(t => t.DeletedAt, (DateTime?)null)
                 .Set(t => t.UpdatedAt, DateTime.UtcNow));
+
+    public Task DeleteAllByFamilyAsync(ObjectId familyId) =>
+        _context.TaskTemplates.DeleteManyAsync(t => t.FamilyId == familyId);
 }

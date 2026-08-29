@@ -50,4 +50,10 @@ public class StoreRepository : IStoreRepository
         _context.Redemptions.Find(r => r.FamilyId == familyId)
             .SortByDescending(r => r.RequestedAt)
             .ToListAsync();
+
+    public Task DeleteAllItemsByFamilyAsync(ObjectId familyId) =>
+        _context.StoreItems.DeleteManyAsync(i => i.FamilyId == familyId);
+
+    public Task DeleteAllRedemptionsByFamilyAsync(ObjectId familyId) =>
+        _context.Redemptions.DeleteManyAsync(r => r.FamilyId == familyId);
 }

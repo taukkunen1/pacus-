@@ -20,4 +20,7 @@ public class SettingsRepository : ISettingsRepository
             s => s.FamilyId == settings.FamilyId,
             settings,
             new ReplaceOptions { IsUpsert = true });
+
+    public Task DeleteByFamilyIdAsync(ObjectId familyId) =>
+        _context.Settings.DeleteManyAsync(s => s.FamilyId == familyId);
 }

@@ -16,4 +16,7 @@ public interface IDailyRoutineRepository
     // A qualquer momento so deve existir no maximo uma rotina com status Open por usuario.
     // Usado pelo fechamento do dia para achar o que precisa ser fechado (pode estar atrasado varios dias).
     Task<DailyRoutine?> GetLatestOpenAsync(ObjectId userId);
+
+    // Remove todas as rotinas da familia -- exclusao de conta (LGPD, item B3).
+    Task DeleteAllByFamilyAsync(ObjectId familyId);
 }

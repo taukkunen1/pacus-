@@ -18,4 +18,7 @@ public interface ITaskTemplateRepository
     // caminho de replicar os dados da tarefa (ja guardados no template inativo desde
     // a criacao) para todos os dias seguintes, sem reescrever nada.
     Task ActivateAsync(ObjectId id);
+
+    // Remove todos os templates da familia -- exclusao de conta (LGPD, item B3).
+    Task DeleteAllByFamilyAsync(ObjectId familyId);
 }

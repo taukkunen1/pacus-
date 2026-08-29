@@ -17,4 +17,8 @@ public interface IStoreRepository
     // exportacao de dados (B2).
     Task<List<StoreItem>> GetAllItemsByFamilyAsync(ObjectId familyId);
     Task<List<Redemption>> GetAllRedemptionsByFamilyAsync(ObjectId familyId);
+
+    // Remove todos os itens e resgates da familia -- exclusao de conta (LGPD, item B3).
+    Task DeleteAllItemsByFamilyAsync(ObjectId familyId);
+    Task DeleteAllRedemptionsByFamilyAsync(ObjectId familyId);
 }

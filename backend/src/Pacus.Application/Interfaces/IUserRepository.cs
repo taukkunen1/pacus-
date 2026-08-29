@@ -14,4 +14,7 @@ public interface IUserRepository
 
     // Todos os membros da familia (adulto + crianca(s)), para exportacao de dados (LGPD, item B2).
     Task<List<User>> GetByFamilyAsync(ObjectId familyId);
+
+    // Remove todos os usuarios da familia -- exclusao de conta (LGPD, item B3).
+    Task DeleteAllByFamilyAsync(ObjectId familyId);
 }

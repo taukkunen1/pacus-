@@ -10,4 +10,7 @@ public interface IPacusRepository
     Task<PacusEntity?> GetByFamilyIdAsync(ObjectId familyId);
     Task<PacusEntity> CreateAsync(PacusEntity pacus);
     Task UpdateAsync(PacusEntity pacus);
+
+    // Remove o pacus da familia -- exclusao de conta (LGPD, item B3).
+    Task DeleteByFamilyIdAsync(ObjectId familyId);
 }

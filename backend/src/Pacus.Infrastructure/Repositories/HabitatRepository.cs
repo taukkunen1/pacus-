@@ -28,4 +28,7 @@ public class HabitatRepository : IHabitatRepository
 
         return habitat;
     }
+
+    public Task DeleteByFamilyIdAsync(ObjectId familyId) =>
+        _context.Habitats.DeleteManyAsync(h => h.FamilyId == familyId);
 }

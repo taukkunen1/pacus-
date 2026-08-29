@@ -110,6 +110,11 @@ public class DailyRoutineHttpIntegrationTests : IClassFixture<MongoIntegrationFi
 
         await BootstrapAndLoginAdultAsync(client);
 
+        // CreateAdHocTaskAsync exige uma rotina "em aberto" pra familia --
+        // sem isso da InvalidOperationException / 400. GetToday cria a
+        // rotina de hoje se ainda nao existir.
+        await client.GetAsync("/api/v1/daily-routines/today");
+
         var createResponse = await client.PostAsJsonAsync(
             "/api/v1/daily-tasks",
             new

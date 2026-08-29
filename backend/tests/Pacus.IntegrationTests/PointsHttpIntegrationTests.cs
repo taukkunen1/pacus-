@@ -323,6 +323,63 @@ public sealed class PointsHttpIntegrationTests
             childPin);
     }
 
+    // Isolamento por familia (checklist de seguranca, item A2). Saldo e
+    // extrato sao sempre "os da familia do token" (sem id de rota), entao a
+    // garantia e estrutural -- este teste prova via HTTP que ajustar o saldo
+    // da Familia A nao vaza pro saldo da Familia B.
+    [Fact]
+    public async Task Balance_ShouldBeIsolatedPerFamily()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var familyA = await BootstrapAsync(client);
+        await LoginAdultAsync(client, familyA);
+
+        var adjustA = await client.PostAsJsonAsync(
+            "/api/v1/points/adjust",
+            new { balance = 50, reason = "saldo inicial familia A" });
+
+        Assert.Equal(HttpStatusCode.OK, adjustA.StatusCode);
+
+        var familyB = await BootstrapAsync(client);
+        await LoginAdultAsync(client, familyB);
+
+        var balanceB = await client.GetAsync("/api/v1/points");
+        Assert.Equal(HttpStatusCode.OK, balanceB.StatusCode);
+
+        var body = await balanceB.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(0, body.GetProperty("balance").GetInt32());
+    }
+
+    [Fact]
+    public async Task Transactions_ShouldNotLeakBetweenFamilies()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var familyA = await BootstrapAsync(client);
+        await LoginAdultAsync(client, familyA);
+
+        await client.PostAsJsonAsync(
+            "/api/v1/points/adjust",
+            new { balance = 7, reason = "transacao exclusiva da familia A" });
+
+        var familyB = await BootstrapAsync(client);
+        await LoginAdultAsync(client, familyB);
+
+        var response = await client.GetAsync("/api/v1/points/transactions");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var transactions = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.DoesNotContain(
+            transactions.EnumerateArray(),
+            t => t.TryGetProperty("reason", out var reason)
+                 && reason.GetString() == "transacao exclusiva da familia A");
+    }
+
     private sealed record TestFamily(
         string AdultUserId,
         string ChildUserId,

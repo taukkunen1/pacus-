@@ -466,6 +466,103 @@ public class StoreHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
             response.StatusCode);
     }
 
+    // Isolamento por familia (checklist de seguranca, item A2) -- Familia B
+    // nao pode aprovar/rejeitar um resgate que pertence a Familia A so por
+    // saber o ObjectId. StoreService.GetOwnedPendingRedemptionAsync ja faz
+    // essa checagem (redemption.UserId != familyId), este teste so prova
+    // a garantia via HTTP e evita regressao.
+    [Fact]
+    public async Task ApproveRedemption_FromAnotherFamily_ShouldNotBeAllowed()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var familyA = await BootstrapAsync(client);
+        await LoginAdultAsync(client, familyA);
+
+        var itemId = await CreateStoreItemAsync(client, "Recompensa da Familia A", 1, 2);
+
+        await LoginChildAsync(client, familyA);
+
+        var requestResponse = await client.PostAsJsonAsync(
+            "/api/v1/store/redemptions",
+            new { storeItemId = itemId });
+
+        var redemption = await requestResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var redemptionId = redemption.GetProperty("id").GetString()!;
+
+        var familyB = await BootstrapAsync(client);
+        await LoginAdultAsync(client, familyB);
+
+        var approveResponse = await client.PutAsync(
+            $"/api/v1/store/redemptions/{redemptionId}/approve",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, approveResponse.StatusCode);
+
+        // Confirma que o resgate da Familia A continua pendente (nao foi mexido).
+        await LoginAdultAsync(client, familyA);
+
+        var rejectByOwnerResponse = await client.PutAsync(
+            $"/api/v1/store/redemptions/{redemptionId}/reject",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.OK, rejectByOwnerResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task RejectRedemption_FromAnotherFamily_ShouldNotBeAllowed()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var familyA = await BootstrapAsync(client);
+        await LoginAdultAsync(client, familyA);
+
+        var itemId = await CreateStoreItemAsync(client, "Outra recompensa da Familia A", 1, null);
+
+        await LoginChildAsync(client, familyA);
+
+        var requestResponse = await client.PostAsJsonAsync(
+            "/api/v1/store/redemptions",
+            new { storeItemId = itemId });
+
+        var redemption = await requestResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var redemptionId = redemption.GetProperty("id").GetString()!;
+
+        var familyB = await BootstrapAsync(client);
+        await LoginAdultAsync(client, familyB);
+
+        var rejectResponse = await client.PutAsync(
+            $"/api/v1/store/redemptions/{redemptionId}/reject",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, rejectResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetItems_ShouldNotReturnAnotherFamilysItems()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var familyA = await BootstrapAsync(client);
+        await LoginAdultAsync(client, familyA);
+        var itemIdA = await CreateStoreItemAsync(client, "Item exclusivo da Familia A", 5, null);
+
+        var familyB = await BootstrapAsync(client);
+        await LoginAdultAsync(client, familyB);
+
+        var response = await client.GetAsync("/api/v1/store/items");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var items = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.DoesNotContain(
+            items.EnumerateArray(),
+            i => i.GetProperty("id").GetString() == itemIdA);
+    }
+
     private async Task EnsureTodayRoutineAsync(
         HttpClient client)
     {

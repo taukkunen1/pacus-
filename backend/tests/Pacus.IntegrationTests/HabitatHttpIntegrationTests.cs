@@ -313,6 +313,89 @@ public class HabitatHttpIntegrationTests : IClassFixture<MongoIntegrationFixture
             HttpStatusCode.Forbidden,
             updateResponse.StatusCode);
     }
+
+    // Isolamento por familia (checklist de seguranca, item A2). O habitat nao
+    // tem id de rota -- e sempre "o habitat da familia do token" -- entao a
+    // garantia aqui e estrutural (GetByFamilyIdAsync so busca pelo FamilyId
+    // do token), mas o teste prova isso via HTTP pra virar regressao se
+    // alguem trocar a query um dia.
+    [Fact]
+    public async Task Habitat_ShouldBeIsolatedPerFamily()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        await BootstrapAndLoginAdultAsync(client);
+
+        var updateA = await client.PutAsJsonAsync(
+            "/api/v1/pacus/me/habitat",
+            new
+            {
+                bounds = new { width = 900, height = 500 },
+                elements = new
+                {
+                    water = true,
+                    plants = new[] { "familia-a-planta" },
+                    rocks = Array.Empty<string>(),
+                    hidingSpots = Array.Empty<string>(),
+                    bubbles = false
+                },
+                theme = "familia-a"
+            });
+
+        Assert.Equal(HttpStatusCode.OK, updateA.StatusCode);
+
+        await BootstrapAndLoginAdultAsync(client);
+
+        var getB = await client.GetAsync("/api/v1/pacus/me/habitat");
+        Assert.Equal(HttpStatusCode.OK, getB.StatusCode);
+
+        var habitatB = await getB.Content.ReadFromJsonAsync<JsonElement>();
+
+        // Familia B nunca setou theme/elements -- se estivesse vendo o
+        // habitat da Familia A, "theme" viria "familia-a".
+        Assert.NotEqual(
+            "familia-a",
+            habitatB.TryGetProperty("theme", out var themeB) ? themeB.GetString() : null);
+    }
+
+    private async Task<string> BootstrapAndLoginAdultAsync(HttpClient client)
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var adultEmail = $"adult-{suffix}@test.local";
+        const string adultPassword = "Teste123!";
+
+        var bootstrapResponse = await client.PostAsJsonAsync(
+            "/api/v1/bootstrap",
+            new
+            {
+                adultName = $"Adulto {suffix}",
+                adultEmail,
+                adultPassword,
+                childName = $"Crianca {suffix}",
+                childPin = "1234"
+            });
+
+        Assert.Contains(
+            bootstrapResponse.StatusCode,
+            new[] { HttpStatusCode.OK, HttpStatusCode.Created });
+
+        var loginResponse = await client.PostAsJsonAsync(
+            "/api/v1/auth/adult/login",
+            new { email = adultEmail, password = adultPassword });
+
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+
+        var login = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var token = login.GetProperty("token").GetString();
+
+        Assert.False(string.IsNullOrWhiteSpace(token));
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+
+        return token!;
+    }
 }
 
 

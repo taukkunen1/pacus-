@@ -97,4 +97,77 @@ public class DailyRoutineHttpIntegrationTests : IClassFixture<MongoIntegrationFi
         Assert.True(
             routine.TryGetProperty("tasks", out _));
     }
+
+    // Isolamento por familia (checklist de seguranca, item A2). "today" e
+    // sempre a rotina da familia do token (sem id de rota) -- garantia
+    // estrutural, provada aqui via HTTP: a tarefa ad-hoc criada pela
+    // Familia A nao pode aparecer na rotina de hoje da Familia B.
+    [Fact]
+    public async Task GetToday_ShouldBeIsolatedPerFamily()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        await BootstrapAndLoginAdultAsync(client);
+
+        var createResponse = await client.PostAsJsonAsync(
+            "/api/v1/daily-tasks",
+            new
+            {
+                title = "Tarefa exclusiva da Familia A",
+                description = (string?)null,
+                type = "mandatory",
+                period = "morning",
+                points = 1
+            });
+
+        Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+
+        await BootstrapAndLoginAdultAsync(client);
+
+        var routineResponse = await client.GetAsync("/api/v1/daily-routines/today");
+        Assert.Equal(HttpStatusCode.OK, routineResponse.StatusCode);
+
+        var routine = await routineResponse.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.DoesNotContain(
+            routine.GetProperty("tasks").EnumerateArray(),
+            t => t.GetProperty("title").GetString() == "Tarefa exclusiva da Familia A");
+    }
+
+    private async Task BootstrapAndLoginAdultAsync(HttpClient client)
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var adultEmail = $"adult-{suffix}@test.local";
+        const string adultPassword = "Teste123!";
+
+        var bootstrapResponse = await client.PostAsJsonAsync(
+            "/api/v1/bootstrap",
+            new
+            {
+                adultName = $"Adulto {suffix}",
+                adultEmail,
+                adultPassword,
+                childName = $"Crianca {suffix}",
+                childPin = "1234"
+            });
+
+        Assert.Contains(
+            bootstrapResponse.StatusCode,
+            new[] { HttpStatusCode.OK, HttpStatusCode.Created });
+
+        var loginResponse = await client.PostAsJsonAsync(
+            "/api/v1/auth/adult/login",
+            new { email = adultEmail, password = adultPassword });
+
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+
+        var login = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var token = login.GetProperty("token").GetString();
+
+        Assert.False(string.IsNullOrWhiteSpace(token));
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+    }
 }

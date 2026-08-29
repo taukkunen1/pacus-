@@ -11,7 +11,7 @@ Convenção:
 ## Fase A — Segurança (Prioridade 1, itens que faltam)
 
 - [x] **[AQUI] A1. Rate limiting no login (adulto e criança) e no bootstrap.** Hoje não existe limite de tentativas — o PIN da criança tem só 4 dígitos (10.000 combinações), então dá pra forçar bruta sem nenhum bloqueio. Implementar limite por IP/usuário nos endpoints `/api/v1/auth/*` e `/api/v1/bootstrap`.
-- [ ] **[AQUI] A2. Testes de isolamento por família nos controllers que ainda não têm** (Store, Habitat, Points, DailyRoutines, Settings) — hoje só `TasksController` tem esse tipo de teste. Replicar o padrão criado em `TasksHttpIntegrationTests.cs`.
+- [x] **[AQUI] A2. Testes de isolamento por família nos controllers que ainda não têm** (Store, Habitat, Points, DailyRoutines, Settings) — hoje só `TasksController` tem esse tipo de teste. Replicar o padrão criado em `TasksHttpIntegrationTests.cs`.
 - [ ] **[AQUI] A3. Testes de manipulação de ObjectId / troca de papel** (criança tentando ação de adulto, adulto de uma família usando id de outra) nos endpoints que ainda não cobrem isso.
 - [ ] **[AQUI] A4. Renomear os campos `UserId` que na verdade significam `FamilyId`** em `DailyRoutine`, `TaskTemplate`, `StoreItem`, `Redemption`, `Settings`, `PointTransaction` (entidades + repositórios + serviços). Não é bug hoje, mas é a maior fonte provável de bug futuro.
 - [ ] **[AQUI] A5. Log de auditoria para ações administrativas sensíveis** (excluir tarefa, aprovar/rejeitar resgate, ajustar pontos manualmente) — registrar quem fez, quando, e o que mudou, separado do dado em si.
@@ -52,3 +52,4 @@ _(atualizado a cada item concluído)_
 
 - 2026-08-28/29: Corrigido `TasksController.Delete` sem checagem de família (commit `979cd19`), criado `TasksHttpIntegrationTests.cs`, corrigido `JWT_SECRET` ausente no CI e dois testes desatualizados (regra de pontos antiga). CI validado verde.
 - 2026-08-29: **A1 concluído.** Rate limiting nativo do ASP.NET Core (auth: 10/5min por IP, bootstrap: 5/15min por IP), desativado em Development pra não quebrar os testes de integração. Corrigido de brinde um teste com bug de timezone (`HistoryHttpIntegrationTests` calculava "hoje" em UTC em vez de America/Sao_Paulo). CI validado verde.
+- 2026-08-29: **A2 concluído.** Adicionados testes de isolamento por família em Store, Habitat, Points, Settings e DailyRoutines (`StoreHttpIntegrationTests.cs`, `HabitatHttpIntegrationTests.cs`, `PointsHttpIntegrationTests.cs`, `SettingsHttpIntegrationTests.cs` novo, `DailyRoutineHttpIntegrationTests.cs`). Nenhum bug encontrado nesses controllers -- todos já escopam por `FamilyId` do token, sem id externo. CI validado verde (commit `d2bb249`). Removido trigger/debug temporário do `ci.yml`.

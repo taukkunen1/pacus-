@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using Pacus.Application.Utils;
 using Pacus.Domain.Entities;
 using Pacus.Domain.Enums;
 
@@ -52,9 +53,13 @@ public sealed class HistoryHttpIntegrationTests
 
         await LoginAdultAsync(client, family);
 
-        var today =
-            DateTime.UtcNow
-                .ToString("yyyy-MM-dd");
+        // GetOrCreateTodayAsync (chamado por EnsureTodayRoutineAsync) usa o
+        // timezone fixo "America/Sao_Paulo" pra decidir que dia e "hoje" (ver
+        // DailyRoutinesController), nao UTC -- calcular "hoje" com
+        // DateTime.UtcNow aqui quebra sempre que o teste roda entre 00h-03h
+        // UTC (21h-00h em SP), quando os dois dias divergem. Usando o mesmo
+        // helper que o codigo de producao usa pra ficar consistente.
+        var today = TimezoneHelper.GetOperationalDate("America/Sao_Paulo");
 
         await EnsureTodayRoutineAsync(client);
 
@@ -116,9 +121,13 @@ public sealed class HistoryHttpIntegrationTests
 
         await EnsureTodayRoutineAsync(client);
 
-        var today =
-            DateTime.UtcNow
-                .ToString("yyyy-MM-dd");
+        // GetOrCreateTodayAsync (chamado por EnsureTodayRoutineAsync) usa o
+        // timezone fixo "America/Sao_Paulo" pra decidir que dia e "hoje" (ver
+        // DailyRoutinesController), nao UTC -- calcular "hoje" com
+        // DateTime.UtcNow aqui quebra sempre que o teste roda entre 00h-03h
+        // UTC (21h-00h em SP), quando os dois dias divergem. Usando o mesmo
+        // helper que o codigo de producao usa pra ficar consistente.
+        var today = TimezoneHelper.GetOperationalDate("America/Sao_Paulo");
 
         var response =
             await client.GetAsync(
@@ -155,9 +164,13 @@ public sealed class HistoryHttpIntegrationTests
 
         await EnsureTodayRoutineAsync(client);
 
-        var today =
-            DateTime.UtcNow
-                .ToString("yyyy-MM-dd");
+        // GetOrCreateTodayAsync (chamado por EnsureTodayRoutineAsync) usa o
+        // timezone fixo "America/Sao_Paulo" pra decidir que dia e "hoje" (ver
+        // DailyRoutinesController), nao UTC -- calcular "hoje" com
+        // DateTime.UtcNow aqui quebra sempre que o teste roda entre 00h-03h
+        // UTC (21h-00h em SP), quando os dois dias divergem. Usando o mesmo
+        // helper que o codigo de producao usa pra ficar consistente.
+        var today = TimezoneHelper.GetOperationalDate("America/Sao_Paulo");
 
         var familyTwo =
             await BootstrapAsync(client);

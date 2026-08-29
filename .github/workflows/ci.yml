@@ -26,7 +26,21 @@ jobs:
         # CI, nunca usado em producao (isso continua vindo do Render).
         env:
           JWT_SECRET: ci-placeholder-secret-nao-usar-em-producao-0123456789
-        run: dotnet test backend/Pacus.sln --configuration Release --no-build
+        run: |
+          set -o pipefail
+          dotnet test backend/Pacus.sln --configuration Release --no-build 2>&1 | tee /tmp/test-output.txt
+      - name: Emit test failures as annotations (debug aid)
+        if: failure()
+        run: |
+          grep -nE "^\s*Failed\s|\[FAIL\]|Total tests:|Passed:|Failed:|error CS" /tmp/test-output.txt > /tmp/test-summary.txt || true
+          grep -B1 -A30 -E "^\s*Failed\s" /tmp/test-output.txt > /tmp/test-fail-detail.txt || true
+          {
+            echo "=== SUMMARY ==="
+            cat /tmp/test-summary.txt
+            echo "=== FAILURE DETAIL ==="
+            cat /tmp/test-fail-detail.txt
+          } > /tmp/test-fail-excerpt.txt
+          echo "::error::$(cat /tmp/test-fail-excerpt.txt | tr '\n' '~' | sed 's/~/%0A/g' | cut -c1-60000)"
 
   frontend:
     runs-on: ubuntu-latest

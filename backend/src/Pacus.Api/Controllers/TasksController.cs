@@ -88,7 +88,11 @@ public class TasksController : ControllerBase
             // repositorio direto — a versao anterior fazia SoftDeleteAsync(templateId)
             // sem checar de quem era o template, permitindo excluir tarefas de
             // qualquer familia so sabendo o id.
-            await _taskTemplateService.DeleteAsync(_currentUser.FamilyId, id);
+            await _taskTemplateService.DeleteAsync(
+                _currentUser.FamilyId,
+                id,
+                _currentUser.UserId,
+                _currentUser.Role.ToString());
 
             return NoContent();
         }

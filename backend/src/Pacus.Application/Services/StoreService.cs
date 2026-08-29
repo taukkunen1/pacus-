@@ -11,15 +11,20 @@ public class StoreService : IStoreService
 {
     private readonly IStoreRepository _storeRepository;
     private readonly IPointsService _pointsService;
+    private readonly IAuditLogRepository _auditLogRepository;
 
     // TODO: assim como o timezone nos outros services, isso deveria vir de settings
     // da familia em vez de fixo — ver mesmo TODO em DailyRoutinesController.
     private const string DefaultTimezone = "America/Sao_Paulo";
 
-    public StoreService(IStoreRepository storeRepository, IPointsService pointsService)
+    public StoreService(
+        IStoreRepository storeRepository,
+        IPointsService pointsService,
+        IAuditLogRepository auditLogRepository)
     {
         _storeRepository = storeRepository;
         _pointsService = pointsService;
+        _auditLogRepository = auditLogRepository;
     }
 
     public async Task<StoreItem> CreateItemAsync(ObjectId familyId, ObjectId createdBy, CreateStoreItemRequest request)
@@ -105,6 +110,22 @@ public class StoreService : IStoreService
             await _storeRepository.UpdateItemAsync(item);
         }
 
+        // Log de auditoria (checklist de seguranca, item A5) — aprovar resgate e uma
+        // acao administrativa sensivel (debita pontos da familia), registrada separada
+        // do dado em si.
+        await _auditLogRepository.CreateAsync(new AuditLog
+        {
+            Id = ObjectId.GenerateNewId(),
+            FamilyId = familyId,
+            Action = "redemption.approved",
+            EntityType = "Redemption",
+            EntityId = redemption.Id.ToString(),
+            Details = $"Resgate aprovado: {redemption.ItemTitle} ({redemption.Cost} pontos)",
+            ActorId = reviewedBy,
+            ActorRole = UserRole.Adult,
+            CreatedAt = DateTime.UtcNow,
+        });
+
         return redemption;
     }
 
@@ -116,6 +137,20 @@ public class StoreService : IStoreService
         redemption.ReviewedBy = reviewedBy;
         redemption.ReviewedAt = DateTime.UtcNow;
         await _storeRepository.UpdateRedemptionAsync(redemption);
+
+        // Log de auditoria (checklist de seguranca, item A5) — mesma logica do approve.
+        await _auditLogRepository.CreateAsync(new AuditLog
+        {
+            Id = ObjectId.GenerateNewId(),
+            FamilyId = familyId,
+            Action = "redemption.rejected",
+            EntityType = "Redemption",
+            EntityId = redemption.Id.ToString(),
+            Details = $"Resgate rejeitado: {redemption.ItemTitle} ({redemption.Cost} pontos)",
+            ActorId = reviewedBy,
+            ActorRole = UserRole.Adult,
+            CreatedAt = DateTime.UtcNow,
+        });
 
         return redemption;
     }

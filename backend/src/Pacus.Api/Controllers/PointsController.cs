@@ -16,15 +16,18 @@ public class PointsController : ControllerBase
 {
     private readonly IPointsService _pointsService;
     private readonly IPointTransactionRepository _pointTransactionRepository;
+    private readonly IAuditLogRepository _auditLogRepository;
     private readonly ICurrentUserService _currentUser;
 
     public PointsController(
         IPointsService pointsService,
         IPointTransactionRepository pointTransactionRepository,
+        IAuditLogRepository auditLogRepository,
         ICurrentUserService currentUser)
     {
         _pointsService = pointsService;
         _pointTransactionRepository = pointTransactionRepository;
+        _auditLogRepository = auditLogRepository;
         _currentUser = currentUser;
     }
 
@@ -69,6 +72,22 @@ public class PointsController : ControllerBase
                 actorId: _currentUser.UserId,
                 actorRole: _currentUser.Role,
                 reason: request.Reason ?? "Ajuste manual de saldo (migracao de progresso anterior)");
+
+            // Log de auditoria (checklist de seguranca, item A5) — ajuste manual de
+            // saldo e uma acao administrativa sensivel, registrada separada da
+            // propria transacao de pontos (que ja existe em point_transactions).
+            await _auditLogRepository.CreateAsync(new Pacus.Domain.Entities.AuditLog
+            {
+                Id = MongoDB.Bson.ObjectId.GenerateNewId(),
+                FamilyId = _currentUser.FamilyId,
+                Action = "points.manual_adjustment",
+                EntityType = "PointsBalance",
+                EntityId = _currentUser.FamilyId.ToString(),
+                Details = $"Saldo: {currentBalance} -> {request.Balance} (delta {delta}, motivo: {request.Reason ?? "nao informado"})",
+                ActorId = _currentUser.UserId,
+                ActorRole = _currentUser.Role,
+                CreatedAt = DateTime.UtcNow,
+            });
         }
 
         var newBalance = await _pointsService.GetBalanceAsync(_currentUser.FamilyId);

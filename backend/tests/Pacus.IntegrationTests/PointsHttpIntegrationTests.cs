@@ -255,6 +255,36 @@ public sealed class PointsHttpIntegrationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    // Log de auditoria (checklist de seguranca, item A5): ajuste manual de
+    // saldo e uma acao administrativa sensivel e precisa deixar rastro na
+    // colecao audit_logs, separado da propria transacao em point_transactions.
+    [Fact]
+    public async Task AdjustBalance_ShouldCreateAuditLogEntry()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/points/adjust",
+            new { balance = 42, reason = "teste de auditoria" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var mongoClient = new MongoClient(GetConnectionString(factory));
+        var database = mongoClient.GetDatabase(factory.DatabaseName);
+        var auditLogs = database.GetCollection<Pacus.Domain.Entities.AuditLog>("audit_logs");
+
+        var log = await auditLogs
+            .Find(a => a.Action == "points.manual_adjustment" && a.FamilyId == ObjectId.Parse(family.FamilyId))
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(log);
+        Assert.Contains("teste de auditoria", log.Details);
+    }
+
     private async Task LoginChildAsync(
         HttpClient client,
         TestFamily family)

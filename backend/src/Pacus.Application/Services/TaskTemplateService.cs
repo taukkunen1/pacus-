@@ -9,9 +9,15 @@ namespace Pacus.Application.Services;
 public class TaskTemplateService : ITaskTemplateService
 {
     private readonly ITaskTemplateRepository _taskTemplateRepository;
+    private readonly IAuditLogRepository _auditLogRepository;
 
-    public TaskTemplateService(ITaskTemplateRepository taskTemplateRepository) =>
+    public TaskTemplateService(
+        ITaskTemplateRepository taskTemplateRepository,
+        IAuditLogRepository auditLogRepository)
+    {
         _taskTemplateRepository = taskTemplateRepository;
+        _auditLogRepository = auditLogRepository;
+    }
 
     public async Task<TaskTemplate> CreateAsync(
         ObjectId familyId,
@@ -86,7 +92,9 @@ public class TaskTemplateService : ITaskTemplateService
 
     public async Task DeleteAsync(
         ObjectId familyId,
-        string id)
+        string id,
+        ObjectId actorId,
+        string actorRole)
     {
         if (!ObjectId.TryParse(id, out var templateId))
             throw new InvalidOperationException("Id de tarefa invalido.");
@@ -102,6 +110,22 @@ public class TaskTemplateService : ITaskTemplateService
             throw new InvalidOperationException("Tarefa permanente nao encontrada.");
 
         await _taskTemplateRepository.SoftDeleteAsync(templateId);
+
+        // Log de auditoria (checklist de seguranca, item A5) — exclusao de tarefa
+        // permanente e uma acao administrativa sensivel, registrada separada do
+        // dado em si (colecao audit_logs, nunca tocada pelo fluxo normal do app).
+        await _auditLogRepository.CreateAsync(new AuditLog
+        {
+            Id = ObjectId.GenerateNewId(),
+            FamilyId = familyId,
+            Action = "task_template.deleted",
+            EntityType = "TaskTemplate",
+            EntityId = templateId.ToString(),
+            Details = $"Tarefa excluida: {template.Title}",
+            ActorId = actorId,
+            ActorRole = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase) ? UserRole.Adult : UserRole.Child,
+            CreatedAt = DateTime.UtcNow,
+        });
     }
 
     private static (TaskType Type, TaskPeriod Period) ParseTypeAndPeriod(

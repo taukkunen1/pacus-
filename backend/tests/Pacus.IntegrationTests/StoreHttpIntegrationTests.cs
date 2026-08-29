@@ -2,6 +2,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using MongoDB.Driver;
 
 namespace Pacus.IntegrationTests;
 
@@ -388,6 +389,64 @@ public class StoreHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
         Assert.Equal(
             "Rejected",
             rejected.GetProperty("status").GetString());
+    }
+
+    // Log de auditoria (checklist de seguranca, item A5): aprovar/rejeitar
+    // resgate e uma acao administrativa sensivel e precisa deixar rastro na
+    // colecao audit_logs, separado do dado em si (a propria Redemption ja
+    // guarda ReviewedBy/ReviewedAt, mas isso nao e um log de auditoria).
+    [Fact]
+    public async Task RejectRedemption_ShouldCreateAuditLogEntry()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+
+        await LoginAdultAsync(client, family);
+
+        var itemId =
+            await CreateStoreItemAsync(
+                client,
+                "Recompensa para auditoria",
+                1,
+                null);
+
+        await LoginChildAsync(client, family);
+
+        var requestResponse =
+            await client.PostAsJsonAsync(
+                "/api/v1/store/redemptions",
+                new
+                {
+                    storeItemId = itemId
+                });
+
+        var redemption =
+            await requestResponse.Content
+                .ReadFromJsonAsync<JsonElement>();
+
+        var redemptionId =
+            redemption.GetProperty("id").GetString()!;
+
+        await LoginAdultAsync(client, family);
+
+        var rejectResponse =
+            await client.PutAsync(
+                $"/api/v1/store/redemptions/{redemptionId}/reject",
+                content: null);
+
+        Assert.Equal(HttpStatusCode.OK, rejectResponse.StatusCode);
+
+        var database = new MongoClient(_mongo.ConnectionString).GetDatabase(factory.DatabaseName);
+        var auditLogs = database.GetCollection<Pacus.Domain.Entities.AuditLog>("audit_logs");
+
+        var log = await auditLogs
+            .Find(a => a.Action == "redemption.rejected" && a.EntityId == redemptionId)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(log);
+        Assert.Equal(family.FamilyId, log.FamilyId.ToString());
     }
 
     [Fact]

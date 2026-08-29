@@ -401,3 +401,17 @@ public class FakeStoreRepository
         return Task.CompletedTask;
     }
 }
+
+public class FakeAuditLogRepository
+    : IAuditLogRepository
+{
+    public readonly List<AuditLog> Logs = new();
+
+    public Task<AuditLog> CreateAsync(
+        AuditLog log)
+    {
+        Logs.Add(log);
+
+        return Task.FromResult(log);
+    }
+}

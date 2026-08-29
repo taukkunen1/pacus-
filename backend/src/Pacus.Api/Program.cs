@@ -144,6 +144,7 @@ builder.Services.AddScoped<ITaskEventRepository, TaskEventRepository>();
 builder.Services.AddScoped<IStoreRepository, StoreRepository>();
 builder.Services.AddScoped<ISettingsRepository, SettingsRepository>();
 builder.Services.AddScoped<IPacusGrowthRepository, PacusGrowthRepository>();
+builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 
 // Auth
 builder.Services.AddScoped<ICurrentUserService, HttpCurrentUserService>();

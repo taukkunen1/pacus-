@@ -14,7 +14,8 @@ public class StoreServiceTests
         var storeRepo = new FakeStoreRepository();
         var pointsRepo = new FakePointTransactionRepository();
         var pointsService = new PointsService(pointsRepo);
-        var store = new StoreService(storeRepo, pointsService);
+        var auditLogRepo = new FakeAuditLogRepository();
+        var store = new StoreService(storeRepo, pointsService, auditLogRepo);
         return (store, storeRepo, pointsRepo);
     }
 

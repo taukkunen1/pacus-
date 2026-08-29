@@ -22,5 +22,7 @@ public interface ITaskTemplateService
 
     Task DeleteAsync(
         ObjectId familyId,
-        string id);
+        string id,
+        ObjectId actorId,
+        string actorRole);
 }

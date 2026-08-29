@@ -2,6 +2,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using MongoDB.Driver;
 
 namespace Pacus.IntegrationTests;
 
@@ -97,6 +98,35 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
         Assert.DoesNotContain(
             templates.EnumerateArray(),
             t => t.GetProperty("id").GetString() == templateId);
+    }
+
+    // Log de auditoria (checklist de seguranca, item A5): excluir uma tarefa
+    // permanente e uma acao administrativa sensivel e precisa deixar rastro
+    // na colecao audit_logs, separado do dado em si (o template so fica com
+    // DeletedAt marcado -- soft delete).
+    [Fact]
+    public async Task Delete_ShouldCreateAuditLogEntry()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+        var templateId = await CreateTemplateAndGetIdAsync(client);
+
+        var response = await client.DeleteAsync($"/api/v1/tasks/{templateId}");
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        var database = new MongoClient(_mongo.ConnectionString).GetDatabase(factory.DatabaseName);
+        var auditLogs = database.GetCollection<Pacus.Domain.Entities.AuditLog>("audit_logs");
+
+        var log = await auditLogs
+            .Find(a => a.Action == "task_template.deleted" && a.EntityId == templateId)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(log);
+        Assert.Equal(family.FamilyId, log.FamilyId.ToString());
+        Assert.Equal(family.AdultUserId, log.ActorId.ToString());
     }
 
     [Fact]

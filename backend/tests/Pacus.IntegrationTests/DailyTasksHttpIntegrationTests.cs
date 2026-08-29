@@ -145,6 +145,52 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
             reopenedTask.GetProperty("completedAt").ValueKind);
     }
 
+    // Manipulacao de ObjectId (checklist de seguranca, item A3): adulto da
+    // Familia B tenta completar/editar/deletar uma tarefa cujo id pertence
+    // a rotina da Familia A. GetLatestOpenAsync ja escopa por FamilyId, entao
+    // o id de outra familia nunca aparece na rotina de quem esta autenticado
+    // -- a garantia e estrutural, este teste prova via HTTP.
+    [Fact]
+    public async Task TaskOperations_WithAnotherFamilysTaskId_ShouldNotBeAllowed()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var familyA = await BootstrapAsync(client);
+        await LoginAdultAsync(client, familyA);
+        await EnsureTodayRoutineAsync(client);
+
+        var taskIdFromFamilyA = await CreateTaskAndGetIdAsync(client);
+
+        var familyB = await BootstrapAsync(client);
+        await LoginAdultAsync(client, familyB);
+        await EnsureTodayRoutineAsync(client);
+
+        var completeResponse = await client.PostAsync(
+            $"/api/v1/daily-tasks/{taskIdFromFamilyA}/complete",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, completeResponse.StatusCode);
+
+        var updateResponse = await client.PutAsJsonAsync(
+            $"/api/v1/daily-tasks/{taskIdFromFamilyA}",
+            new
+            {
+                title = "Sequestrada pela Familia B",
+                description = (string?)null,
+                type = "expected",
+                period = "afternoon",
+                points = 3
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, updateResponse.StatusCode);
+
+        var deleteResponse = await client.DeleteAsync(
+            $"/api/v1/daily-tasks/{taskIdFromFamilyA}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, deleteResponse.StatusCode);
+    }
+
     [Fact]
     public async Task AdjustPoints_ShouldChangeTaskPoints_ThroughHttp()
     {

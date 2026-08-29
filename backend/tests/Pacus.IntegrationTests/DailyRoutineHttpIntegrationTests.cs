@@ -140,6 +140,55 @@ public class DailyRoutineHttpIntegrationTests : IClassFixture<MongoIntegrationFi
             t => t.GetProperty("title").GetString() == "Tarefa exclusiva da Familia A");
     }
 
+    // Troca de papel (checklist de seguranca, item A3): crianca tentando
+    // ajustar o cronometro de jogo, acao restrita ao adulto via
+    // [RequireRole(UserRole.Adult)] em AdjustGameTimer.
+    [Fact]
+    public async Task AdjustGameTimer_ShouldBeForbiddenForChild()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        const string childPin = "1234";
+
+        var bootstrapResponse = await client.PostAsJsonAsync(
+            "/api/v1/bootstrap",
+            new
+            {
+                adultName = $"Adulto {suffix}",
+                adultEmail = $"adult-{suffix}@test.local",
+                adultPassword = "Teste123!",
+                childName = $"Crianca {suffix}",
+                childPin
+            });
+
+        Assert.Contains(
+            bootstrapResponse.StatusCode,
+            new[] { HttpStatusCode.OK, HttpStatusCode.Created });
+
+        var bootstrap = await bootstrapResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var childUserId = bootstrap.GetProperty("childUserId").GetString();
+
+        var loginResponse = await client.PostAsJsonAsync(
+            "/api/v1/auth/child/login",
+            new { userId = childUserId, pin = childPin });
+
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+
+        var login = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var token = login.GetProperty("token").GetString();
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.PutAsJsonAsync(
+            "/api/v1/daily-routines/today/game-timer/adjust",
+            new { deltaMinutes = 30 });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     private async Task BootstrapAndLoginAdultAsync(HttpClient client)
     {
         var suffix = Guid.NewGuid().ToString("N")[..8];

@@ -236,6 +236,58 @@ public sealed class PointsHttpIntegrationTests
         return (string)field!.GetValue(factory)!;
     }
 
+    // Troca de papel (checklist de seguranca, item A3): crianca tentando
+    // ajustar o saldo manualmente, acao restrita ao adulto via
+    // [RequireRole(UserRole.Adult)].
+    [Fact]
+    public async Task AdjustBalance_ShouldBeForbiddenForChild()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginChildAsync(client, family);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/points/adjust",
+            new { balance = 999, reason = "crianca tentando ajustar saldo" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    private async Task LoginChildAsync(
+        HttpClient client,
+        TestFamily family)
+    {
+        var response =
+            await client.PostAsJsonAsync(
+                "/api/v1/auth/child/login",
+                new
+                {
+                    userId = family.ChildUserId,
+                    pin = family.ChildPin
+                });
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            response.StatusCode);
+
+        var body =
+            await response.Content
+                .ReadFromJsonAsync<JsonElement>();
+
+        var token =
+            body.GetProperty("token").GetString();
+
+        Assert.False(
+            string.IsNullOrWhiteSpace(token));
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(
+                "Bearer",
+                token);
+    }
+
     private async Task LoginAdultAsync(
         HttpClient client,
         TestFamily family)

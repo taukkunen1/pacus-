@@ -34,6 +34,7 @@ import { appState } from "../state/app-state.js";
 import { isValidPoints, POINTS_HELP_TEXT } from "../utils/validation.js";
 import { promptTextarea, showMessageModal } from "../components/modal.js";
 import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
+import { withSlowLoadHint, SLOW_LOAD_MESSAGE } from "../utils/slow-load-hint.js";
 
 const PERIODS = [
   "morning",
@@ -255,10 +256,16 @@ export async function renderHome(
 
   try {
     [routine, balance] =
-      await Promise.all([
-        getTodayRoutine(),
-        getPointsBalance()
-      ]);
+      await withSlowLoadHint(
+        Promise.all([
+          getTodayRoutine(),
+          getPointsBalance()
+        ]),
+        () => {
+          const loadingEl = content.querySelector("p.task-empty");
+          if (loadingEl) loadingEl.textContent = SLOW_LOAD_MESSAGE;
+        }
+      );
   } catch (err) {
     content.innerHTML = `
       <p class="error-text">

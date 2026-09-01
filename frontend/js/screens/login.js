@@ -1,5 +1,6 @@
 import { loginAdult, loginChild, resetAdultPassword } from "../api/auth-api.js";
 import { getFamilyChildren } from "../api/family-api.js";
+import { withSlowLoadHint, SLOW_LOAD_MESSAGE } from "../utils/slow-load-hint.js";
 
 const CHILD_PROFILE_KEY = "pacus.child.profileId"; // so um id, nao e credencial — ok em localStorage
 const CHILDREN_CACHE_KEY = "pacus.family.children"; // so nome + id de cada crianca — mesmo motivo
@@ -70,18 +71,29 @@ export function renderLogin(root, onSuccess) {
       const email = slot.querySelector("#email").value.trim();
       const password = slot.querySelector("#password").value;
       const errorEl = slot.querySelector("#adult-error");
+      const submitBtn = slot.querySelector('#adult-form button[type="submit"]');
+      const originalLabel = submitBtn.textContent;
       errorEl.classList.add("hidden");
 
       submitting = true;
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Entrando...";
       try {
-        const result = await loginAdult(email, password);
+        const result = await withSlowLoadHint(
+          loginAdult(email, password),
+          () => { submitBtn.textContent = "Ainda conectando..."; errorEl.textContent = SLOW_LOAD_MESSAGE; errorEl.classList.remove("hidden", "error-text"); errorEl.classList.add("hint-text"); }
+        );
         await cacheFamilyChildren();
         onSuccess(result);
       } catch (err) {
+        errorEl.classList.remove("hint-text");
+        errorEl.classList.add("error-text");
         errorEl.textContent = err.message;
         errorEl.classList.remove("hidden");
       } finally {
         submitting = false;
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalLabel;
       }
     });
 
@@ -127,15 +139,30 @@ export function renderLogin(root, onSuccess) {
       errorEl.classList.add("hidden");
       successEl.classList.add("hidden");
 
+      const resetBtn = slot.querySelector("#forgot-form button[type=submit]");
+      const resetOriginalLabel = resetBtn.textContent;
+
       submitting = true;
+      resetBtn.disabled = true;
+      resetBtn.textContent = "Enviando...";
       try {
-        const result = await resetAdultPassword(email, code, newPassword);
+        const result = await withSlowLoadHint(
+          resetAdultPassword(email, code, newPassword),
+          () => { resetBtn.textContent = "Ainda conectando..."; errorEl.textContent = SLOW_LOAD_MESSAGE; errorEl.classList.remove("hidden", "error-text"); errorEl.classList.add("hint-text"); }
+        );
+        errorEl.classList.add("hidden");
         successEl.textContent = `Senha redefinida! Seu novo código de recuperação é: ${result.newRecoveryCode} — guarde em lugar seguro, ele substitui o anterior.`;
         successEl.classList.remove("hidden");
-        slot.querySelector("#forgot-form button[type=submit]").disabled = true;
+        resetBtn.disabled = true;
+        resetBtn.textContent = resetOriginalLabel;
+        return;
       } catch (err) {
+        errorEl.classList.remove("hint-text");
+        errorEl.classList.add("error-text");
         errorEl.textContent = err.message;
         errorEl.classList.remove("hidden");
+        resetBtn.disabled = false;
+        resetBtn.textContent = resetOriginalLabel;
       } finally {
         submitting = false;
       }
@@ -248,18 +275,26 @@ export function renderLogin(root, onSuccess) {
     }
 
     async function trySubmit() {
-      if (pin.length === 0) return;
+      if (pin.length === 0 || submitting) return;
 
       errorEl.classList.add("hidden");
+      submitting = true;
       try {
-        const result = await loginChild(child.id, pin);
+        const result = await withSlowLoadHint(
+          loginChild(child.id, pin),
+          () => { errorEl.textContent = SLOW_LOAD_MESSAGE; errorEl.classList.remove("hidden", "error-text"); errorEl.classList.add("hint-text"); }
+        );
         localStorage.setItem(CHILD_PROFILE_KEY, child.id);
         onSuccess(result);
       } catch (err) {
         pin = "";
         renderDots();
+        errorEl.classList.remove("hint-text");
+        errorEl.classList.add("error-text");
         errorEl.textContent = err.message;
         errorEl.classList.remove("hidden");
+      } finally {
+        submitting = false;
       }
     }
 

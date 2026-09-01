@@ -26,12 +26,9 @@ Ambas as pendências acima ("Ação sugerida" original) já foram corrigidas nes
 - **Testes** — suíte de integração em xUnit no backend (`*.HttpIntegrationTests.cs`), cobrindo isolamento por família, permissões por papel (adulto/criança) e os fluxos de LGPD (exportação, exclusão de conta).
 - **CI** (`.github/workflows/ci.yml`) — dois jobs: `backend` (`dotnet build` + `dotnet test`) e `frontend` (`node --check` em todo `.js` de `frontend/js`, só sintaxe).
 
-## Duas branches, dois mundos
+## Branches (E1 resolvido em 2026-09-01)
 
-- **`main`** — só 2 commits, nenhum código real; o segundo é um `pacus.zip` de 22MB subido pela interface web do GitHub. Sem histórico compartilhado com `feature/next-migration`.
-- **`feature/next-migration`** — a aplicação inteira (68+ commits), é onde este documento e o trabalho recente vivem.
-
-Isso já estava identificado e documentado como item **E1** do checklist de segurança (`docs/SECURITY_LGPD_CHECKLIST.md`) — decisão de consolidação adiada a pedido do dono do projeto. Nada muda aqui até você decidir.
+`main` e `feature/next-migration` estavam com históricos desconexos: `main` tinha só 2 commits (o segundo era um `pacus.zip` de 22MB subido pela interface web do GitHub, sem código real), enquanto todo o app vivia só em `feature/next-migration`. Consolidado a pedido explícito do dono do projeto: force-push de `main` para o commit de `feature/next-migration` — as duas branches agora apontam para o mesmo commit, `main` tem o app inteiro, e `ci.yml` (que só dispara em push para `main`) volta a validar de verdade a cada push, sem precisar do truque de trigger temporário. Os 2 commits antigos de `main` (o zip) não foram perdidos — ficaram preservados na tag `main-legacy-zip-backup`. Detalhes no item **E1** do checklist (`docs/SECURITY_LGPD_CHECKLIST.md`).
 
 ## Segurança e LGPD (`docs/SECURITY_LGPD_CHECKLIST.md`)
 

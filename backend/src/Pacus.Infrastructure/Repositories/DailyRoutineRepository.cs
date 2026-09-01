@@ -33,13 +33,30 @@ public class DailyRoutineRepository : IDailyRoutineRepository
     // mudanca de alguem. O chamador que perdeu a corrida simplesmente tenta de novo (o
     // service nao faz retry automatico aqui -- ver nota no achado #5 em
     // docs/ESTADO_ATUAL.md sobre esse trade-off).
+    //
+    // Bug encontrado em producao (2026-09-01, apos o deploy do achado #5): rotinas
+    // criadas ANTES do campo Version existir nao tem "version" gravado no documento do
+    // Mongo. Version desserializa como 0 em C# (comentario em DailyRoutine.cs), mas uma
+    // query { version: 0 } NAO bate em documento sem o campo -- o Mongo nao trata "campo
+    // ausente" como igual a 0 numa comparacao direta. Resultado: TODO UpdateAsync numa
+    // rotina legada falhava com ConflictException, sempre, mesmo sem nenhuma concorrencia
+    // real (nao era uma corrida passageira -- por isso o retry em GetToday nao resolvia).
+    // Corrigido tratando "campo ausente" como equivalente a versao 0 no filtro, so para
+    // esse caso -- sem precisar de script de migracao nem tocar nos documentos existentes.
     public async Task UpdateAsync(DailyRoutine routine)
     {
         var expectedVersion = routine.Version;
         routine.Version = expectedVersion + 1;
 
+        var idFilter = Builders<DailyRoutine>.Filter.Eq(r => r.Id, routine.Id);
+        var versionFilter = expectedVersion == 0
+            ? Builders<DailyRoutine>.Filter.Or(
+                Builders<DailyRoutine>.Filter.Eq(r => r.Version, 0),
+                Builders<DailyRoutine>.Filter.Exists(r => r.Version, false))
+            : Builders<DailyRoutine>.Filter.Eq(r => r.Version, expectedVersion);
+
         var result = await _context.DailyRoutines.ReplaceOneAsync(
-            r => r.Id == routine.Id && r.Version == expectedVersion,
+            idFilter & versionFilter,
             routine);
 
         if (result.MatchedCount == 0)

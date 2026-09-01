@@ -33,6 +33,14 @@ public class DailyRoutinesController : ControllerBase
         _currentUser = currentUser;
     }
 
+    // Sem try/catch aqui de proposito (nem nas actions abaixo): NotFoundException/
+    // ConflictException/ValidationException/UnauthorizedAccessException lancadas pelo
+    // service viram o status HTTP certo sozinhas, via
+    // Pacus.Api.Middleware.AppExceptionHandler (achado #1 da auditoria de API de
+    // 2026-09-01 -- ver docs/ESTADO_ATUAL.md). E as respostas usam .ToResponse()
+    // (DailyRoutineDto.cs) em vez de devolver a entidade de dominio crua (achado #3
+    // da mesma auditoria).
+
     [HttpGet("today")]
     public async Task<IActionResult> GetToday()
     {
@@ -44,21 +52,15 @@ public class DailyRoutinesController : ControllerBase
         await _dayClosingService.CloseIfDueAsync(familyId, timezone);
 
         var routine = await _dailyRoutineService.GetOrCreateTodayAsync(familyId, timezone);
-        return Ok(routine);
+        return Ok(routine.ToResponse());
     }
 
     [HttpGet]
     public async Task<IActionResult> GetByDate([FromQuery] string date)
     {
         var routine = await _dailyRoutineRepository.GetByUserAndDateAsync(_currentUser.FamilyId, date);
-        return routine is null ? NotFound() : Ok(routine);
+        return routine is null ? NotFound() : Ok(routine.ToResponse());
     }
-
-    // Sem try/catch aqui de proposito (nem nas actions abaixo): NotFoundException/
-    // ConflictException/ValidationException/UnauthorizedAccessException lancadas pelo
-    // service viram o status HTTP certo sozinhas, via
-    // Pacus.Api.Middleware.AppExceptionHandler (achado #1 da auditoria de API de
-    // 2026-09-01 -- ver docs/ESTADO_ATUAL.md).
 
     // Reordenar e autonomia da crianca sobre o dia atual — sem RequireRole aqui de proposito.
     [HttpPut("today/order")]
@@ -66,7 +68,7 @@ public class DailyRoutinesController : ControllerBase
     {
         var routine = await _dailyRoutineService.ReorderTasksAsync(
             _currentUser.FamilyId, orderedTaskIds, _currentUser.UserId, _currentUser.Role.ToString());
-        return Ok(routine);
+        return Ok(routine.ToResponse());
     }
 
     // Pausar/despausar e acao de qualquer papel (adulto ou crianca) —
@@ -76,7 +78,7 @@ public class DailyRoutinesController : ControllerBase
     {
         var routine = await _dailyRoutineService.PauseGameTimerAsync(
             _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString());
-        return Ok(routine);
+        return Ok(routine.ToResponse());
     }
 
     [HttpPut("today/game-timer/resume")]
@@ -84,7 +86,7 @@ public class DailyRoutinesController : ControllerBase
     {
         var routine = await _dailyRoutineService.ResumeGameTimerAsync(
             _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString());
-        return Ok(routine);
+        return Ok(routine.ToResponse());
     }
 
     // +1h/-1h etc. Restrito ao painel adulto — a crianca recebe 403 direto
@@ -95,7 +97,7 @@ public class DailyRoutinesController : ControllerBase
     {
         var routine = await _dailyRoutineService.AdjustGameTimerAsync(
             _currentUser.FamilyId, request.DeltaMinutes, _currentUser.UserId, _currentUser.Role.ToString());
-        return Ok(routine);
+        return Ok(routine.ToResponse());
     }
 
     // Vinculo (relatedness -- ver docs/PROPOSITO.md): reacao pessoal do adulto sobre o
@@ -107,6 +109,6 @@ public class DailyRoutinesController : ControllerBase
     {
         var routine = await _dailyRoutineService.SetReactionAsync(
             _currentUser.FamilyId, request.Icon, request.Message, _currentUser.UserId, _currentUser.Role.ToString());
-        return Ok(routine);
+        return Ok(routine.ToResponse());
     }
 }

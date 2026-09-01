@@ -26,6 +26,8 @@ public class DailyTasksController : ControllerBase
     // ValidationException/UnauthorizedAccessException lancadas pelo service viram o
     // status HTTP certo sozinhas, via Pacus.Api.Middleware.AppExceptionHandler
     // (achado #1 da auditoria de API de 2026-09-01 -- ver docs/ESTADO_ATUAL.md).
+    // E as respostas usam .ToResponse() (DailyRoutineDto.cs) em vez de devolver a
+    // entidade de dominio crua (achado #3 da mesma auditoria).
     [HttpPost]
     public async Task<IActionResult> Create(
         [FromBody] CreateTaskRequest request)
@@ -36,7 +38,7 @@ public class DailyTasksController : ControllerBase
             _currentUser.UserId,
             _currentUser.Role.ToString());
 
-        return Ok(routine);
+        return Ok(routine.ToResponse());
     }
 
     [HttpPost("{id}/complete")]
@@ -49,7 +51,7 @@ public class DailyTasksController : ControllerBase
             _currentUser.UserId,
             _currentUser.Role.ToString());
 
-        return Ok(routine);
+        return Ok(routine.ToResponse());
     }
 
     [HttpPost("{id}/reopen")]
@@ -62,7 +64,7 @@ public class DailyTasksController : ControllerBase
             _currentUser.UserId,
             _currentUser.Role.ToString());
 
-        return Ok(routine);
+        return Ok(routine.ToResponse());
     }
 
     [HttpPut("{id}/option")]
@@ -77,7 +79,7 @@ public class DailyTasksController : ControllerBase
             _currentUser.UserId,
             _currentUser.Role.ToString());
 
-        return Ok(routine);
+        return Ok(routine.ToResponse());
     }
 
     [HttpPut("{id}/points")]
@@ -92,7 +94,7 @@ public class DailyTasksController : ControllerBase
             _currentUser.UserId,
             _currentUser.Role.ToString());
 
-        return Ok(routine);
+        return Ok(routine.ToResponse());
     }
 
     [HttpPut("{id}")]
@@ -107,7 +109,7 @@ public class DailyTasksController : ControllerBase
             _currentUser.UserId,
             _currentUser.Role.ToString());
 
-        return Ok(routine);
+        return Ok(routine.ToResponse());
     }
 
     [HttpDelete("{id}")]
@@ -119,6 +121,6 @@ public class DailyTasksController : ControllerBase
             _currentUser.UserId,
             _currentUser.Role.ToString());
 
-        return Ok(routine);
+        return Ok(routine.ToResponse());
     }
 }

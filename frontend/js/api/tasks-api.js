@@ -18,6 +18,15 @@ export const deleteDailyTask = (id) =>
     method: "DELETE",
   });
 
+// Escolha real da crianca entre as Options de uma tarefa (Teoria da
+// Autodeterminacao -- ver docs/PROPOSITO.md). selectedOption null limpa a
+// escolha.
+export const selectTaskOption = (id, selectedOption) =>
+  apiClient(`/daily-tasks/${id}/option`, {
+    method: "PUT",
+    body: JSON.stringify({ selectedOption }),
+  });
+
 export const reorderDailyTasks = (orderedTaskIds) =>
   apiClient("/daily-routines/today/order", {
     method: "PUT",

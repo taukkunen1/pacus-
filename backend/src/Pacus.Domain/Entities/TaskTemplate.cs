@@ -20,6 +20,13 @@ public class TaskTemplate
     public int Order { get; set; }
     public bool Active { get; set; } = true;
 
+    // Op-in de escolha real pra crianca (Teoria da Autodeterminacao -- ver
+    // docs/PROPOSITO.md): 2-4 opcoes que a crianca escolhe entre si antes de concluir
+    // a tarefa (ex.: "Escolha UMA destas: torre de copos / ponte de papel / abrigo").
+    // Vazio = tarefa sem opcoes, comportamento normal. Copiado como esta para cada
+    // DailyTask gerado (DailyTask.Options) -- nao muda quando o template muda depois.
+    public List<string> Options { get; set; } = new();
+
     // Ate esta mudanca este campo existia no banco (toda tarefa permanente sempre
     // gravou "daily" aqui) mas nunca era lido em lugar nenhum -- a materializacao
     // diaria (DailyRoutineService) sempre criava a tarefa em TODOS os dias,

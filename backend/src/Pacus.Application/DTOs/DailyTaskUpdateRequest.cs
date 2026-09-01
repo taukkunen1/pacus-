@@ -5,5 +5,8 @@ public record DailyTaskUpdateRequest(
     string? Description,
     string Type,
     string Period,
-    int Points
+    int Points,
+    List<string>? Options = null
 );
+
+public record SelectTaskOptionRequest(string? SelectedOption);

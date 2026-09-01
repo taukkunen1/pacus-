@@ -216,6 +216,53 @@ async function promptRecurrenceChoice(existingTask, basePoints) {
   }
 }
 
+// Pergunta as opcoes de escolha (2-4) que a crianca vai poder selecionar
+// antes de concluir a tarefa (Teoria da Autodeterminacao -- docs/PROPOSITO.md).
+// Mesma logica de frontend/js/screens/home.js (duplicada aqui em vez de
+// compartilhada -- os dois arquivos ja duplicam varios outros prompts, e nao
+// ha um modulo comum de "prompts de tarefa" ainda). Retorna null se a pessoa
+// cancelar depois de comecar a preencher (o chamador deve abortar).
+function promptForOptions(currentOptions) {
+  const hasCurrent = Array.isArray(currentOptions) && currentOptions.length > 0;
+
+  const wantsOptions = window.confirm(
+    hasCurrent
+      ? "Esta tarefa tem opções pra escolher. Editar as opções?\n\nOK = Sim\nCancelar = Manter como está"
+      : "Adicionar opções pra criança escolher entre missões (ex.: torre de copos / ponte de papel)?\n\nOK = Sim\nCancelar = Não, tarefa comum"
+  );
+
+  if (!wantsOptions) {
+    return hasCurrent ? currentOptions : [];
+  }
+
+  const options = [];
+  for (let i = 1; i <= 4; i++) {
+    const suggestion = currentOptions?.[i - 1] ?? "";
+    const raw = window.prompt(
+      `Opção ${i}${i > 2 ? " (deixe em branco pra parar)" : ""}:`,
+      suggestion
+    );
+
+    if (raw === null) return null;
+
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      if (i <= 2) {
+        showToast(
+          "Uma tarefa com opções precisa de pelo menos 2.",
+          { error: true }
+        );
+        return null;
+      }
+      break;
+    }
+
+    options.push(trimmed);
+  }
+
+  return options;
+}
+
 export async function renderPacus(root, navigate) {
   root.innerHTML = `
     <div class="screen">
@@ -830,6 +877,11 @@ export async function renderPacus(root, navigate) {
       return;
     }
 
+    const options = promptForOptions(null);
+    if (options === null) {
+      return;
+    }
+
     try {
       const created = await createTask({
         title: title.trim(),
@@ -838,6 +890,7 @@ export async function renderPacus(root, navigate) {
         type,
         period,
         points,
+        options,
         ...recurrenceChoice
       });
 
@@ -940,6 +993,11 @@ export async function renderPacus(root, navigate) {
       return;
     }
 
+    const options = promptForOptions(task.options);
+    if (options === null) {
+      return;
+    }
+
     try {
       const updated = await updateTask(
         id,
@@ -950,6 +1008,7 @@ export async function renderPacus(root, navigate) {
           type,
           period,
           points,
+          options,
           ...recurrenceChoice
         }
       );

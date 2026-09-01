@@ -119,6 +119,34 @@
   text-decoration-color: rgba(234, 246, 243, 0.4);
 }
 
+/* Chips de escolha real da crianca entre missoes de uma tarefa (Teoria da
+   Autodeterminacao -- ver docs/PROPOSITO.md e TaskTemplate.Options). */
+.task-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.task-option-chip {
+  font-family: var(--font-display);
+  font-size: var(--step-xs, 0.8rem);
+  color: var(--text-on-dark-dim);
+  background: rgba(234, 246, 243, 0.08);
+  border: 1.5px solid rgba(234, 246, 243, 0.2);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+  transition: background var(--duration-fast) var(--ease-water), color var(--duration-fast) var(--ease-water), border-color var(--duration-fast) var(--ease-water);
+}
+.task-option-chip:hover {
+  background: rgba(234, 246, 243, 0.15);
+}
+.task-option-chip.is-selected {
+  color: var(--color-tide-deep);
+  background: var(--color-lagoon-light);
+  border-color: var(--color-lagoon-light);
+  font-weight: 600;
+}
+
 .task-points {
   flex-shrink: 0;
   font-family: var(--font-data);

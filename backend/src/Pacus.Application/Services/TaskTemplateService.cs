@@ -26,6 +26,7 @@ public class TaskTemplateService : ITaskTemplateService
     {
         var (type, period) = ParseTypeAndPeriod(request);
         var (recurrence, variants, customDays) = ParseRecurrenceAndVariants(request);
+        var options = ParseOptions(request.Options);
 
         var existing = await _taskTemplateRepository.GetActiveByUserAsync(familyId);
 
@@ -43,6 +44,7 @@ public class TaskTemplateService : ITaskTemplateService
             Recurrence = recurrence,
             Variants = variants,
             CustomDays = customDays,
+            Options = options,
             CreatedBy = createdBy,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -66,6 +68,7 @@ public class TaskTemplateService : ITaskTemplateService
 
         var (type, period) = ParseTypeAndPeriod(request);
         var (recurrence, variants, customDays) = ParseRecurrenceAndVariants(request);
+        var options = ParseOptions(request.Options);
 
         template.Title = request.Title;
         template.Description = request.Description;
@@ -75,6 +78,7 @@ public class TaskTemplateService : ITaskTemplateService
         template.Recurrence = recurrence;
         template.Variants = variants;
         template.CustomDays = customDays;
+        template.Options = options;
         template.UpdatedAt = DateTime.UtcNow;
 
         await _taskTemplateRepository.UpdateAsync(template);
@@ -275,5 +279,31 @@ public class TaskTemplateService : ITaskTemplateService
         }
 
         return days;
+    }
+
+    // Op-in de escolha real pra crianca (Teoria da Autodeterminacao -- docs/PROPOSITO.md).
+    // Null/vazio = tarefa sem opcoes (comportamento normal). Quando presente, exige 2-4
+    // opcoes nao vazias e sem duplicata -- uma unica opcao nao seria "escolha" nenhuma,
+    // e mais de 4 vira ruido pra uma crianca decidir.
+    public static List<string> ParseOptions(List<string>? rawOptions)
+    {
+        if (rawOptions is null || rawOptions.Count == 0)
+            return new List<string>();
+
+        var options = rawOptions
+            .Select(o => o?.Trim() ?? string.Empty)
+            .Where(o => o.Length > 0)
+            .ToList();
+
+        if (options.Count != rawOptions.Count)
+            throw new InvalidOperationException("Nenhuma opcao pode ficar em branco.");
+
+        if (options.Count < 2 || options.Count > 4)
+            throw new InvalidOperationException("Uma tarefa com opcoes precisa de 2 a 4 opcoes.");
+
+        if (options.Distinct(StringComparer.OrdinalIgnoreCase).Count() != options.Count)
+            throw new InvalidOperationException("As opcoes nao podem se repetir.");
+
+        return options;
     }
 }

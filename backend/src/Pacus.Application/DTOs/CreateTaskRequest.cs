@@ -14,7 +14,10 @@ public record CreateTaskRequest(
     List<TaskVariantRequest>? Variants = null,
     // So usado quando Recurrence == "custom" -- nomes de DayOfWeek (ex.: "tuesday",
     // "wednesday"), qualquer combinacao incluindo fim de semana.
-    List<string>? CustomDays = null
+    List<string>? CustomDays = null,
+    // Op-in de escolha (Teoria da Autodeterminacao, ver docs/PROPOSITO.md): 2-4 opcoes
+    // curtas que a crianca escolhe entre si antes de concluir. Null/vazio = sem opcoes.
+    List<string>? Options = null
 );
 
 public record TaskVariantRequest(

@@ -27,6 +27,36 @@ function taskCard(task, canManage) {
   const points = Number(task.points);
   const pointsClass = points < 0 ? "task-points--penalty" : "task-points--reward";
 
+  // Escolha real da crianca entre missoes (Teoria da Autodeterminacao -- ver
+  // docs/PROPOSITO.md). So aparece quando o template definiu 2-4 Options;
+  // cada chip manda a escolha pro backend (PUT /daily-tasks/{id}/option).
+  // Nao trava a conclusao da tarefa -- e so um reforco de autonomia, a
+  // crianca pode concluir sem escolher nenhuma.
+  const options = Array.isArray(task.options) ? task.options : [];
+
+  const optionChips = options.length
+    ? `
+        <div class="task-options" role="group" aria-label="Escolha uma missão">
+          ${options
+            .map((option) => {
+              const selected = task.selectedOption === option;
+              return `
+                <button
+                  type="button"
+                  class="task-option-chip ${selected ? "is-selected" : ""}"
+                  data-task-action="select-option"
+                  data-option-value="${escapeHtml(option)}"
+                  aria-pressed="${selected}"
+                >
+                  ${selected ? "✓ " : ""}${escapeHtml(option)}
+                </button>
+              `;
+            })
+            .join("")}
+        </div>
+      `
+    : "";
+
   const managementActions = canManage
     ? `
         <button
@@ -98,6 +128,8 @@ function taskCard(task, canManage) {
             `
             : ""
         }
+
+        ${optionChips}
       </div>
 
       <span class="task-points ${pointsClass}">

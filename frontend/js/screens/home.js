@@ -14,7 +14,8 @@ import {
   createTask,
   updateDailyTask,
   deleteDailyTask,
-  reorderDailyTasks
+  reorderDailyTasks,
+  selectTaskOption
 } from "../api/tasks-api.js";
 
 import { getPendingRedemptions } from "../api/store-api.js";
@@ -97,6 +98,53 @@ async function promptForDescription(currentValue) {
   if (raw === null) return undefined;
 
   return raw.trim() || null;
+}
+
+// Pergunta as opcoes de escolha (2-4) que a crianca vai poder selecionar
+// antes de concluir a tarefa (Teoria da Autodeterminacao -- docs/PROPOSITO.md).
+// Opcional: cancelar/deixar em branco na primeira pergunta = tarefa sem
+// opcoes (comportamento normal). Retorna null se a pessoa cancelar depois de
+// ja ter comecado a preencher (o chamador deve abortar a criacao/edicao
+// inteira nesse caso, igual aos outros prompts desta tela).
+function promptForOptions(currentOptions) {
+  const hasCurrent = Array.isArray(currentOptions) && currentOptions.length > 0;
+
+  const wantsOptions = window.confirm(
+    hasCurrent
+      ? "Esta tarefa tem opções pra escolher. Editar as opções?\n\nOK = Sim\nCancelar = Manter como está"
+      : "Adicionar opções pra criança escolher entre missões (ex.: torre de copos / ponte de papel)?\n\nOK = Sim\nCancelar = Não, tarefa comum"
+  );
+
+  if (!wantsOptions) {
+    return hasCurrent ? currentOptions : [];
+  }
+
+  const options = [];
+  for (let i = 1; i <= 4; i++) {
+    const suggestion = currentOptions?.[i - 1] ?? "";
+    const raw = window.prompt(
+      `Opção ${i}${i > 2 ? " (deixe em branco pra parar)" : ""}:`,
+      suggestion
+    );
+
+    if (raw === null) return null;
+
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      if (i <= 2) {
+        showToast(
+          "Uma tarefa com opções precisa de pelo menos 2.",
+          { error: true }
+        );
+        return null;
+      }
+      break;
+    }
+
+    options.push(trimmed);
+  }
+
+  return options;
 }
 
 function formatGameTimerRemaining(remainingMs) {
@@ -557,6 +605,11 @@ export async function renderHome(
             return;
           }
 
+          const options = promptForOptions(null);
+          if (options === null) {
+            return;
+          }
+
           // So o adulto pode transformar a tarefa em permanente (mexe nas
           // regras da familia) — o backend tambem bloqueia isso pra crianca.
           const permanent =
@@ -572,7 +625,8 @@ export async function renderHome(
             description,
             type,
             period: activePeriod,
-            points
+            points,
+            options
           };
 
           try {
@@ -662,6 +716,11 @@ export async function renderHome(
               return;
             }
 
+            const options = promptForOptions(task.options);
+            if (options === null) {
+              return;
+            }
+
             try {
               routine =
                 await updateDailyTask(
@@ -673,7 +732,8 @@ export async function renderHome(
                     type,
                     period:
                       task.period,
-                    points
+                    points,
+                    options
                   }
                 );
 
@@ -798,6 +858,44 @@ export async function renderHome(
               routine =
                 await reorderDailyTasks(orderedIds);
 
+              draw();
+            } catch (err) {
+              showToast(
+                err.message,
+                { error: true }
+              );
+            }
+          }
+        );
+      });
+
+    content
+      .querySelectorAll(
+        "[data-task-action=select-option]"
+      )
+      .forEach((button) => {
+        button.addEventListener(
+          "click",
+          async () => {
+            const card =
+              button.closest(".task-card");
+
+            const taskId = card?.dataset.taskId;
+            if (!taskId) return;
+
+            const task = routine.tasks.find(
+              (item) => String(item.id) === String(taskId)
+            );
+            if (!task) return;
+
+            const chosen = button.dataset.optionValue;
+            // Clicar de novo na mesma opcao ja escolhida desmarca -- da pra
+            // criança mudar de ideia sem precisar de outra opcao "neutra".
+            const nextValue =
+              task.selectedOption === chosen ? null : chosen;
+
+            try {
+              routine = await selectTaskOption(taskId, nextValue);
               draw();
             } catch (err) {
               showToast(

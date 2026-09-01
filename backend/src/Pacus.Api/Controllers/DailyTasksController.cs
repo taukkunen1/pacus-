@@ -97,6 +97,33 @@ public class DailyTasksController : ControllerBase
         }
     }
 
+    [HttpPut("{id}/option")]
+    public async Task<IActionResult> SelectOption(
+        string id,
+        [FromBody] SelectTaskOptionRequest request)
+    {
+        try
+        {
+            var routine =
+                await _dailyRoutineService.SelectTaskOptionAsync(
+                    _currentUser.FamilyId,
+                    id,
+                    request.SelectedOption,
+                    _currentUser.UserId,
+                    _currentUser.Role.ToString());
+
+            return Ok(routine);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(403, new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     [HttpPut("{id}/points")]
     public async Task<IActionResult> AdjustPoints(
         string id,

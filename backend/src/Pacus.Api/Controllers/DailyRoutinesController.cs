@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Pacus.Api.Auth;
 using Pacus.Application.DTOs;
+using Pacus.Application.Exceptions;
 using Pacus.Application.Interfaces;
 using Pacus.Application.Services;
 using Pacus.Domain.Enums;
@@ -41,18 +42,43 @@ public class DailyRoutinesController : ControllerBase
     // (DailyRoutineDto.cs) em vez de devolver a entidade de dominio crua (achado #3
     // da mesma auditoria).
 
+    // Tentativas extras so aqui: GetToday e uma leitura do ponto de vista do usuario,
+    // mas por baixo pode escrever (fechar o dia anterior, sincronizar tarefas novas de
+    // template) via concorrencia otimista (achado #5 da auditoria -- ver
+    // docs/ESTADO_ATUAL.md e DailyRoutineRepository.UpdateAsync). Duas abas/dispositivos
+    // da familia abrindo a tela "Hoje" quase ao mesmo tempo bastam pra colidir e um dos
+    // dois tomar ConflictException (409) so por ter carregado a pagina -- nao por ter
+    // pedido uma acao. Relendo e tentando de novo aqui, a proxima passada ja enxerga o
+    // estado gravado pela primeira e normalmente nao ha mais nada a sincronizar, entao
+    // resolve sozinho sem incomodar quem so estava abrindo o app.
+    private const int GetTodayMaxAttempts = 3;
+
     [HttpGet("today")]
     public async Task<IActionResult> GetToday()
     {
         var familyId = _currentUser.FamilyId;
         var timezone = await _familyTimezoneService.GetTimezoneAsync(familyId);
 
-        // "Nao e necessario manter um processo rodando exatamente a meia-noite" — o fechamento
-        // acontece de forma preguicosa, no primeiro acesso que perceber que o dia virou.
-        await _dayClosingService.CloseIfDueAsync(familyId, timezone);
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                // "Nao e necessario manter um processo rodando exatamente a meia-noite" — o
+                // fechamento acontece de forma preguicosa, no primeiro acesso que perceber
+                // que o dia virou.
+                await _dayClosingService.CloseIfDueAsync(familyId, timezone);
 
-        var routine = await _dailyRoutineService.GetOrCreateTodayAsync(familyId, timezone);
-        return Ok(routine.ToResponse());
+                var routine = await _dailyRoutineService.GetOrCreateTodayAsync(familyId, timezone);
+                return Ok(routine.ToResponse());
+            }
+            catch (ConflictException) when (attempt < GetTodayMaxAttempts)
+            {
+                // corrida passageira contra outra requisicao concorrente -- tenta de novo
+                // com estado fresco. Na ultima tentativa deixa o ConflictException subir
+                // pro AppExceptionHandler (409) normalmente: se colidiu 3x seguidas ja nao
+                // e mais so azar de timing.
+            }
+        }
     }
 
     [HttpGet]

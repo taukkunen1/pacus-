@@ -129,6 +129,17 @@ function taskCard(task, canManage) {
             : ""
         }
 
+        ${
+          task.reason
+            ? `
+              <p class="task-reason">
+                <span class="task-reason__icon" aria-hidden="true">💡</span>
+                ${escapeHtml(task.reason)}
+              </p>
+            `
+            : ""
+        }
+
         ${optionChips}
       </div>
 

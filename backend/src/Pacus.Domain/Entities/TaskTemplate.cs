@@ -14,6 +14,16 @@ public class TaskTemplate
     public ObjectId FamilyId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
+
+    // Motivo por tras da tarefa, mostrado pra crianca (nao so "como fazer", como
+    // Description, mas "por que isso importa") -- parentalidade autonomo-suportiva
+    // (Joussemet, Landry & Koestner 2008; ver docs/PROPOSITO.md): dar a razao por
+    // tras da regra, nao so a regra, muda como a crianca internaliza a
+    // responsabilidade. Opcional -- null/vazio = sem motivo explicito (nao bloqueia
+    // nada, so deixa de aparecer o card). Copiado como esta pra cada DailyTask
+    // gerado (mesma logica de Options acima).
+    public string? Reason { get; set; }
+
     public TaskType Type { get; set; }
     public TaskPeriod Period { get; set; }
     public int Points { get; set; }

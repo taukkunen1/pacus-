@@ -263,6 +263,21 @@ function promptForOptions(currentOptions) {
   return options;
 }
 
+// Pergunta o "por que isso importa" da tarefa -- parentalidade autonomo-
+// suportiva (ver docs/PROPOSITO.md e a mesma funcao em home.js, duplicada
+// aqui pelo mesmo motivo que promptForOptions). Opcional; cancelar mantem o
+// motivo atual (nao aborta a criacao/edicao, diferente dos campos obrigatorios).
+function promptForReason(currentValue) {
+  const raw = window.prompt(
+    "Por que essa tarefa importa? (opcional — o que a criança vê como motivo, não como fazer)",
+    currentValue ?? ""
+  );
+
+  if (raw === null) return currentValue ?? null;
+
+  return raw.trim() || null;
+}
+
 export async function renderPacus(root, navigate) {
   root.innerHTML = `
     <div class="screen">
@@ -882,6 +897,8 @@ export async function renderPacus(root, navigate) {
       return;
     }
 
+    const reason = promptForReason(null);
+
     try {
       const created = await createTask({
         title: title.trim(),
@@ -891,6 +908,7 @@ export async function renderPacus(root, navigate) {
         period,
         points,
         options,
+        reason,
         ...recurrenceChoice
       });
 
@@ -998,6 +1016,8 @@ export async function renderPacus(root, navigate) {
       return;
     }
 
+    const reason = promptForReason(task.reason);
+
     try {
       const updated = await updateTask(
         id,
@@ -1009,6 +1029,7 @@ export async function renderPacus(root, navigate) {
           period,
           points,
           options,
+          reason,
           ...recurrenceChoice
         }
       );

@@ -10,6 +10,12 @@ public class DailyTask
     public string? TaskTemplateId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
+
+    // "Por que isso importa" (parentalidade autonomo-suportiva -- ver
+    // docs/PROPOSITO.md e TaskTemplate.Reason). Copiado do template no momento da
+    // geracao, igual Options/SelectedOption.
+    public string? Reason { get; set; }
+
     public TaskType Type { get; set; }
     public TaskPeriod Period { get; set; }
     public int Order { get; set; }

@@ -139,4 +139,61 @@ public class TaskOptionsTests
 
         Assert.Null(updated.Tasks.Single().SelectedOption);
     }
+
+    // Cobre o campo Reason ("por que isso importa" -- parentalidade
+    // autonomo-suportiva, ver docs/PROPOSITO.md e TaskTemplate.Reason).
+    [Fact]
+    public void ParseReason_NuloOuVazio_RetornaNull()
+    {
+        Assert.Null(TaskTemplateService.ParseReason(null));
+        Assert.Null(TaskTemplateService.ParseReason(""));
+        Assert.Null(TaskTemplateService.ParseReason("   "));
+    }
+
+    [Fact]
+    public void ParseReason_ComTexto_RetornaTrimado()
+    {
+        Assert.Equal(
+            "Aprender coisas novas te ajuda a crescer.",
+            TaskTemplateService.ParseReason("  Aprender coisas novas te ajuda a crescer.  "));
+    }
+
+    [Fact]
+    public async Task TarefaPermanenteComReason_CopiaReasonParaDailyTask()
+    {
+        var (templates, dailyRoutine) = BuildSystem();
+        var userId = ObjectId.GenerateNewId();
+
+        await templates.CreateAsync(userId, userId,
+            new CreateTaskRequest(
+                "Escola", null, "mandatory", "morning", 2,
+                Reason: "Aprender coisas novas te ajuda a crescer e ter mais escolhas."));
+
+        var routine = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-01", "America/Sao_Paulo");
+
+        var task = Assert.Single(routine.Tasks);
+        Assert.Equal("Aprender coisas novas te ajuda a crescer e ter mais escolhas.", task.Reason);
+    }
+
+    [Fact]
+    public async Task UpdateTaskAsync_ReasonEmBranco_LimpaMotivo()
+    {
+        var (templates, dailyRoutine) = BuildSystem();
+        var userId = ObjectId.GenerateNewId();
+
+        await templates.CreateAsync(userId, userId,
+            new CreateTaskRequest(
+                "Escola", null, "mandatory", "morning", 2,
+                Reason: "Motivo original"));
+
+        var routine = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-01", "America/Sao_Paulo");
+        var task = routine.Tasks.Single();
+
+        var updated = await dailyRoutine.UpdateTaskAsync(
+            userId, task.Id,
+            new DailyTaskUpdateRequest(task.Title, task.Description, "mandatory", "morning", task.Points, Reason: "   "),
+            userId, "adult");
+
+        Assert.Null(updated.Tasks.Single().Reason);
+    }
 }

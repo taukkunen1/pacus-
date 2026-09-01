@@ -147,6 +147,22 @@ function promptForOptions(currentOptions) {
   return options;
 }
 
+// Pergunta o "por que isso importa" da tarefa -- parentalidade autonomo-
+// suportiva (Joussemet, Landry & Koestner 2008; ver docs/PROPOSITO.md): dar a
+// razao por tras da regra, nao so a regra. Opcional, uma frase curta (window.
+// prompt de uma linha e suficiente aqui -- diferente da descricao, que pode
+// ter varios itens). Retorna null se cancelado (sem alterar o motivo atual).
+function promptForReason(currentValue) {
+  const raw = window.prompt(
+    "Por que essa tarefa importa? (opcional — o que a criança vê como motivo, não como fazer)",
+    currentValue ?? ""
+  );
+
+  if (raw === null) return currentValue ?? null;
+
+  return raw.trim() || null;
+}
+
 function formatGameTimerRemaining(remainingMs) {
   const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
   const h = Math.floor(totalSeconds / 3600);
@@ -610,6 +626,8 @@ export async function renderHome(
             return;
           }
 
+          const reason = promptForReason(null);
+
           // So o adulto pode transformar a tarefa em permanente (mexe nas
           // regras da familia) — o backend tambem bloqueia isso pra crianca.
           const permanent =
@@ -626,7 +644,8 @@ export async function renderHome(
             type,
             period: activePeriod,
             points,
-            options
+            options,
+            reason
           };
 
           try {
@@ -721,6 +740,8 @@ export async function renderHome(
               return;
             }
 
+            const reason = promptForReason(task.reason);
+
             try {
               routine =
                 await updateDailyTask(
@@ -733,7 +754,8 @@ export async function renderHome(
                     period:
                       task.period,
                     points,
-                    options
+                    options,
+                    reason
                   }
                 );
 

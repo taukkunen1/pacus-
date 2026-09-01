@@ -27,6 +27,7 @@ public class TaskTemplateService : ITaskTemplateService
         var (type, period) = ParseTypeAndPeriod(request);
         var (recurrence, variants, customDays) = ParseRecurrenceAndVariants(request);
         var options = ParseOptions(request.Options);
+        var reason = ParseReason(request.Reason);
 
         var existing = await _taskTemplateRepository.GetActiveByUserAsync(familyId);
 
@@ -45,6 +46,7 @@ public class TaskTemplateService : ITaskTemplateService
             Variants = variants,
             CustomDays = customDays,
             Options = options,
+            Reason = reason,
             CreatedBy = createdBy,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -69,6 +71,7 @@ public class TaskTemplateService : ITaskTemplateService
         var (type, period) = ParseTypeAndPeriod(request);
         var (recurrence, variants, customDays) = ParseRecurrenceAndVariants(request);
         var options = ParseOptions(request.Options);
+        var reason = ParseReason(request.Reason);
 
         template.Title = request.Title;
         template.Description = request.Description;
@@ -79,6 +82,7 @@ public class TaskTemplateService : ITaskTemplateService
         template.Variants = variants;
         template.CustomDays = customDays;
         template.Options = options;
+        template.Reason = reason;
         template.UpdatedAt = DateTime.UtcNow;
 
         await _taskTemplateRepository.UpdateAsync(template);
@@ -305,5 +309,14 @@ public class TaskTemplateService : ITaskTemplateService
             throw new InvalidOperationException("As opcoes nao podem se repetir.");
 
         return options;
+    }
+
+    // "Por que isso importa" (TaskTemplate.Reason) -- so trim + null-se-vazio, sem
+    // limite artificial de tamanho: diferente de Options, aqui e texto livre de
+    // verdade (uma frase, geralmente), sem estrutura pra validar.
+    public static string? ParseReason(string? rawReason)
+    {
+        var trimmed = rawReason?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed;
     }
 }

@@ -17,7 +17,9 @@ public record CreateTaskRequest(
     List<string>? CustomDays = null,
     // Op-in de escolha (Teoria da Autodeterminacao, ver docs/PROPOSITO.md): 2-4 opcoes
     // curtas que a crianca escolhe entre si antes de concluir. Null/vazio = sem opcoes.
-    List<string>? Options = null
+    List<string>? Options = null,
+    // "Por que isso importa" -- ver TaskTemplate.Reason. Opcional, null/vazio = sem motivo.
+    string? Reason = null
 );
 
 public record TaskVariantRequest(

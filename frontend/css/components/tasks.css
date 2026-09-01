@@ -119,6 +119,22 @@
   text-decoration-color: rgba(234, 246, 243, 0.4);
 }
 
+/* "Por que isso importa" -- parentalidade autonomo-suportiva (ver
+   docs/PROPOSITO.md e TaskTemplate.Reason). Visualmente distinto da
+   descricao (que e "como fazer"): cor mais quente, icone de lampada, sem
+   risco quando a tarefa e concluida (o motivo continua valendo). */
+.task-reason {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: var(--step-xs, 0.8rem);
+  color: var(--color-sun);
+  margin-top: 4px;
+  font-style: italic;
+  white-space: pre-line;
+}
+.task-reason__icon { flex-shrink: 0; }
+
 /* Chips de escolha real da crianca entre missoes de uma tarefa (Teoria da
    Autodeterminacao -- ver docs/PROPOSITO.md e TaskTemplate.Options). */
 .task-options {

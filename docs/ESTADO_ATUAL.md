@@ -78,3 +78,12 @@ A pedido do dono do produto, depois de um levantamento do que faltava no app:
 - **Limpeza**: removidos `components/task-editor.js`, `components/task-card.js`, `state/task-state.js` (confirmado sem nenhum import em lugar nenhum). README atualizado: hospedagem da API deixou de estar "em aberto" — já roda no Render.
 - **Fora do escopo por decisão do dono do produto**: notificações push/e-mail reais (ficaram só como badge in-app, sem Firebase/provedor de e-mail) e reset de senha por e-mail de verdade (ficou o recovery code, sem provedor de e-mail configurado).
 - Suíte completa (36 unitários + integração via Testcontainers) verde no CI real antes de remover o trigger temporário do `ci.yml`. Ainda em `feature/next-migration` — sem merge/deploy pra `main` (instrução permanente do dono do produto).
+
+## Melhorias baseadas em ciência do comportamento (2026-09-01, pós-`docs/PROPOSITO.md`)
+
+Depois de registrar o propósito do produto no código, pedidas explicitamente pelo dono do produto:
+
+- **Elogio de esforço, não de resultado** (Dweck & Mueller 1998): toast contextual ao concluir tarefa, `utils/effort-messages.js` — frases de esforço/processo (não de traço/resultado), escolhidas por prioridade (dia completo > período completo > tipo desafio > pontos altos > genérico).
+- **Escolha real dentro de limites do adulto** (Teoria da Autodeterminação): `TaskTemplate.Options`/`DailyTask.Options`+`SelectedOption` — 2 a 4 opções estruturadas que a criança escolhe antes de concluir, em qualquer tipo/período de tarefa (permanente ou só-hoje). `PUT /api/v1/daily-tasks/{id}/option`. Chips clicáveis em `task-list.js`.
+- **"Por que isso importa"** (parentalidade autônomo-suportiva — Joussemet, Landry & Koestner 2008): `TaskTemplate.Reason`/`DailyTask.Reason`, campo opcional de texto livre mostrado sempre no card da tarefa (não escondido atrás de um clique), distinto da descrição (que é "como fazer" — o Reason é "por quê"). Cobre qualquer tarefa, permanente ou só-hoje. As 4 tarefas reais já cadastradas (Momento Criativo, Inglês, Escoteiro, Escola) ficaram sem motivo por ora — decisão do dono do produto, para preencher com calma depois via edição.
+- 50 testes unitários passando; suíte de integração validada no CI real (trigger temporário em `ci.yml`, revertido depois).

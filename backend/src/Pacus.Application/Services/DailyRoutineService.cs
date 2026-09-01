@@ -99,6 +99,7 @@ public class DailyRoutineService : IDailyRoutineService
                 Points = resolved.Points,
                 Status = TaskItemStatus.Pending,
                 Options = new List<string>(template.Options),
+                Reason = template.Reason,
                 CompletedAt = null,
                 CreatedBy = userId.ToString(),
                 Origin = "template",
@@ -145,6 +146,7 @@ public class DailyRoutineService : IDailyRoutineService
                 Points = pair.Resolved!.Points,
                 Status = TaskItemStatus.Pending,
                 Options = new List<string>(pair.Template.Options),
+                Reason = pair.Template.Reason,
                 CompletedAt = null,
                 CreatedBy = userId.ToString(),
                 Origin = "template",
@@ -276,6 +278,7 @@ public class DailyRoutineService : IDailyRoutineService
         if (string.IsNullOrWhiteSpace(request.Title))
             throw new InvalidOperationException("O titulo da tarefa e obrigatorio.");
         var options = TaskTemplateService.ParseOptions(request.Options);
+        var reason = TaskTemplateService.ParseReason(request.Reason);
         await EnsureChildPermissionAsync(userId, actorRole, p => p.CanCreateTasks);
 
         var actorRoleEnum = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
@@ -295,6 +298,7 @@ public class DailyRoutineService : IDailyRoutineService
             Active = false,
             Recurrence = "daily",
             Options = options,
+            Reason = reason,
             CreatedBy = actorId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -313,6 +317,7 @@ public class DailyRoutineService : IDailyRoutineService
             Points = request.Points,
             Status = TaskItemStatus.Pending,
             Options = options,
+            Reason = reason,
             CompletedAt = null,
             CreatedBy = actorId.ToString(),
             Origin = actorRole.ToLowerInvariant(),
@@ -461,6 +466,7 @@ public class DailyRoutineService : IDailyRoutineService
             throw new InvalidOperationException($"Periodo invalido: {request.Period}");
         ValidatePoints(request.Points);
         var options = TaskTemplateService.ParseOptions(request.Options);
+        var reason = TaskTemplateService.ParseReason(request.Reason);
         await EnsureChildPermissionAsync(userId, actorRole, p => p.CanEditTasks);
 
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
@@ -475,6 +481,7 @@ public class DailyRoutineService : IDailyRoutineService
         task.Period = period;
         task.Points = request.Points;
         task.Options = options;
+        task.Reason = reason;
         // Se a opcao escolhida antes nao existe mais na lista nova, descarta -- nao faz
         // sentido manter uma "escolha" que nao e mais uma opcao valida da tarefa.
         if (task.SelectedOption is not null && !options.Contains(task.SelectedOption))

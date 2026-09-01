@@ -101,8 +101,10 @@ public sealed class PointsHttpIntegrationTests
             90,
             body.GetProperty("balance").GetInt32());
 
+        // 90 * Settings.DefaultPointToBrlRate (0.06, sem Settings salvo pra familia) = 5.4.
+        // Era 4.5 com a taxa antiga (0.05) -- atualizado junto da mudanca de taxa.
         Assert.Equal(
-            4.5,
+            5.4,
             body.GetProperty("brl").GetDouble());
     }
 

@@ -1,1 +1,0 @@
-// TODO: componente task-card

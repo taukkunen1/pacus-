@@ -38,6 +38,48 @@ public class StoreController : ControllerBase
         return Ok(items.Select(ToStoreItemResponse));
     }
 
+    // Painel de gerenciamento do adulto -- inclui itens desativados, para poder reativar.
+    [RequireRole(UserRole.Adult)]
+    [HttpGet("items/all")]
+    public async Task<IActionResult> GetAllItems()
+    {
+        var items = await _storeRepository.GetAllItemsByFamilyAsync(_currentUser.FamilyId);
+
+        return Ok(items.Select(ToStoreItemResponse));
+    }
+
+    // Somente adulto edita itens.
+    [RequireRole(UserRole.Adult)]
+    [HttpPut("items/{id}")]
+    public async Task<IActionResult> UpdateItem(string id, [FromBody] CreateStoreItemRequest request)
+    {
+        try
+        {
+            var item = await _storeService.UpdateItemAsync(_currentUser.FamilyId, id, request);
+            return Ok(ToStoreItemResponse(item));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    // Somente adulto ativa/desativa (nunca apaga -- resgates antigos referenciam o item).
+    [RequireRole(UserRole.Adult)]
+    [HttpPut("items/{id}/active")]
+    public async Task<IActionResult> SetItemActive(string id, [FromBody] SetStoreItemActiveRequest request)
+    {
+        try
+        {
+            var item = await _storeService.SetItemActiveAsync(_currentUser.FamilyId, id, request.Active);
+            return Ok(ToStoreItemResponse(item));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     // Somente adulto cria itens.
     [RequireRole(UserRole.Adult)]
     [HttpPost("items")]

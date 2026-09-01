@@ -161,6 +161,7 @@ builder.Services.AddScoped<IStoreService, StoreService>();
 builder.Services.AddScoped<ITaskTemplateService, TaskTemplateService>();
 builder.Services.AddScoped<IDataExportService, DataExportService>();
 builder.Services.AddScoped<IAccountDeletionService, AccountDeletionService>();
+builder.Services.AddScoped<IFamilyTimezoneService, FamilyTimezoneService>();
 
 builder.Services
     .AddControllers()

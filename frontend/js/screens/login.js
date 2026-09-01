@@ -1,4 +1,4 @@
-import { loginAdult, loginChild } from "../api/auth-api.js";
+import { loginAdult, loginChild, resetAdultPassword } from "../api/auth-api.js";
 import { getFamilyChildren } from "../api/family-api.js";
 
 const CHILD_PROFILE_KEY = "pacus.child.profileId"; // so um id, nao e credencial — ok em localStorage
@@ -60,6 +60,7 @@ export function renderLogin(root, onSuccess) {
         </div>
         <p class="error-text hidden" id="adult-error"></p>
         <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+        <button type="button" class="btn btn-ghost btn-block" id="forgot-password-btn">Esqueci minha senha</button>
       </form>
     `;
 
@@ -76,6 +77,62 @@ export function renderLogin(root, onSuccess) {
         const result = await loginAdult(email, password);
         await cacheFamilyChildren();
         onSuccess(result);
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.classList.remove("hidden");
+      } finally {
+        submitting = false;
+      }
+    });
+
+    slot.querySelector("#forgot-password-btn").addEventListener("click", renderForgotPasswordForm);
+  }
+
+  // "Esqueci minha senha" -- sem provedor de e-mail configurado, usa o codigo de
+  // recuperacao mostrado uma unica vez no cadastro da familia (ver BootstrapService).
+  function renderForgotPasswordForm() {
+    slot.innerHTML = `
+      <form class="login-form" id="forgot-form">
+        <p class="profile-picker-hint">Use o código de recuperação que você guardou ao criar a família.</p>
+        <div class="field">
+          <label for="reset-email">Email</label>
+          <input id="reset-email" name="email" type="email" autocomplete="username" required />
+        </div>
+        <div class="field">
+          <label for="reset-code">Código de recuperação</label>
+          <input id="reset-code" name="code" type="text" autocomplete="off" required />
+        </div>
+        <div class="field">
+          <label for="reset-password">Nova senha</label>
+          <input id="reset-password" name="newPassword" type="password" autocomplete="new-password" required />
+        </div>
+        <p class="error-text hidden" id="forgot-error"></p>
+        <p class="hidden" id="forgot-success"></p>
+        <button type="submit" class="btn btn-primary btn-block">Redefinir senha</button>
+        <button type="button" class="btn btn-ghost btn-block" id="back-to-login-btn">Voltar</button>
+      </form>
+    `;
+
+    slot.querySelector("#back-to-login-btn").addEventListener("click", renderAdultForm);
+
+    slot.querySelector("#forgot-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (submitting) return;
+
+      const email = slot.querySelector("#reset-email").value.trim();
+      const code = slot.querySelector("#reset-code").value.trim();
+      const newPassword = slot.querySelector("#reset-password").value;
+      const errorEl = slot.querySelector("#forgot-error");
+      const successEl = slot.querySelector("#forgot-success");
+      errorEl.classList.add("hidden");
+      successEl.classList.add("hidden");
+
+      submitting = true;
+      try {
+        const result = await resetAdultPassword(email, code, newPassword);
+        successEl.textContent = `Senha redefinida! Seu novo código de recuperação é: ${result.newRecoveryCode} — guarde em lugar seguro, ele substitui o anterior.`;
+        successEl.classList.remove("hidden");
+        slot.querySelector("#forgot-form button[type=submit]").disabled = true;
       } catch (err) {
         errorEl.textContent = err.message;
         errorEl.classList.remove("hidden");

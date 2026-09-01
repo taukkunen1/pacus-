@@ -17,6 +17,7 @@ import {
   reorderDailyTasks
 } from "../api/tasks-api.js";
 
+import { getPendingRedemptions } from "../api/store-api.js";
 import { renderTank } from "../pacus/habitat.js";
 import { renderTaskSection } from "../components/task-list.js";
 import { formatOperationalDate } from "../utils/date.js";
@@ -171,6 +172,17 @@ export async function renderHome(
     console.warn("PACUS nao encontrado. A tela de hoje continuara sem o estagio do PACUS.", err);
   }
 
+  // Numerozinho na aba "Loja" avisando o adulto de resgate(s) aguardando aprovacao --
+  // so uma contagem leve, sem mudar nada na tela de hoje em si.
+  let pendingRedemptionsCount = 0;
+  if (isAdult) {
+    try {
+      const pending = await getPendingRedemptions();
+      pendingRedemptionsCount = pending?.length ?? 0;
+    } catch (err) {
+      console.warn("Nao foi possivel carregar resgates pendentes.", err);
+    }
+  }
 
   function totalTasks() {
     return routine.tasks.filter(
@@ -453,7 +465,10 @@ export async function renderHome(
         </div>
       </div>
 
-      ${renderBottomNav("today")}
+      ${renderBottomNav("today", {
+        today: !isAdult ? Math.max(0, totalTasks() - doneTasks()) : 0,
+        store: isAdult ? pendingRedemptionsCount : 0
+      })}
     `;
 
     attachHandlers();

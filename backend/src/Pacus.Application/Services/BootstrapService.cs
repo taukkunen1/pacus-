@@ -43,6 +43,11 @@ public class BootstrapService : IBootstrapService
         var now = DateTime.UtcNow;
         var familyId = ObjectId.GenerateNewId();
 
+        // Recovery code do "esqueci minha senha" (ver AuthService.ResetAdultPasswordAsync) --
+        // so aparece em texto puro aqui, uma unica vez, na resposta deste endpoint. O frontend
+        // deve orientar o adulto a guardar em lugar seguro antes de sair da tela.
+        var recoveryCode = AuthService.GenerateRecoveryCode();
+
         var adult = new User
         {
             Id = ObjectId.GenerateNewId(),
@@ -50,6 +55,7 @@ public class BootstrapService : IBootstrapService
             Name = request.AdultName,
             Email = email,
             PasswordHash = _passwordHasher.Hash(request.AdultPassword),
+            RecoveryCodeHash = _passwordHasher.Hash(recoveryCode),
             Timezone = "America/Sao_Paulo",
             FamilyId = familyId,
             CreatedAt = now,
@@ -116,7 +122,8 @@ public class BootstrapService : IBootstrapService
             child.Id.ToString(),
             familyId.ToString(),
             pacus.Id.ToString(),
-            "Familia PACUS criada com sucesso."
+            "Familia PACUS criada com sucesso.",
+            recoveryCode
         );
     }
 }

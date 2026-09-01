@@ -28,7 +28,8 @@ public class StoreServiceTests
             new PointsService(new FakePointTransactionRepository()),
             new FakeSettingsRepository());
 
-        var store = new StoreService(storeRepo, pointsService, auditLogRepo, dailyRoutineService);
+        var store = new StoreService(
+            storeRepo, pointsService, auditLogRepo, dailyRoutineService, new FakeFamilyTimezoneService());
         return (store, storeRepo, pointsRepo, routines);
     }
 

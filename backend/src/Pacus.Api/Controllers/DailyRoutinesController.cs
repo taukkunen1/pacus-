@@ -16,26 +16,28 @@ public class DailyRoutinesController : ControllerBase
     private readonly IDailyRoutineService _dailyRoutineService;
     private readonly IDailyRoutineRepository _dailyRoutineRepository;
     private readonly IDayClosingService _dayClosingService;
+    private readonly IFamilyTimezoneService _familyTimezoneService;
     private readonly ICurrentUserService _currentUser;
 
     public DailyRoutinesController(
         IDailyRoutineService dailyRoutineService,
         IDailyRoutineRepository dailyRoutineRepository,
         IDayClosingService dayClosingService,
+        IFamilyTimezoneService familyTimezoneService,
         ICurrentUserService currentUser)
     {
         _dailyRoutineService = dailyRoutineService;
         _dailyRoutineRepository = dailyRoutineRepository;
         _dayClosingService = dayClosingService;
+        _familyTimezoneService = familyTimezoneService;
         _currentUser = currentUser;
     }
 
     [HttpGet("today")]
     public async Task<IActionResult> GetToday()
     {
-        // TODO: timezone devera vir de settings/perfil da familia, nao fixo.
-        const string timezone = "America/Sao_Paulo";
         var familyId = _currentUser.FamilyId;
+        var timezone = await _familyTimezoneService.GetTimezoneAsync(familyId);
 
         // "Nao e necessario manter um processo rodando exatamente a meia-noite" — o fechamento
         // acontece de forma preguicosa, no primeiro acesso que perceber que o dia virou.

@@ -44,4 +44,25 @@ public class AuthController : ControllerBase
             return Unauthorized(new { error = ex.Message });
         }
     }
+
+    // "Esqueci minha senha" do adulto -- sem provedor de e-mail configurado neste projeto,
+    // usa o recovery code mostrado uma unica vez no bootstrap (ver BootstrapService).
+    [AllowAnonymous]
+    [HttpPost("adult/reset-password")]
+    public async Task<IActionResult> ResetAdultPassword([FromBody] ResetAdultPasswordRequest request)
+    {
+        try
+        {
+            var newRecoveryCode = await _authService.ResetAdultPasswordAsync(
+                request.Email, request.RecoveryCode, request.NewPassword);
+
+            return Ok(new ResetAdultPasswordResponse(
+                "Senha redefinida com sucesso. Guarde o novo codigo de recuperacao.",
+                newRecoveryCode));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { error = ex.Message });
+        }
+    }
 }

@@ -19,6 +19,7 @@ public class PointsController : ControllerBase
     private readonly IPointTransactionRepository _pointTransactionRepository;
     private readonly IAuditLogRepository _auditLogRepository;
     private readonly ISettingsRepository _settingsRepository;
+    private readonly IFamilyTimezoneService _familyTimezoneService;
     private readonly ICurrentUserService _currentUser;
 
     public PointsController(
@@ -26,12 +27,14 @@ public class PointsController : ControllerBase
         IPointTransactionRepository pointTransactionRepository,
         IAuditLogRepository auditLogRepository,
         ISettingsRepository settingsRepository,
+        IFamilyTimezoneService familyTimezoneService,
         ICurrentUserService currentUser)
     {
         _pointsService = pointsService;
         _pointTransactionRepository = pointTransactionRepository;
         _auditLogRepository = auditLogRepository;
         _settingsRepository = settingsRepository;
+        _familyTimezoneService = familyTimezoneService;
         _currentUser = currentUser;
     }
 
@@ -63,7 +66,7 @@ public class PointsController : ControllerBase
 
         if (delta != 0)
         {
-            const string timezone = "America/Sao_Paulo";
+            var timezone = await _familyTimezoneService.GetTimezoneAsync(_currentUser.FamilyId);
             var date = TimezoneHelper.GetOperationalDate(timezone);
 
             await _pointsService.RecordAsync(

@@ -43,7 +43,7 @@ Sirva `frontend/` por um servidor HTTP, por exemplo `python -m http.server 5500 
 `.github/workflows/pages.yml` prepara deploy do frontend no GitHub Pages.
 
 ## Deploy da API
-`backend/Dockerfile` gera uma imagem ASP.NET Core 10. `deploy/docker-compose.yml` documenta a execução com MongoDB Atlas externo. O provedor de hospedagem da API ainda precisa ser escolhido.
+`backend/Dockerfile` gera uma imagem ASP.NET Core 10. `deploy/docker-compose.yml` documenta a execução com MongoDB Atlas externo. Hospedada em produção no Render (`pacus.onrender.com`).
 
 ## Segurança
 Nunca commitar senha do MongoDB, JWT secret ou connection strings reais. Checklist completo de segurança/LGPD em `docs/SECURITY_LGPD_CHECKLIST.md`.

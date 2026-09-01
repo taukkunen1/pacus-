@@ -14,20 +14,26 @@ const NAV_ITEMS = [
   { key: "store", label: "Loja" }
 ];
 
-export function renderBottomNav(activeKey) {
+// `badges` e opcional: { [navKey]: count }. So aparece um numerozinho no canto
+// da aba quando count > 0 -- ex. tarefas de hoje ainda pendentes (crianca) ou
+// resgates aguardando aprovacao (adulto). Cada tela calcula os proprios numeros
+// com os dados que ja carregou (nao faz nenhuma chamada nova aqui).
+export function renderBottomNav(activeKey, badges = {}) {
   return `
     <nav class="bottom-nav" aria-label="Navegação principal">
-      ${NAV_ITEMS.map(
-        (item) => `
+      ${NAV_ITEMS.map((item) => {
+        const count = Number(badges[item.key]) || 0;
+        return `
           <button
             data-nav="${item.key}"
             class="${item.key === activeKey ? "is-active" : ""}"
             type="button"
           >
             ${item.label}
+            ${count > 0 ? `<span class="nav-badge">${count > 99 ? "99+" : count}</span>` : ""}
           </button>
-        `
-      ).join("")}
+        `;
+      }).join("")}
     </nav>
   `;
 }

@@ -1,6 +1,8 @@
 # PACUS
 
-PACUS é um aplicativo de rotina com histórico diário, tarefas dinâmicas, Pacus Points e crescimento independente do desempenho.
+PACUS é um sistema de apoio à rotina familiar que ajuda crianças a desenvolver autonomia, responsabilidade e hábitos positivos por meio de pequenas tarefas diárias, acompanhamento dos adultos e reforço positivo — sem transformar a rotina numa experiência de punição. Veja o propósito completo (e o porquê de decisões como "tarefa não concluída nunca desconta saldo") em [`docs/PROPOSITO.md`](docs/PROPOSITO.md).
+
+Na prática, hoje isso é um app de rotina com histórico diário, tarefas dinâmicas, Pacus Points e um bichinho virtual (o PACUS) que cresce independente do desempenho.
 
 ## Arquitetura
 

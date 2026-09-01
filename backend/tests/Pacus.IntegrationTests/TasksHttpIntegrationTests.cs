@@ -219,7 +219,7 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
         var deleteResponse = await clientB.DeleteAsync(
             $"/api/v1/tasks/{templateIdFromFamilyA}");
 
-        Assert.Equal(HttpStatusCode.BadRequest, deleteResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, deleteResponse.StatusCode);
 
         // Confirma que o template da Familia A continua ativo/intacto.
         var listResponse = await clientA.GetAsync("/api/v1/tasks");
@@ -256,7 +256,7 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
                 points = 1
             });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]

@@ -2,6 +2,7 @@ using MongoDB.Bson;
 using Pacus.Application.DTOs;
 using Pacus.Application.Services;
 using Pacus.UnitTests.Fakes;
+using Pacus.Application.Exceptions;
 
 namespace Pacus.UnitTests;
 
@@ -33,28 +34,28 @@ public class TaskOptionsTests
     [Fact]
     public void ParseOptions_UmaUnicaOpcao_LancaExcecao()
     {
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<ValidationException>(() =>
             TaskTemplateService.ParseOptions(new List<string> { "Só uma" }));
     }
 
     [Fact]
     public void ParseOptions_MaisDeQuatroOpcoes_LancaExcecao()
     {
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<ValidationException>(() =>
             TaskTemplateService.ParseOptions(new List<string> { "A", "B", "C", "D", "E" }));
     }
 
     [Fact]
     public void ParseOptions_OpcaoEmBranco_LancaExcecao()
     {
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<ValidationException>(() =>
             TaskTemplateService.ParseOptions(new List<string> { "A", "  " }));
     }
 
     [Fact]
     public void ParseOptions_OpcoesDuplicadas_LancaExcecao()
     {
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<ValidationException>(() =>
             TaskTemplateService.ParseOptions(new List<string> { "Torre", "torre" }));
     }
 
@@ -116,7 +117,7 @@ public class TaskOptionsTests
         var routine = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-01", "America/Sao_Paulo");
         var taskId = routine.Tasks.Single().Id;
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        await Assert.ThrowsAsync<ValidationException>(() =>
             dailyRoutine.SelectTaskOptionAsync(userId, taskId, "Opção inexistente", userId, "child"));
     }
 

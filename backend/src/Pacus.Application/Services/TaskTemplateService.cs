@@ -3,6 +3,7 @@ using Pacus.Application.DTOs;
 using Pacus.Application.Interfaces;
 using Pacus.Domain.Entities;
 using Pacus.Domain.Enums;
+using Pacus.Application.Exceptions;
 
 namespace Pacus.Application.Services;
 
@@ -61,12 +62,12 @@ public class TaskTemplateService : ITaskTemplateService
         CreateTaskRequest request)
     {
         if (!ObjectId.TryParse(id, out var templateId))
-            throw new InvalidOperationException("Id de tarefa invalido.");
+            throw new ValidationException("Id de tarefa invalido.");
 
         var template = await _taskTemplateRepository.GetByIdAsync(templateId);
 
         if (template is null || template.FamilyId != familyId)
-            throw new InvalidOperationException("Tarefa permanente nao encontrada.");
+            throw new NotFoundException("Tarefa permanente nao encontrada.");
 
         var (type, period) = ParseTypeAndPeriod(request);
         var (recurrence, variants, customDays) = ParseRecurrenceAndVariants(request);
@@ -95,12 +96,12 @@ public class TaskTemplateService : ITaskTemplateService
         string id)
     {
         if (!ObjectId.TryParse(id, out var templateId))
-            throw new InvalidOperationException("Id de tarefa invalido.");
+            throw new ValidationException("Id de tarefa invalido.");
 
         var template = await _taskTemplateRepository.GetByIdAsync(templateId);
 
         if (template is null || template.FamilyId != familyId)
-            throw new InvalidOperationException("Tarefa permanente nao encontrada.");
+            throw new NotFoundException("Tarefa permanente nao encontrada.");
 
         await _taskTemplateRepository.ActivateAsync(templateId);
     }
@@ -112,7 +113,7 @@ public class TaskTemplateService : ITaskTemplateService
         string actorRole)
     {
         if (!ObjectId.TryParse(id, out var templateId))
-            throw new InvalidOperationException("Id de tarefa invalido.");
+            throw new ValidationException("Id de tarefa invalido.");
 
         var template = await _taskTemplateRepository.GetByIdAsync(templateId);
 
@@ -122,7 +123,7 @@ public class TaskTemplateService : ITaskTemplateService
         // seguranca (isolamento por FamilyId) — nunca chamar o repositorio direto
         // a partir do controller para operacoes que envolvem posse.
         if (template is null || template.FamilyId != familyId)
-            throw new InvalidOperationException("Tarefa permanente nao encontrada.");
+            throw new NotFoundException("Tarefa permanente nao encontrada.");
 
         await _taskTemplateRepository.SoftDeleteAsync(templateId);
 
@@ -151,7 +152,7 @@ public class TaskTemplateService : ITaskTemplateService
                 ignoreCase: true,
                 out var type))
         {
-            throw new InvalidOperationException(
+            throw new ValidationException(
                 $"Tipo de tarefa invalido: {request.Type}");
         }
 
@@ -160,13 +161,13 @@ public class TaskTemplateService : ITaskTemplateService
                 ignoreCase: true,
                 out var period))
         {
-            throw new InvalidOperationException(
+            throw new ValidationException(
                 $"Periodo invalido: {request.Period}");
         }
 
         if (request.Points == 0 || request.Points < -10 || request.Points > 10)
         {
-            throw new InvalidOperationException(
+            throw new ValidationException(
                 "Cada tarefa deve valer entre 1 e 10 Pacus Points, ou entre -1 e -10 (penalidade). Zero nao e permitido.");
         }
 
@@ -191,7 +192,7 @@ public class TaskTemplateService : ITaskTemplateService
 
         if (!ValidRecurrences.Contains(recurrence))
         {
-            throw new InvalidOperationException(
+            throw new ValidationException(
                 $"Recorrencia invalida: {recurrence}. Use {TaskTemplate.RecurrenceDaily}, {TaskTemplate.RecurrenceWeekday}, {TaskTemplate.RecurrenceWeekend}, {TaskTemplate.RecurrenceCustom} ou {TaskTemplate.RecurrenceWeekdayRotation}.");
         }
 
@@ -203,7 +204,7 @@ public class TaskTemplateService : ITaskTemplateService
 
         if (request.Variants is null || request.Variants.Count == 0)
         {
-            throw new InvalidOperationException(
+            throw new ValidationException(
                 $"Recorrencia \"{TaskTemplate.RecurrenceWeekdayRotation}\" precisa de pelo menos uma variante (Variants).");
         }
 
@@ -214,7 +215,7 @@ public class TaskTemplateService : ITaskTemplateService
         {
             if (!Enum.TryParse<DayOfWeek>(variant.DayOfWeek, ignoreCase: true, out var dayOfWeek))
             {
-                throw new InvalidOperationException(
+                throw new ValidationException(
                     $"Dia da semana invalido na variante: {variant.DayOfWeek}.");
             }
 
@@ -222,25 +223,25 @@ public class TaskTemplateService : ITaskTemplateService
             // RecurrenceWeekend/RecurrenceDaily se precisar de sabado/domingo tambem).
             if (dayOfWeek == DayOfWeek.Saturday || dayOfWeek == DayOfWeek.Sunday)
             {
-                throw new InvalidOperationException(
+                throw new ValidationException(
                     $"Recorrencia \"{TaskTemplate.RecurrenceWeekdayRotation}\" so aceita dias uteis (segunda a sexta); recebido: {dayOfWeek}.");
             }
 
             if (!seenDays.Add(dayOfWeek))
             {
-                throw new InvalidOperationException(
+                throw new ValidationException(
                     $"Dia da semana repetido nas variantes: {dayOfWeek}.");
             }
 
             if (string.IsNullOrWhiteSpace(variant.Title))
             {
-                throw new InvalidOperationException(
+                throw new ValidationException(
                     $"Toda variante precisa de titulo (faltando em {dayOfWeek}).");
             }
 
             if (variant.Points is { } variantPoints && (variantPoints == 0 || variantPoints < -10 || variantPoints > 10))
             {
-                throw new InvalidOperationException(
+                throw new ValidationException(
                     $"Pontos invalidos na variante de {dayOfWeek}: cada tarefa deve valer entre 1 e 10 Pacus Points, ou entre -1 e -10 (penalidade). Zero nao e permitido.");
             }
 
@@ -264,7 +265,7 @@ public class TaskTemplateService : ITaskTemplateService
     {
         if (customDays is null || customDays.Count == 0)
         {
-            throw new InvalidOperationException(
+            throw new ValidationException(
                 $"Recorrencia \"{TaskTemplate.RecurrenceCustom}\" precisa de pelo menos um dia (CustomDays).");
         }
 
@@ -275,7 +276,7 @@ public class TaskTemplateService : ITaskTemplateService
         {
             if (!Enum.TryParse<DayOfWeek>(raw, ignoreCase: true, out var day))
             {
-                throw new InvalidOperationException($"Dia da semana invalido: {raw}.");
+                throw new ValidationException($"Dia da semana invalido: {raw}.");
             }
 
             if (seen.Add(day))
@@ -300,13 +301,13 @@ public class TaskTemplateService : ITaskTemplateService
             .ToList();
 
         if (options.Count != rawOptions.Count)
-            throw new InvalidOperationException("Nenhuma opcao pode ficar em branco.");
+            throw new ValidationException("Nenhuma opcao pode ficar em branco.");
 
         if (options.Count < 2 || options.Count > 4)
-            throw new InvalidOperationException("Uma tarefa com opcoes precisa de 2 a 4 opcoes.");
+            throw new ValidationException("Uma tarefa com opcoes precisa de 2 a 4 opcoes.");
 
         if (options.Distinct(StringComparer.OrdinalIgnoreCase).Count() != options.Count)
-            throw new InvalidOperationException("As opcoes nao podem se repetir.");
+            throw new ValidationException("As opcoes nao podem se repetir.");
 
         return options;
     }

@@ -4,6 +4,7 @@ using Pacus.Application.Interfaces;
 using Pacus.Application.Utils;
 using Pacus.Domain.Entities;
 using Pacus.Domain.Enums;
+using Pacus.Application.Exceptions;
 
 namespace Pacus.Application.Services;
 
@@ -32,10 +33,10 @@ public class StoreService : IStoreService
     public async Task<StoreItem> CreateItemAsync(ObjectId familyId, ObjectId createdBy, CreateStoreItemRequest request)
     {
         if (request.DailyLimit is not null && request.DailyLimit <= 0)
-            throw new InvalidOperationException("O limite diario, quando informado, deve ser maior que zero.");
+            throw new ValidationException("O limite diario, quando informado, deve ser maior que zero.");
 
         if (request.ScreenTimeMinutes is not null && request.ScreenTimeMinutes <= 0)
-            throw new InvalidOperationException("Os minutos de tempo de tela, quando informados, devem ser maiores que zero.");
+            throw new ValidationException("Os minutos de tempo de tela, quando informados, devem ser maiores que zero.");
 
         var item = new StoreItem
         {
@@ -65,10 +66,10 @@ public class StoreService : IStoreService
         var item = await GetOwnedItemAsync(familyId, itemId);
 
         if (request.DailyLimit is not null && request.DailyLimit <= 0)
-            throw new InvalidOperationException("O limite diario, quando informado, deve ser maior que zero.");
+            throw new ValidationException("O limite diario, quando informado, deve ser maior que zero.");
 
         if (request.ScreenTimeMinutes is not null && request.ScreenTimeMinutes <= 0)
-            throw new InvalidOperationException("Os minutos de tempo de tela, quando informados, devem ser maiores que zero.");
+            throw new ValidationException("Os minutos de tempo de tela, quando informados, devem ser maiores que zero.");
 
         item.Title = request.Title;
         item.Description = request.Description;
@@ -98,11 +99,11 @@ public class StoreService : IStoreService
     private async Task<StoreItem> GetOwnedItemAsync(ObjectId familyId, string itemId)
     {
         if (!ObjectId.TryParse(itemId, out var id))
-            throw new InvalidOperationException("Id de item da loja invalido.");
+            throw new ValidationException("Id de item da loja invalido.");
 
         var item = await _storeRepository.GetItemByIdAsync(id);
         if (item is null || item.FamilyId != familyId)
-            throw new InvalidOperationException("Item da loja nao encontrado.");
+            throw new NotFoundException("Item da loja nao encontrado.");
 
         return item;
     }
@@ -111,10 +112,10 @@ public class StoreService : IStoreService
     {
         var item = await _storeRepository.GetItemByIdAsync(storeItemId);
         if (item is null || item.FamilyId != familyId || !item.Active)
-            throw new InvalidOperationException("Item da loja nao encontrado ou indisponivel.");
+            throw new NotFoundException("Item da loja nao encontrado ou indisponivel.");
 
         if (item.Stock is not null && item.Stock <= 0)
-            throw new InvalidOperationException("Item sem estoque disponivel.");
+            throw new ValidationException("Item sem estoque disponivel.");
 
         if (item.DailyLimit is not null)
             await EnsureDailyLimitNotReachedAsync(familyId, item);
@@ -150,7 +151,7 @@ public class StoreService : IStoreService
             TimezoneHelper.GetOperationalDate(timezone, r.RequestedAt) == today);
 
         if (usedToday >= item.DailyLimit)
-            throw new InvalidOperationException(
+            throw new ValidationException(
                 $"Limite diario deste item ja atingido ({item.DailyLimit}x por dia). Tente novamente amanha.");
     }
 
@@ -160,7 +161,7 @@ public class StoreService : IStoreService
 
         var balance = await _pointsService.GetBalanceAsync(familyId);
         if (balance < redemption.Cost)
-            throw new InvalidOperationException("Saldo de Pacus Points insuficiente para aprovar este resgate.");
+            throw new ValidationException("Saldo de Pacus Points insuficiente para aprovar este resgate.");
 
         var item = await _storeRepository.GetItemByIdAsync(redemption.StoreItemId);
         var timezone = await _familyTimezoneService.GetTimezoneAsync(familyId);
@@ -263,14 +264,14 @@ public class StoreService : IStoreService
     private async Task<Redemption> GetOwnedPendingRedemptionAsync(ObjectId familyId, string redemptionId)
     {
         if (!ObjectId.TryParse(redemptionId, out var id))
-            throw new InvalidOperationException("Id de resgate invalido.");
+            throw new ValidationException("Id de resgate invalido.");
 
         var redemption = await _storeRepository.GetRedemptionByIdAsync(id);
         if (redemption is null || redemption.FamilyId != familyId)
-            throw new InvalidOperationException("Resgate nao encontrado.");
+            throw new NotFoundException("Resgate nao encontrado.");
 
         if (redemption.Status != RedemptionStatus.Pending)
-            throw new InvalidOperationException("Este resgate ja foi revisado.");
+            throw new ConflictException("Este resgate ja foi revisado.");
 
         return redemption;
     }

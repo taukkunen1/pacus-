@@ -2,6 +2,7 @@ using MongoDB.Bson;
 using Pacus.Application.DTOs;
 using Pacus.Application.Services;
 using Pacus.UnitTests.Fakes;
+using Pacus.Application.Exceptions;
 
 namespace Pacus.UnitTests;
 
@@ -117,7 +118,7 @@ public class TaskRecurrenceTests
         var (templates, _) = BuildSystem(out _);
         var userId = ObjectId.GenerateNewId();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => templates.CreateAsync(userId, userId,
+        await Assert.ThrowsAsync<ValidationException>(() => templates.CreateAsync(userId, userId,
             new CreateTaskRequest("Momento Criativo", null, "challenge", "afternoon", 3, Recurrence: "weekday_rotation")));
     }
 
@@ -127,7 +128,7 @@ public class TaskRecurrenceTests
         var (templates, _) = BuildSystem(out _);
         var userId = ObjectId.GenerateNewId();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => templates.CreateAsync(userId, userId,
+        await Assert.ThrowsAsync<ValidationException>(() => templates.CreateAsync(userId, userId,
             new CreateTaskRequest(
                 "Momento Criativo",
                 null,
@@ -199,7 +200,7 @@ public class TaskRecurrenceTests
         var (templates, _) = BuildSystem(out _);
         var userId = ObjectId.GenerateNewId();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => templates.CreateAsync(userId, userId,
+        await Assert.ThrowsAsync<ValidationException>(() => templates.CreateAsync(userId, userId,
             new CreateTaskRequest("Inglês", null, "challenge", "afternoon", 3, Recurrence: "custom")));
     }
 

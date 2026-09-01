@@ -48,20 +48,19 @@ public class StoreController : ControllerBase
         return Ok(items.Select(ToStoreItemResponse));
     }
 
+    // Sem try/catch aqui de proposito (nem nas actions abaixo, exceto onde
+    // observado): NotFoundException/ConflictException/ValidationException lancadas
+    // pelo service viram o status HTTP certo sozinhas, via
+    // Pacus.Api.Middleware.AppExceptionHandler (achado #1 da auditoria de API de
+    // 2026-09-01 -- ver docs/ESTADO_ATUAL.md).
+
     // Somente adulto edita itens.
     [RequireRole(UserRole.Adult)]
     [HttpPut("items/{id}")]
     public async Task<IActionResult> UpdateItem(string id, [FromBody] CreateStoreItemRequest request)
     {
-        try
-        {
-            var item = await _storeService.UpdateItemAsync(_currentUser.FamilyId, id, request);
-            return Ok(ToStoreItemResponse(item));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var item = await _storeService.UpdateItemAsync(_currentUser.FamilyId, id, request);
+        return Ok(ToStoreItemResponse(item));
     }
 
     // Somente adulto ativa/desativa (nunca apaga -- resgates antigos referenciam o item).
@@ -69,15 +68,8 @@ public class StoreController : ControllerBase
     [HttpPut("items/{id}/active")]
     public async Task<IActionResult> SetItemActive(string id, [FromBody] SetStoreItemActiveRequest request)
     {
-        try
-        {
-            var item = await _storeService.SetItemActiveAsync(_currentUser.FamilyId, id, request.Active);
-            return Ok(ToStoreItemResponse(item));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var item = await _storeService.SetItemActiveAsync(_currentUser.FamilyId, id, request.Active);
+        return Ok(ToStoreItemResponse(item));
     }
 
     // Somente adulto cria itens.
@@ -102,30 +94,23 @@ public class StoreController : ControllerBase
     public async Task<IActionResult> RequestRedemption(
         [FromBody] RequestRedemptionRequest request)
     {
-        try
-        {
-            if (!ObjectId.TryParse(request.StoreItemId, out var storeItemId))
-            {
-                return BadRequest(new
-                {
-                    error = "Id do item da loja invalido."
-                });
-            }
-
-            var redemption = await _storeService.RequestRedemptionAsync(
-                _currentUser.FamilyId,
-                _currentUser.UserId,
-                storeItemId);
-
-            return Ok(ToRedemptionResponse(redemption));
-        }
-        catch (InvalidOperationException ex)
+        // Formato de id malformado nao e uma regra de negocio do service, e a propria
+        // action que recebe o parametro -- fica aqui mesmo, fora do try/catch de
+        // excecao de dominio.
+        if (!ObjectId.TryParse(request.StoreItemId, out var storeItemId))
         {
             return BadRequest(new
             {
-                error = ex.Message
+                error = "Id do item da loja invalido."
             });
         }
+
+        var redemption = await _storeService.RequestRedemptionAsync(
+            _currentUser.FamilyId,
+            _currentUser.UserId,
+            storeItemId);
+
+        return Ok(ToRedemptionResponse(redemption));
     }
 
     // Somente adulto aprova.
@@ -133,22 +118,12 @@ public class StoreController : ControllerBase
     [HttpPut("redemptions/{id}/approve")]
     public async Task<IActionResult> ApproveRedemption(string id)
     {
-        try
-        {
-            var redemption = await _storeService.ApproveRedemptionAsync(
-                _currentUser.FamilyId,
-                id,
-                _currentUser.UserId);
+        var redemption = await _storeService.ApproveRedemptionAsync(
+            _currentUser.FamilyId,
+            id,
+            _currentUser.UserId);
 
-            return Ok(ToRedemptionResponse(redemption));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new
-            {
-                error = ex.Message
-            });
-        }
+        return Ok(ToRedemptionResponse(redemption));
     }
 
     // Somente adulto rejeita.
@@ -156,22 +131,12 @@ public class StoreController : ControllerBase
     [HttpPut("redemptions/{id}/reject")]
     public async Task<IActionResult> RejectRedemption(string id)
     {
-        try
-        {
-            var redemption = await _storeService.RejectRedemptionAsync(
-                _currentUser.FamilyId,
-                id,
-                _currentUser.UserId);
+        var redemption = await _storeService.RejectRedemptionAsync(
+            _currentUser.FamilyId,
+            id,
+            _currentUser.UserId);
 
-            return Ok(ToRedemptionResponse(redemption));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new
-            {
-                error = ex.Message
-            });
-        }
+        return Ok(ToRedemptionResponse(redemption));
     }
 
     // Fila de resgates aguardando revisao do adulto.

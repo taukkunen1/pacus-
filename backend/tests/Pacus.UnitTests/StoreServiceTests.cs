@@ -3,6 +3,7 @@ using Pacus.Application.DTOs;
 using Pacus.Application.Services;
 using Pacus.Domain.Enums;
 using Pacus.UnitTests.Fakes;
+using Pacus.Application.Exceptions;
 
 namespace Pacus.UnitTests;
 
@@ -70,7 +71,7 @@ public class StoreServiceTests
             new CreateStoreItemRequest("Carrinho Hot Wheels", null, 300, "toy", null, 1));
         var redemption = await store.RequestRedemptionAsync(familyId, familyId, item.Id);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<ValidationException>(
             () => store.ApproveRedemptionAsync(familyId, redemption.Id.ToString(), familyId));
 
         Assert.Equal(100, await pointsRepo.GetBalanceAsync(familyId)); // saldo intacto
@@ -108,7 +109,7 @@ public class StoreServiceTests
 
         await store.ApproveRedemptionAsync(familyId, redemption.Id.ToString(), familyId);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<ConflictException>(
             () => store.RejectRedemptionAsync(familyId, redemption.Id.ToString(), familyId));
     }
 
@@ -162,7 +163,7 @@ public class StoreServiceTests
 
         // Nem precisa esperar a revisao do adulto -- a segunda SOLICITACAO no mesmo dia
         // ja e bloqueada, mesmo com a primeira ainda Pending.
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+        var ex = await Assert.ThrowsAsync<ValidationException>(
             () => store.RequestRedemptionAsync(familyId, familyId, item.Id));
         Assert.Contains("Limite diario", ex.Message);
     }

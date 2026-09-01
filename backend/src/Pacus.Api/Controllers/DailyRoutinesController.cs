@@ -54,20 +54,19 @@ public class DailyRoutinesController : ControllerBase
         return routine is null ? NotFound() : Ok(routine);
     }
 
+    // Sem try/catch aqui de proposito (nem nas actions abaixo): NotFoundException/
+    // ConflictException/ValidationException/UnauthorizedAccessException lancadas pelo
+    // service viram o status HTTP certo sozinhas, via
+    // Pacus.Api.Middleware.AppExceptionHandler (achado #1 da auditoria de API de
+    // 2026-09-01 -- ver docs/ESTADO_ATUAL.md).
+
     // Reordenar e autonomia da crianca sobre o dia atual — sem RequireRole aqui de proposito.
     [HttpPut("today/order")]
     public async Task<IActionResult> UpdateOrder([FromBody] List<string> orderedTaskIds)
     {
-        try
-        {
-            var routine = await _dailyRoutineService.ReorderTasksAsync(
-                _currentUser.FamilyId, orderedTaskIds, _currentUser.UserId, _currentUser.Role.ToString());
-            return Ok(routine);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var routine = await _dailyRoutineService.ReorderTasksAsync(
+            _currentUser.FamilyId, orderedTaskIds, _currentUser.UserId, _currentUser.Role.ToString());
+        return Ok(routine);
     }
 
     // Pausar/despausar e acao de qualquer papel (adulto ou crianca) —
@@ -75,31 +74,17 @@ public class DailyRoutinesController : ControllerBase
     [HttpPut("today/game-timer/pause")]
     public async Task<IActionResult> PauseGameTimer()
     {
-        try
-        {
-            var routine = await _dailyRoutineService.PauseGameTimerAsync(
-                _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString());
-            return Ok(routine);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var routine = await _dailyRoutineService.PauseGameTimerAsync(
+            _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString());
+        return Ok(routine);
     }
 
     [HttpPut("today/game-timer/resume")]
     public async Task<IActionResult> ResumeGameTimer()
     {
-        try
-        {
-            var routine = await _dailyRoutineService.ResumeGameTimerAsync(
-                _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString());
-            return Ok(routine);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var routine = await _dailyRoutineService.ResumeGameTimerAsync(
+            _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString());
+        return Ok(routine);
     }
 
     // +1h/-1h etc. Restrito ao painel adulto — a crianca recebe 403 direto
@@ -108,20 +93,9 @@ public class DailyRoutinesController : ControllerBase
     [HttpPut("today/game-timer/adjust")]
     public async Task<IActionResult> AdjustGameTimer([FromBody] AdjustGameTimerRequest request)
     {
-        try
-        {
-            var routine = await _dailyRoutineService.AdjustGameTimerAsync(
-                _currentUser.FamilyId, request.DeltaMinutes, _currentUser.UserId, _currentUser.Role.ToString());
-            return Ok(routine);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new { error = ex.Message });
-        }
+        var routine = await _dailyRoutineService.AdjustGameTimerAsync(
+            _currentUser.FamilyId, request.DeltaMinutes, _currentUser.UserId, _currentUser.Role.ToString());
+        return Ok(routine);
     }
 
     // Vinculo (relatedness -- ver docs/PROPOSITO.md): reacao pessoal do adulto sobre o
@@ -131,19 +105,8 @@ public class DailyRoutinesController : ControllerBase
     [HttpPut("today/reaction")]
     public async Task<IActionResult> SetReaction([FromBody] SetDailyReactionRequest request)
     {
-        try
-        {
-            var routine = await _dailyRoutineService.SetReactionAsync(
-                _currentUser.FamilyId, request.Icon, request.Message, _currentUser.UserId, _currentUser.Role.ToString());
-            return Ok(routine);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new { error = ex.Message });
-        }
+        var routine = await _dailyRoutineService.SetReactionAsync(
+            _currentUser.FamilyId, request.Icon, request.Message, _currentUser.UserId, _currentUser.Role.ToString());
+        return Ok(routine);
     }
 }

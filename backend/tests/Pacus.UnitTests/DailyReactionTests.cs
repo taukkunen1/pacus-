@@ -2,6 +2,7 @@ using MongoDB.Bson;
 using Pacus.Application.DTOs;
 using Pacus.Application.Services;
 using Pacus.UnitTests.Fakes;
+using Pacus.Application.Exceptions;
 
 namespace Pacus.UnitTests;
 
@@ -61,7 +62,7 @@ public class DailyReactionTests
 
         await service.CreateRoutineForDateAsync(userId, "2026-09-01", "America/Sao_Paulo");
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        await Assert.ThrowsAsync<ValidationException>(() =>
             service.SetReactionAsync(userId, "fogo", null, actorId, "adult"));
     }
 

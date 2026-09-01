@@ -170,7 +170,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
             $"/api/v1/daily-tasks/{taskIdFromFamilyA}/complete",
             content: null);
 
-        Assert.Equal(HttpStatusCode.BadRequest, completeResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, completeResponse.StatusCode);
 
         var updateResponse = await client.PutAsJsonAsync(
             $"/api/v1/daily-tasks/{taskIdFromFamilyA}",
@@ -183,12 +183,12 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                 points = 3
             });
 
-        Assert.Equal(HttpStatusCode.BadRequest, updateResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, updateResponse.StatusCode);
 
         var deleteResponse = await client.DeleteAsync(
             $"/api/v1/daily-tasks/{taskIdFromFamilyA}");
 
-        Assert.Equal(HttpStatusCode.BadRequest, deleteResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, deleteResponse.StatusCode);
     }
 
     // Checklist de seguranca e LGPD, item C2: a crianca tem acesso estrutural a estes
@@ -215,7 +215,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
             $"/api/v1/daily-tasks/{taskIdFromFamilyA}/complete",
             content: null);
 
-        Assert.Equal(HttpStatusCode.BadRequest, completeResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, completeResponse.StatusCode);
 
         var updateResponse = await client.PutAsJsonAsync(
             $"/api/v1/daily-tasks/{taskIdFromFamilyA}",
@@ -228,12 +228,12 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                 points = 3
             });
 
-        Assert.Equal(HttpStatusCode.BadRequest, updateResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, updateResponse.StatusCode);
 
         var deleteResponse = await client.DeleteAsync(
             $"/api/v1/daily-tasks/{taskIdFromFamilyA}");
 
-        Assert.Equal(HttpStatusCode.BadRequest, deleteResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, deleteResponse.StatusCode);
     }
 
     [Fact]

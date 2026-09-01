@@ -15,6 +15,13 @@ public class AuthController : ControllerBase
 
     public AuthController(IAuthService authService) => _authService = authService;
 
+    // Os try/catch abaixo continuam de proposito (ver Pacus.Api.Middleware.
+    // AppExceptionHandler pro tratamento padrao do resto da API, achado #1 da
+    // auditoria de API de 2026-09-01): aqui o UnauthorizedAccessException do
+    // AuthService precisa virar 401 (nao autenticado -- credencial errada), nao o
+    // 403 (autenticado mas sem permissao) que o handler global usa por padrao pro
+    // resto dos controllers. Ambos os status sao "acesso negado" em ingles comum,
+    // mas o significado HTTP e diferente, entao esta e a excecao a regra.
     [AllowAnonymous]
     [HttpPost("adult/login")]
     public async Task<IActionResult> AdultLogin([FromBody] AdultLoginRequest request)

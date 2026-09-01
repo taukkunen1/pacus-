@@ -4,6 +4,7 @@ using Pacus.Application.Interfaces;
 using Pacus.Domain.Entities;
 using Pacus.Domain.Enums;
 using PacusEntity = Pacus.Domain.Entities.Pacus;
+using Pacus.Application.Exceptions;
 
 namespace Pacus.Application.Services;
 
@@ -36,7 +37,7 @@ public class BootstrapService : IBootstrapService
 
         if (existingAdult is not null)
         {
-            throw new InvalidOperationException(
+            throw new ConflictException(
                 "Ja existe um usuario adulto com este email.");
         }
 

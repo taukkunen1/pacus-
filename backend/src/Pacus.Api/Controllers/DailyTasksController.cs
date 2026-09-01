@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Pacus.Api.Auth;
 using Pacus.Application.DTOs;
@@ -22,79 +22,47 @@ public class DailyTasksController : ControllerBase
         _currentUser = currentUser;
     }
 
+    // Sem try/catch aqui de proposito: NotFoundException/ConflictException/
+    // ValidationException/UnauthorizedAccessException lancadas pelo service viram o
+    // status HTTP certo sozinhas, via Pacus.Api.Middleware.AppExceptionHandler
+    // (achado #1 da auditoria de API de 2026-09-01 -- ver docs/ESTADO_ATUAL.md).
     [HttpPost]
     public async Task<IActionResult> Create(
         [FromBody] CreateTaskRequest request)
     {
-        try
-        {
-            var routine =
-                await _dailyRoutineService.CreateAdHocTaskAsync(
-                    _currentUser.FamilyId,
-                    request,
-                    _currentUser.UserId,
-                    _currentUser.Role.ToString());
+        var routine = await _dailyRoutineService.CreateAdHocTaskAsync(
+            _currentUser.FamilyId,
+            request,
+            _currentUser.UserId,
+            _currentUser.Role.ToString());
 
-            return Ok(routine);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return StatusCode(403, new { error = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        return Ok(routine);
     }
 
     [HttpPost("{id}/complete")]
     public async Task<IActionResult> Complete(string id)
     {
-        try
-        {
-            var routine =
-                await _dailyRoutineService.ToggleTaskAsync(
-                    _currentUser.FamilyId,
-                    id,
-                    true,
-                    _currentUser.UserId,
-                    _currentUser.Role.ToString());
+        var routine = await _dailyRoutineService.ToggleTaskAsync(
+            _currentUser.FamilyId,
+            id,
+            true,
+            _currentUser.UserId,
+            _currentUser.Role.ToString());
 
-            return Ok(routine);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return StatusCode(403, new { error = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        return Ok(routine);
     }
 
     [HttpPost("{id}/reopen")]
     public async Task<IActionResult> Reopen(string id)
     {
-        try
-        {
-            var routine =
-                await _dailyRoutineService.ToggleTaskAsync(
-                    _currentUser.FamilyId,
-                    id,
-                    false,
-                    _currentUser.UserId,
-                    _currentUser.Role.ToString());
+        var routine = await _dailyRoutineService.ToggleTaskAsync(
+            _currentUser.FamilyId,
+            id,
+            false,
+            _currentUser.UserId,
+            _currentUser.Role.ToString());
 
-            return Ok(routine);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return StatusCode(403, new { error = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        return Ok(routine);
     }
 
     [HttpPut("{id}/option")]
@@ -102,26 +70,14 @@ public class DailyTasksController : ControllerBase
         string id,
         [FromBody] SelectTaskOptionRequest request)
     {
-        try
-        {
-            var routine =
-                await _dailyRoutineService.SelectTaskOptionAsync(
-                    _currentUser.FamilyId,
-                    id,
-                    request.SelectedOption,
-                    _currentUser.UserId,
-                    _currentUser.Role.ToString());
+        var routine = await _dailyRoutineService.SelectTaskOptionAsync(
+            _currentUser.FamilyId,
+            id,
+            request.SelectedOption,
+            _currentUser.UserId,
+            _currentUser.Role.ToString());
 
-            return Ok(routine);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return StatusCode(403, new { error = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        return Ok(routine);
     }
 
     [HttpPut("{id}/points")]
@@ -129,26 +85,14 @@ public class DailyTasksController : ControllerBase
         string id,
         [FromBody] AdjustPointsRequest request)
     {
-        try
-        {
-            var routine =
-                await _dailyRoutineService.AdjustTaskPointsAsync(
-                    _currentUser.FamilyId,
-                    id,
-                    request.Points,
-                    _currentUser.UserId,
-                    _currentUser.Role.ToString());
+        var routine = await _dailyRoutineService.AdjustTaskPointsAsync(
+            _currentUser.FamilyId,
+            id,
+            request.Points,
+            _currentUser.UserId,
+            _currentUser.Role.ToString());
 
-            return Ok(routine);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return StatusCode(403, new { error = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        return Ok(routine);
     }
 
     [HttpPut("{id}")]
@@ -156,49 +100,25 @@ public class DailyTasksController : ControllerBase
         string id,
         [FromBody] DailyTaskUpdateRequest request)
     {
-        try
-        {
-            var routine =
-                await _dailyRoutineService.UpdateTaskAsync(
-                    _currentUser.FamilyId,
-                    id,
-                    request,
-                    _currentUser.UserId,
-                    _currentUser.Role.ToString());
+        var routine = await _dailyRoutineService.UpdateTaskAsync(
+            _currentUser.FamilyId,
+            id,
+            request,
+            _currentUser.UserId,
+            _currentUser.Role.ToString());
 
-            return Ok(routine);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return StatusCode(403, new { error = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        return Ok(routine);
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id)
     {
-        try
-        {
-            var routine =
-                await _dailyRoutineService.DeleteTaskAsync(
-                    _currentUser.FamilyId,
-                    id,
-                    _currentUser.UserId,
-                    _currentUser.Role.ToString());
+        var routine = await _dailyRoutineService.DeleteTaskAsync(
+            _currentUser.FamilyId,
+            id,
+            _currentUser.UserId,
+            _currentUser.Role.ToString());
 
-            return Ok(routine);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return StatusCode(403, new { error = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        return Ok(routine);
     }
 }

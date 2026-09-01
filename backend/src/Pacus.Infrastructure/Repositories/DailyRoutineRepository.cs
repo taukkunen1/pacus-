@@ -1,5 +1,6 @@
 using MongoDB.Bson;
 using MongoDB.Driver;
+using Pacus.Application.Exceptions;
 using Pacus.Application.Interfaces;
 using Pacus.Domain.Entities;
 using Pacus.Infrastructure.Mongo;
@@ -21,8 +22,36 @@ public class DailyRoutineRepository : IDailyRoutineRepository
         return routine;
     }
 
-    public Task UpdateAsync(DailyRoutine routine) =>
-        _context.DailyRoutines.ReplaceOneAsync(r => r.Id == routine.Id, routine);
+    // Concorrencia otimista (achado #5 da auditoria de API de 2026-09-01 -- ver
+    // docs/ESTADO_ATUAL.md): antes era um ReplaceOneAsync filtrado so por Id, sem guarda
+    // de versao -- duas requisicoes lendo a mesma rotina (ex.: crianca completando uma
+    // tarefa e adulto ajustando o game timer quase ao mesmo tempo) faziam um "lost
+    // update" silencioso, a segunda gravacao sobrescrevendo a primeira sem erro nenhum.
+    // Agora o filtro exige Version == a versao que foi lida; se outra escrita ja
+    // aconteceu no meio do caminho, o filtro nao bate em nada (MatchedCount == 0) e a
+    // gravacao falha alto (ConflictException, 409) em vez de silenciosamente perder a
+    // mudanca de alguem. O chamador que perdeu a corrida simplesmente tenta de novo (o
+    // service nao faz retry automatico aqui -- ver nota no achado #5 em
+    // docs/ESTADO_ATUAL.md sobre esse trade-off).
+    public async Task UpdateAsync(DailyRoutine routine)
+    {
+        var expectedVersion = routine.Version;
+        routine.Version = expectedVersion + 1;
+
+        var result = await _context.DailyRoutines.ReplaceOneAsync(
+            r => r.Id == routine.Id && r.Version == expectedVersion,
+            routine);
+
+        if (result.MatchedCount == 0)
+        {
+            // Reverte a mutacao local do numero de versao -- o chamador pode querer
+            // inspecionar/logar o objeto depois do throw, e ele nao foi de fato salvo.
+            routine.Version = expectedVersion;
+
+            throw new ConflictException(
+                "Esta rotina foi alterada por outra requisicao enquanto isso era processado. Tente novamente.");
+        }
+    }
 
     // Paginado (achado #4 da auditoria de API de 2026-09-01 -- ver docs/ESTADO_ATUAL.md):
     // antes devolvia a lista inteira de dias encerrados sem limite, que so cresce com o

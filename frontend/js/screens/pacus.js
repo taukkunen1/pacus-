@@ -63,6 +63,126 @@ async function promptWeekdayVariants() {
   return variants;
 }
 
+// Abreviacao em portugues (o que a pessoa digita) -> nome em ingles do enum
+// DayOfWeek do backend (o que a API espera). Cobre a semana inteira -- usado
+// so pela recorrencia "custom" (dias especificos, ex.: "Ingles" so terca e
+// quarta, "Escoteiro" so sabado), diferente de WEEKDAYS acima (so uteis, so
+// pra "atividade diferente por dia").
+const DAY_ABBR = [
+  { abbr: "seg", key: "Monday" },
+  { abbr: "ter", key: "Tuesday" },
+  { abbr: "qua", key: "Wednesday" },
+  { abbr: "qui", key: "Thursday" },
+  { abbr: "sex", key: "Friday" },
+  { abbr: "sab", key: "Saturday" },
+  { abbr: "dom", key: "Sunday" }
+];
+
+// "seg, Qua ,sáb" -> ["Monday", "Wednesday", "Saturday"]. Retorna null se
+// algum token nao bater com nenhuma abreviacao (o chamador deve tratar como
+// entrada invalida) ou se a lista ficar vazia.
+function parseCustomDaysInput(raw) {
+  if (!raw?.trim()) return null;
+
+  const tokens = raw
+    .split(",")
+    .map((token) =>
+      token
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "") // remove acento: "sáb" -> "sab"
+        .slice(0, 3)
+    )
+    .filter(Boolean);
+
+  if (!tokens.length) return null;
+
+  const days = [];
+  for (const token of tokens) {
+    const match = DAY_ABBR.find((d) => d.abbr === token);
+    if (!match) return null;
+    if (!days.includes(match.key)) days.push(match.key);
+  }
+
+  return days;
+}
+
+// Pergunta quando a tarefa deve aparecer e retorna { recurrence, variants?,
+// customDays? } pronto pra mandar no payload de createTask/updateTask (ou
+// null se a pessoa cancelar em qualquer etapa -- o chamador deve abortar).
+// `existingTask` (opcional, usado na edicao) pre-seleciona a opcao e os dias
+// que a tarefa ja tinha configurados, pra "aceitar o padrao" bastar apertar
+// Enter na maioria dos casos.
+async function promptRecurrenceChoice(existingTask) {
+  const currentRecurrence = existingTask?.recurrence ?? "daily";
+  const defaultChoice =
+    {
+      daily: "1",
+      weekday: "2",
+      weekend: "3",
+      custom: "4",
+      weekday_rotation: "5"
+    }[currentRecurrence] ?? "1";
+
+  const choice = window.prompt(
+    "Quando essa tarefa deve aparecer?\n" +
+      "1) Todos os dias\n" +
+      "2) Dias úteis (segunda a sexta)\n" +
+      "3) Fim de semana (sábado e domingo)\n" +
+      "4) Dias específicos (você escolhe quais)\n" +
+      "5) Atividade diferente a cada dia útil (ex.: Momento Criativo)",
+    defaultChoice
+  );
+
+  if (choice === null) return null;
+
+  switch (choice.trim()) {
+    case "2":
+      return { recurrence: "weekday" };
+
+    case "3":
+      return { recurrence: "weekend" };
+
+    case "4": {
+      const currentDaysHint = (existingTask?.customDays ?? [])
+        .map((day) => DAY_ABBR.find((d) => d.key.toLowerCase() === String(day).toLowerCase())?.abbr)
+        .filter(Boolean)
+        .join(",");
+
+      const raw = window.prompt(
+        "Quais dias? Separe por vírgula: seg,ter,qua,qui,sex,sab,dom",
+        currentDaysHint
+      );
+
+      if (raw === null) return null;
+
+      const customDays = parseCustomDaysInput(raw);
+      if (!customDays) {
+        showToast(
+          "Dias inválidos. Use seg,ter,qua,qui,sex,sab,dom separados por vírgula.",
+          { error: true }
+        );
+        return null;
+      }
+
+      return { recurrence: "custom", customDays };
+    }
+
+    case "5": {
+      // Nao pre-preenche as atividades de cada dia mesmo editando uma tarefa
+      // rotativa existente -- limitacao aceitavel do formato "um prompt por
+      // vez"; a pessoa precisa redigitar as 5 atividades pra manter a rotacao.
+      const variants = await promptWeekdayVariants();
+      if (!variants) return null;
+      return { recurrence: "weekday_rotation", variants };
+    }
+
+    default:
+      return { recurrence: "daily" };
+  }
+}
+
 export async function renderPacus(root, navigate) {
   root.innerHTML = `
     <div class="screen">
@@ -306,11 +426,7 @@ export async function renderPacus(root, navigate) {
                   ${active ? "Ativa" : "Inativa"}
                 </span>
 
-                ${
-                  task.recurrence === "weekday_rotation"
-                    ? `<span>🔁 1 atividade/dia útil</span>`
-                    : ""
-                }
+                ${recurrenceBadge(task)}
               </div>
             </div>
 
@@ -349,6 +465,25 @@ export async function renderPacus(root, navigate) {
         `;
       })
       .join("");
+  }
+
+  // Selo curto na lista de tarefas permanentes mostrando em quais dias a
+  // tarefa aparece, quando nao e todo dia (o caso mais comum nao precisa de
+  // selo nenhum).
+  function recurrenceBadge(task) {
+    if (task.recurrence === "weekday") return `<span>📅 dias úteis</span>`;
+    if (task.recurrence === "weekend") return `<span>📅 fim de semana</span>`;
+    if (task.recurrence === "weekday_rotation") return `<span>🔁 1 atividade/dia útil</span>`;
+
+    if (task.recurrence === "custom" && (task.customDays ?? []).length) {
+      const labels = task.customDays
+        .map((day) => DAY_ABBR.find((d) => d.key.toLowerCase() === String(day).toLowerCase())?.abbr)
+        .filter(Boolean)
+        .join(", ");
+      return `<span>📅 ${escapeHtml(labels)}</span>`;
+    }
+
+    return "";
   }
 
   async function createPermanentTask() {
@@ -417,24 +552,11 @@ export async function renderPacus(root, navigate) {
       return;
     }
 
-    // Tarefa "rotativa" (ex.: Momento Criativo): uma atividade diferente de
-    // segunda a sexta, some no fim de semana. Sem isso toda tarefa permanente
-    // aparece igual em todos os dias.
-    const isRotation = window.confirm(
-      "Essa tarefa deve ter uma atividade diferente a cada dia útil (segunda a sexta)?\n\n" +
-        "OK = Sim, uma atividade por dia (não aparece no fim de semana)\n" +
-        "Cancelar = Não, a mesma tarefa todo dia"
-    );
-
-    let recurrence;
-    let variants;
-
-    if (isRotation) {
-      variants = await promptWeekdayVariants();
-      if (!variants) {
-        return;
-      }
-      recurrence = "weekday_rotation";
+    // Em quais dias essa tarefa aparece -- sem isso toda tarefa permanente
+    // aparecia igual em todos os dias, sem excecao.
+    const recurrenceChoice = await promptRecurrenceChoice();
+    if (!recurrenceChoice) {
+      return;
     }
 
     try {
@@ -445,16 +567,12 @@ export async function renderPacus(root, navigate) {
         type,
         period,
         points,
-        ...(recurrence ? { recurrence, variants } : {})
+        ...recurrenceChoice
       });
 
       tasks = [created, ...tasks];
 
-      showToast(
-        isRotation
-          ? "Tarefa permanente criada — uma atividade diferente por dia útil."
-          : "Tarefa permanente criada."
-      );
+      showToast("Tarefa permanente criada.");
 
       draw();
     } catch (err) {
@@ -541,6 +659,16 @@ export async function renderPacus(root, navigate) {
       return;
     }
 
+    // Pre-seleciona a opcao (e os dias, se for "custom") que a tarefa ja tinha,
+    // pra bastar apertar Enter na maioria dos casos -- sem isso o backend reseta
+    // a recorrencia pro padrao ("daily") sempre que o payload de edicao nao manda
+    // esses campos, apagando silenciosamente uma configuracao como "Inglês" so
+    // terca e quarta so por editar o titulo.
+    const recurrenceChoice = await promptRecurrenceChoice(task);
+    if (!recurrenceChoice) {
+      return;
+    }
+
     try {
       const updated = await updateTask(
         id,
@@ -551,13 +679,7 @@ export async function renderPacus(root, navigate) {
           type,
           period,
           points,
-          // O backend reseta recorrencia pro padrao ("daily", sem variantes) se
-          // esses campos nao vierem no payload -- sem isso, editar titulo/tipo/etc
-          // de uma tarefa "rotativa" (Momento Criativo e afins) apagava a rotacao
-          // por dia da semana sem a pessoa pedir. Edicao da propria rotacao ainda
-          // nao tem UI; por enquanto isso so preserva o que ja estava configurado.
-          recurrence: task.recurrence,
-          variants: task.variants
+          ...recurrenceChoice
         }
       );
 

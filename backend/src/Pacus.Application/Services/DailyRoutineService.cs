@@ -608,6 +608,15 @@ public class DailyRoutineService : IDailyRoutineService
             return variant is null ? null : new ResolvedTemplateContent(variant.Title, variant.Description);
         }
 
+        if (template.Recurrence.Equals(TaskTemplate.RecurrenceCustom, StringComparison.OrdinalIgnoreCase))
+        {
+            // Mesmo conteudo do template todo dia escolhido -- so a lista de dias
+            // muda (ex.: "Ingles" so terca e quarta, "Escoteiro" so sabado).
+            return template.CustomDays.Contains(dayOfWeek)
+                ? new ResolvedTemplateContent(template.Title, template.Description)
+                : null;
+        }
+
         // RecurrenceDaily (ou qualquer valor desconhecido/legado): comportamento
         // original, todo dia, com o conteudo do proprio template.
         return new ResolvedTemplateContent(template.Title, template.Description);

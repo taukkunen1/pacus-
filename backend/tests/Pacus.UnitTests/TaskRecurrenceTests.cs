@@ -108,6 +108,71 @@ public class TaskRecurrenceTests
     }
 
     [Fact]
+    public async Task RecorrenciaCustom_AparecoApenasNosDiasEscolhidos_TercaEQuarta()
+    {
+        var (templates, dailyRoutine) = BuildSystem(out _);
+        var userId = ObjectId.GenerateNewId();
+
+        // "Ingles" so terca e quarta -- caso real pedido pelo usuario.
+        await templates.CreateAsync(userId, userId,
+            new CreateTaskRequest(
+                "Inglês",
+                null,
+                "challenge",
+                "afternoon",
+                3,
+                Recurrence: "custom",
+                CustomDays: new List<string> { "Tuesday", "Wednesday" }));
+
+        var monday = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-31", "America/Sao_Paulo");
+        var tuesday = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-01", "America/Sao_Paulo");
+        var wednesday = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-02", "America/Sao_Paulo");
+        var thursday = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-03", "America/Sao_Paulo");
+
+        Assert.Empty(monday.Tasks);
+        Assert.Equal("Inglês", tuesday.Tasks.Single().Title);
+        Assert.Equal("Inglês", wednesday.Tasks.Single().Title);
+        Assert.Empty(thursday.Tasks);
+    }
+
+    [Fact]
+    public async Task RecorrenciaCustom_AceitaUmUnicoDiaDeFimDeSemana_Escoteiro()
+    {
+        var (templates, dailyRoutine) = BuildSystem(out _);
+        var userId = ObjectId.GenerateNewId();
+
+        // "Escoteiro" so sabado -- diferente de RecurrenceWeekend (sabado E domingo),
+        // custom aceita um unico dia, incluindo fim de semana.
+        await templates.CreateAsync(userId, userId,
+            new CreateTaskRequest(
+                "Escoteiro",
+                null,
+                "expected",
+                "morning",
+                2,
+                Recurrence: "custom",
+                CustomDays: new List<string> { "Saturday" }));
+
+        var friday = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-04", "America/Sao_Paulo");
+        var saturday = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-05", "America/Sao_Paulo");
+        var sunday = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-06", "America/Sao_Paulo");
+
+        Assert.Empty(friday.Tasks);
+        Assert.Equal("Escoteiro", saturday.Tasks.Single().Title);
+        Assert.Empty(sunday.Tasks);
+    }
+
+    [Fact]
+    public async Task RecorrenciaCustom_SemDias_LancaExcecao()
+    {
+        var (templates, _) = BuildSystem(out _);
+        var userId = ObjectId.GenerateNewId();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => templates.CreateAsync(userId, userId,
+            new CreateTaskRequest("Inglês", null, "challenge", "afternoon", 3, Recurrence: "custom")));
+    }
+
+    [Fact]
     public async Task RecorrenciaDaily_ContinuaAparecendoTodoDia_ComportamentoOriginal()
     {
         var (templates, dailyRoutine) = BuildSystem(out _);

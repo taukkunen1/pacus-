@@ -96,6 +96,68 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    // Recorrencia "custom" (dias especificos, mesmo conteudo em todos -- ex.:
+    // "Inglês" so terca e quarta, "Escoteiro" so sabado) e nova nesta mudanca.
+    // Mesmo proposito do teste de weekday_rotation acima: validar o contrato JSON
+    // (nomes de dia em ingles minusculo) de ponta a ponta via HTTP real.
+    [Fact]
+    public async Task Create_CustomRecurrence_ShouldPersistCustomDays()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/tasks",
+            new
+            {
+                title = "Inglês",
+                description = (string?)null,
+                type = "challenge",
+                period = "afternoon",
+                points = 3,
+                recurrence = "custom",
+                customDays = new[] { "tuesday", "wednesday" }
+            });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal("custom", body.GetProperty("recurrence").GetString());
+
+        var customDays = body.GetProperty("customDays").EnumerateArray()
+            .Select(d => d.GetString())
+            .ToList();
+        Assert.Equal(new[] { "tuesday", "wednesday" }, customDays);
+    }
+
+    [Fact]
+    public async Task Create_CustomRecurrence_WithoutDays_ShouldBeRejected()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/tasks",
+            new
+            {
+                title = "Escoteiro",
+                description = (string?)null,
+                type = "expected",
+                period = "morning",
+                points = 2,
+                recurrence = "custom"
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task Delete_OtherFamilysTemplate_ShouldNotBeAllowed()
     {

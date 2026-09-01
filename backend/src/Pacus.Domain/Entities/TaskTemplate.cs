@@ -31,11 +31,19 @@ public class TaskTemplate
     // So segunda a sexta, com titulo/descricao diferentes por dia (ver Variants).
     // Dia sem variante correspondente = tarefa nao aparece naquele dia.
     public const string RecurrenceWeekdayRotation = "weekday_rotation";
+    // Qualquer combinacao de dias da semana escolhida na criacao (ver CustomDays),
+    // mesmo conteudo em todos eles -- ex.: "Ingles" so terca e quarta, "Escoteiro"
+    // so sabado. RecurrenceWeekday/RecurrenceWeekend sao atalhos pros dois casos
+    // mais comuns; este cobre qualquer outra combinacao.
+    public const string RecurrenceCustom = "custom";
 
     public string Recurrence { get; set; } = RecurrenceDaily;
 
     // So usado quando Recurrence == RecurrenceWeekdayRotation.
     public List<TaskTemplateVariant> Variants { get; set; } = new();
+
+    // So usado quando Recurrence == RecurrenceCustom.
+    public List<DayOfWeek> CustomDays { get; set; } = new();
 
     public ObjectId CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; }

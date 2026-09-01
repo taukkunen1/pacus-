@@ -27,6 +27,7 @@ import {
   typeLabel
 } from "../utils/format.js";
 import { showToast } from "../components/toast.js";
+import { pickEffortMessage } from "../utils/effort-messages.js";
 import { appState } from "../state/app-state.js";
 import { isValidPoints, POINTS_HELP_TEXT } from "../utils/validation.js";
 import { promptTextarea } from "../components/modal.js";
@@ -861,6 +862,24 @@ export async function renderHome(
 
               balance =
                 await getPointsBalance();
+
+              // Reforço de ESFORÇO (nao de resultado/traço), so ao concluir -- ver
+              // utils/effort-messages.js e docs/PROPOSITO.md. Reabrir a tarefa nao
+              // mostra frase nenhuma, so o toggle silencioso de sempre.
+              if (willComplete) {
+                const justCompleted = routine.tasks.find(
+                  (item) => String(item.id) === String(taskId)
+                );
+
+                if (justCompleted) {
+                  const message = pickEffortMessage(
+                    justCompleted,
+                    routine.tasks
+                  );
+
+                  showToast(`${message} +${justCompleted.points} PP`);
+                }
+              }
 
               draw();
             } catch (err) {

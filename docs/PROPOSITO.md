@@ -54,3 +54,14 @@ produto parecer ir nessa direção.
 - Ao avaliar o "o que falta" do produto, pesar cada lacuna por quanto ela serve a
   autonomia da criança e o vínculo com a rotina, não só por conveniência técnica ou do
   adulto.
+- **Nunca implementar mecânica de "sequência de dias" com perda visível ao quebrar**
+  (ex.: contador de streak que reseta e é mostrado de volta a zero). A pesquisa sobre
+  streaks em apps (mesmo mecanismo do Snapchat) liga esse padrão a uso compulsivo e
+  ansiedade em adolescentes — contradiz diretamente o "sem punição" deste documento,
+  mesmo sendo tecnicamente só "ausência de recompensa". Se algum dia fizer sentido
+  reconhecer consistência ao longo do tempo, fazer isso sem contador que possa "quebrar"
+  (ex.: um total acumulado que só cresce, nunca zera).
+- Elogio/reforço no app (toasts, mensagens do PACUS) deve ser de **esforço e estratégia**
+  ("você conseguiu", "você tentou de um jeito novo"), nunca de traço/resultado ("você é
+  o melhor", "nota 10") — pesquisa de Dweck & Mueller (1998) sobre mindset de
+  crescimento. Ver `frontend/js/utils/effort-messages.js`.

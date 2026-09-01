@@ -1,0 +1,117 @@
+commit 3762b82bed9189af546f3bb380f62cf79991964f
+Author: pepdro <pedro.hdslima98@gmail.com>
+Date:   Tue Sep 1 20:46:29 2026 +0000
+
+    fix(daily-routines): retry em GetToday e no frontend contra 409 de corrida passageira
+    
+    Duas abas/dispositivos da familia abrindo a tela "Hoje" quase ao mesmo tempo
+    colidem no controle de concorrencia otimista de DailyRoutine.Version (achado
+    #5 da auditoria, ver docs/ESTADO_ATUAL.md): a segunda leitura que precisa
+    escrever por baixo dos panos (fechar o dia anterior ou sincronizar tarefas
+    novas de template) toma ConflictException/409, mesmo sendo so um carregamento
+    de tela, nao uma acao pedida pelo usuario.
+    
+    - DailyRoutinesController.GetToday agora tenta ate 3 vezes, relendo o estado
+      antes de cada nova tentativa, antes de deixar o 409 subir de verdade.
+    - getTodayRoutine() no frontend repete a chamada uma vez em caso de 409,
+      cobrindo corridas que a mesma aba possa gerar (ex.: reconexao apos cold
+      start lento do Render).
+    
+    Nao adicionei teste de controller porque Pacus.UnitTests nao referencia
+    Pacus.Api hoje; a logica de concorrencia em si ja e coberta por
+    DailyRoutineConcurrencyTests.
+    
+    Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+    Claude-Session: https://claude.ai/code/session_01ULFZv4FZUjNCfgXnWPjnPh
+
+diff --git a/backend/src/Pacus.Api/Controllers/DailyRoutinesController.cs b/backend/src/Pacus.Api/Controllers/DailyRoutinesController.cs
+index 7307ce2..c7185bf 100755
+--- a/backend/src/Pacus.Api/Controllers/DailyRoutinesController.cs
++++ b/backend/src/Pacus.Api/Controllers/DailyRoutinesController.cs
+@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
+ using Microsoft.AspNetCore.Mvc;
+ using Pacus.Api.Auth;
+ using Pacus.Application.DTOs;
++using Pacus.Application.Exceptions;
+ using Pacus.Application.Interfaces;
+ using Pacus.Application.Services;
+ using Pacus.Domain.Enums;
+@@ -41,18 +42,43 @@ public class DailyRoutinesController : ControllerBase
+     // (DailyRoutineDto.cs) em vez de devolver a entidade de dominio crua (achado #3
+     // da mesma auditoria).
+ 
++    // Tentativas extras so aqui: GetToday e uma leitura do ponto de vista do usuario,
++    // mas por baixo pode escrever (fechar o dia anterior, sincronizar tarefas novas de
++    // template) via concorrencia otimista (achado #5 da auditoria -- ver
++    // docs/ESTADO_ATUAL.md e DailyRoutineRepository.UpdateAsync). Duas abas/dispositivos
++    // da familia abrindo a tela "Hoje" quase ao mesmo tempo bastam pra colidir e um dos
++    // dois tomar ConflictException (409) so por ter carregado a pagina -- nao por ter
++    // pedido uma acao. Relendo e tentando de novo aqui, a proxima passada ja enxerga o
++    // estado gravado pela primeira e normalmente nao ha mais nada a sincronizar, entao
++    // resolve sozinho sem incomodar quem so estava abrindo o app.
++    private const int GetTodayMaxAttempts = 3;
++
+     [HttpGet("today")]
+     public async Task<IActionResult> GetToday()
+     {
+         var familyId = _currentUser.FamilyId;
+         var timezone = await _familyTimezoneService.GetTimezoneAsync(familyId);
+ 
+-        // "Nao e necessario manter um processo rodando exatamente a meia-noite" — o fechamento
+-        // acontece de forma preguicosa, no primeiro acesso que perceber que o dia virou.
+-        await _dayClosingService.CloseIfDueAsync(familyId, timezone);
++        for (var attempt = 1; ; attempt++)
++        {
++            try
++            {
++                // "Nao e necessario manter um processo rodando exatamente a meia-noite" — o
++                // fechamento acontece de forma preguicosa, no primeiro acesso que perceber
++                // que o dia virou.
++                await _dayClosingService.CloseIfDueAsync(familyId, timezone);
+ 
+-        var routine = await _dailyRoutineService.GetOrCreateTodayAsync(familyId, timezone);
+-        return Ok(routine.ToResponse());
++                var routine = await _dailyRoutineService.GetOrCreateTodayAsync(familyId, timezone);
++                return Ok(routine.ToResponse());
++            }
++            catch (ConflictException) when (attempt < GetTodayMaxAttempts)
++            {
++                // corrida passageira contra outra requisicao concorrente -- tenta de novo
++                // com estado fresco. Na ultima tentativa deixa o ConflictException subir
++                // pro AppExceptionHandler (409) normalmente: se colidiu 3x seguidas ja nao
++                // e mais so azar de timing.
++            }
++        }
+     }
+ 
+     [HttpGet]
+diff --git a/frontend/js/api/pacus-api.js b/frontend/js/api/pacus-api.js
+index fbfa3bf..983772e 100755
+--- a/frontend/js/api/pacus-api.js
++++ b/frontend/js/api/pacus-api.js
+@@ -1,7 +1,23 @@
+ import { apiClient } from "./api-client.js";
+ 
+-export function getTodayRoutine() {
+-  return apiClient("/daily-routines/today");
++// O backend ja tenta se resolver sozinho quando duas requisicoes concorrentes
++// colidem ao carregar a rotina de hoje (ex.: duas abas/dispositivos da familia
++// abrindo a tela "Hoje" ao mesmo tempo -- ver retry em DailyRoutinesController.
++// GetToday), mas isso nao cobre uma corrida entre ESTA aba e outra: duas
++// chamadas emitidas de lugares diferentes no mesmo cliente (ou uma requisicao
++// duplicada por uma reconexao apos o cold start lento do Render) ainda podem
++// aparecer como um 409 aqui. Repetir uma vez a chamada, so pra este endpoint
++// de leitura, evita jogar esse erro de corrida passageira na tela de quem so
++// queria abrir o app.
++export async function getTodayRoutine() {
++  try {
++    return await apiClient("/daily-routines/today");
++  } catch (err) {
++    if (err.status === 409) {
++      return apiClient("/daily-routines/today");
++    }
++    throw err;
++  }
+ }
+ 
+ export function completeTask(taskId) {

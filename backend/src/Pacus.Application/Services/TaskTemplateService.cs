@@ -25,6 +25,7 @@ public class TaskTemplateService : ITaskTemplateService
         CreateTaskRequest request)
     {
         var (type, period) = ParseTypeAndPeriod(request);
+        var (recurrence, variants) = ParseRecurrenceAndVariants(request);
 
         var existing = await _taskTemplateRepository.GetActiveByUserAsync(familyId);
 
@@ -39,7 +40,8 @@ public class TaskTemplateService : ITaskTemplateService
             Points = request.Points,
             Order = existing.Count + 1,
             Active = true,
-            Recurrence = "daily",
+            Recurrence = recurrence,
+            Variants = variants,
             CreatedBy = createdBy,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -62,12 +64,15 @@ public class TaskTemplateService : ITaskTemplateService
             throw new InvalidOperationException("Tarefa permanente nao encontrada.");
 
         var (type, period) = ParseTypeAndPeriod(request);
+        var (recurrence, variants) = ParseRecurrenceAndVariants(request);
 
         template.Title = request.Title;
         template.Description = request.Description;
         template.Type = type;
         template.Period = period;
         template.Points = request.Points;
+        template.Recurrence = recurrence;
+        template.Variants = variants;
         template.UpdatedAt = DateTime.UtcNow;
 
         await _taskTemplateRepository.UpdateAsync(template);
@@ -156,5 +161,77 @@ public class TaskTemplateService : ITaskTemplateService
         }
 
         return (type, period);
+    }
+
+    private static readonly HashSet<string> ValidRecurrences = new(StringComparer.OrdinalIgnoreCase)
+    {
+        TaskTemplate.RecurrenceDaily,
+        TaskTemplate.RecurrenceWeekday,
+        TaskTemplate.RecurrenceWeekend,
+        TaskTemplate.RecurrenceWeekdayRotation,
+    };
+
+    private static (string Recurrence, List<TaskTemplateVariant> Variants) ParseRecurrenceAndVariants(
+        CreateTaskRequest request)
+    {
+        var recurrence = string.IsNullOrWhiteSpace(request.Recurrence)
+            ? TaskTemplate.RecurrenceDaily
+            : request.Recurrence;
+
+        if (!ValidRecurrences.Contains(recurrence))
+        {
+            throw new InvalidOperationException(
+                $"Recorrencia invalida: {recurrence}. Use {TaskTemplate.RecurrenceDaily}, {TaskTemplate.RecurrenceWeekday}, {TaskTemplate.RecurrenceWeekend} ou {TaskTemplate.RecurrenceWeekdayRotation}.");
+        }
+
+        if (!recurrence.Equals(TaskTemplate.RecurrenceWeekdayRotation, StringComparison.OrdinalIgnoreCase))
+            return (recurrence, new List<TaskTemplateVariant>());
+
+        if (request.Variants is null || request.Variants.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Recorrencia \"{TaskTemplate.RecurrenceWeekdayRotation}\" precisa de pelo menos uma variante (Variants).");
+        }
+
+        var variants = new List<TaskTemplateVariant>();
+        var seenDays = new HashSet<DayOfWeek>();
+
+        foreach (var variant in request.Variants)
+        {
+            if (!Enum.TryParse<DayOfWeek>(variant.DayOfWeek, ignoreCase: true, out var dayOfWeek))
+            {
+                throw new InvalidOperationException(
+                    $"Dia da semana invalido na variante: {variant.DayOfWeek}.");
+            }
+
+            // So segunda a sexta -- e o proposito desta recorrencia (fim de semana usa
+            // RecurrenceWeekend/RecurrenceDaily se precisar de sabado/domingo tambem).
+            if (dayOfWeek == DayOfWeek.Saturday || dayOfWeek == DayOfWeek.Sunday)
+            {
+                throw new InvalidOperationException(
+                    $"Recorrencia \"{TaskTemplate.RecurrenceWeekdayRotation}\" so aceita dias uteis (segunda a sexta); recebido: {dayOfWeek}.");
+            }
+
+            if (!seenDays.Add(dayOfWeek))
+            {
+                throw new InvalidOperationException(
+                    $"Dia da semana repetido nas variantes: {dayOfWeek}.");
+            }
+
+            if (string.IsNullOrWhiteSpace(variant.Title))
+            {
+                throw new InvalidOperationException(
+                    $"Toda variante precisa de titulo (faltando em {dayOfWeek}).");
+            }
+
+            variants.Add(new TaskTemplateVariant
+            {
+                DayOfWeek = dayOfWeek,
+                Title = variant.Title,
+                Description = variant.Description,
+            });
+        }
+
+        return (recurrence, variants);
     }
 }

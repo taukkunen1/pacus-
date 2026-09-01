@@ -19,7 +19,24 @@ public class TaskTemplate
     public int Points { get; set; }
     public int Order { get; set; }
     public bool Active { get; set; } = true;
-    public string Recurrence { get; set; } = "daily"; // daily | weekday | weekend | custom
+
+    // Ate esta mudanca este campo existia no banco (toda tarefa permanente sempre
+    // gravou "daily" aqui) mas nunca era lido em lugar nenhum -- a materializacao
+    // diaria (DailyRoutineService) sempre criava a tarefa em TODOS os dias,
+    // ignorando o valor. Corrigido: DailyRoutineService.ResolveDailyTaskForDate
+    // agora usa este campo pra decidir se/como a tarefa aparece em cada dia.
+    public const string RecurrenceDaily = "daily";
+    public const string RecurrenceWeekday = "weekday"; // so segunda a sexta, mesmo conteudo
+    public const string RecurrenceWeekend = "weekend"; // so sabado e domingo
+    // So segunda a sexta, com titulo/descricao diferentes por dia (ver Variants).
+    // Dia sem variante correspondente = tarefa nao aparece naquele dia.
+    public const string RecurrenceWeekdayRotation = "weekday_rotation";
+
+    public string Recurrence { get; set; } = RecurrenceDaily;
+
+    // So usado quando Recurrence == RecurrenceWeekdayRotation.
+    public List<TaskTemplateVariant> Variants { get; set; } = new();
+
     public ObjectId CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

@@ -19,6 +19,83 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
         _mongo = mongo;
     }
 
+    // Recorrencia "weekday_rotation" (ex.: Momento Criativo, uma atividade diferente
+    // por dia util) e nova nesta mudanca -- este teste confere o contrato HTTP de
+    // ponta a ponta: nomes de dia da semana em ingles minusculo na ida (o
+    // JsonStringEnumConverter do Program.cs usa CamelCase) precisam ser aceitos pelo
+    // Enum.TryParse(ignoreCase:true) do TaskTemplateService, e o retorno inclui
+    // recurrence + variants (a logica de materializar por dia fica coberta nos
+    // testes unitarios de DailyRoutineService, que conseguem controlar a data --
+    // aqui so valida o formato JSON de fato trafegado pela API).
+    [Fact]
+    public async Task Create_WeekdayRotation_ShouldPersistRecurrenceAndVariants()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/tasks",
+            new
+            {
+                title = "Momento Criativo",
+                description = (string?)null,
+                type = "challenge",
+                period = "afternoon",
+                points = 3,
+                recurrence = "weekday_rotation",
+                variants = new[]
+                {
+                    new { dayOfWeek = "monday", title = "Missão Detetive", description = (string?)null },
+                    new { dayOfWeek = "tuesday", title = "Desafio Engenheiro", description = (string?)null },
+                    new { dayOfWeek = "wednesday", title = "Chef por um Dia", description = (string?)null },
+                    new { dayOfWeek = "thursday", title = "Inventor Maluco", description = (string?)null },
+                    new { dayOfWeek = "friday", title = "Missão 20 Minutos", description = (string?)null },
+                }
+            });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal("weekday_rotation", body.GetProperty("recurrence").GetString());
+
+        var variants = body.GetProperty("variants").EnumerateArray().ToList();
+        Assert.Equal(5, variants.Count);
+        Assert.Equal("monday", variants[0].GetProperty("dayOfWeek").GetString());
+        Assert.Equal("Missão Detetive", variants[0].GetProperty("title").GetString());
+    }
+
+    [Fact]
+    public async Task Create_WeekdayRotation_WithSaturdayVariant_ShouldBeRejected()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/tasks",
+            new
+            {
+                title = "Momento Criativo",
+                description = (string?)null,
+                type = "challenge",
+                period = "afternoon",
+                points = 3,
+                recurrence = "weekday_rotation",
+                variants = new[]
+                {
+                    new { dayOfWeek = "saturday", title = "Passeio em família", description = (string?)null },
+                }
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task Delete_OtherFamilysTemplate_ShouldNotBeAllowed()
     {

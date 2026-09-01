@@ -16,6 +16,53 @@ import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
 const PERIODS = ["morning", "afternoon", "evening"];
 const TYPES = ["mandatory", "expected", "challenge"];
 
+// Rotulo em portugues + nome em ingles do enum DayOfWeek do backend (Enum.TryParse
+// so aceita "Monday", "Tuesday" etc). So segunda a sexta: recurrence
+// "weekday_rotation" e so pra dias uteis (ver TaskTemplateService no backend).
+const WEEKDAYS = [
+  { key: "Monday", label: "Segunda-feira" },
+  { key: "Tuesday", label: "Terça-feira" },
+  { key: "Wednesday", label: "Quarta-feira" },
+  { key: "Thursday", label: "Quinta-feira" },
+  { key: "Friday", label: "Sexta-feira" }
+];
+
+// Pergunta o titulo + descricao de cada dia util pra uma tarefa "rotativa"
+// (atividade diferente de segunda a sexta, ex.: Momento Criativo). Retorna
+// null se a pessoa cancelar em qualquer dia (o chamador deve abortar a
+// criacao inteira nesse caso, pra nao criar uma rotina pela metade).
+async function promptWeekdayVariants() {
+  const variants = [];
+
+  for (const { key, label } of WEEKDAYS) {
+    const dayTitle = window.prompt(
+      `Atividade de ${label} (título curto):`
+    );
+
+    if (!dayTitle?.trim()) {
+      return null;
+    }
+
+    // Descricao e opcional aqui -- cancelar o modal (ex.: Esc) so significa
+    // "sem descricao pra esse dia", nao aborta a criacao da tarefa inteira
+    // (diferente do titulo, que e obrigatorio).
+    const dayDescription = await promptTextarea({
+      title: `${label} — detalhes`,
+      label: "Descrição (opcional) — um item por linha",
+      value: "",
+      placeholder: "Como funciona, o que a criança precisa fazer..."
+    });
+
+    variants.push({
+      dayOfWeek: key,
+      title: dayTitle.trim(),
+      description: dayDescription?.trim() || null
+    });
+  }
+
+  return variants;
+}
+
 export async function renderPacus(root, navigate) {
   root.innerHTML = `
     <div class="screen">
@@ -258,6 +305,12 @@ export async function renderPacus(root, navigate) {
                 <span>
                   ${active ? "Ativa" : "Inativa"}
                 </span>
+
+                ${
+                  task.recurrence === "weekday_rotation"
+                    ? `<span>🔁 1 atividade/dia útil</span>`
+                    : ""
+                }
               </div>
             </div>
 
@@ -364,6 +417,26 @@ export async function renderPacus(root, navigate) {
       return;
     }
 
+    // Tarefa "rotativa" (ex.: Momento Criativo): uma atividade diferente de
+    // segunda a sexta, some no fim de semana. Sem isso toda tarefa permanente
+    // aparece igual em todos os dias.
+    const isRotation = window.confirm(
+      "Essa tarefa deve ter uma atividade diferente a cada dia útil (segunda a sexta)?\n\n" +
+        "OK = Sim, uma atividade por dia (não aparece no fim de semana)\n" +
+        "Cancelar = Não, a mesma tarefa todo dia"
+    );
+
+    let recurrence;
+    let variants;
+
+    if (isRotation) {
+      variants = await promptWeekdayVariants();
+      if (!variants) {
+        return;
+      }
+      recurrence = "weekday_rotation";
+    }
+
     try {
       const created = await createTask({
         title: title.trim(),
@@ -371,13 +444,16 @@ export async function renderPacus(root, navigate) {
           descriptionRaw?.trim() || null,
         type,
         period,
-        points
+        points,
+        ...(recurrence ? { recurrence, variants } : {})
       });
 
       tasks = [created, ...tasks];
 
       showToast(
-        "Tarefa permanente criada."
+        isRotation
+          ? "Tarefa permanente criada — uma atividade diferente por dia útil."
+          : "Tarefa permanente criada."
       );
 
       draw();
@@ -474,7 +550,14 @@ export async function renderPacus(root, navigate) {
             descriptionRaw?.trim() || null,
           type,
           period,
-          points
+          points,
+          // O backend reseta recorrencia pro padrao ("daily", sem variantes) se
+          // esses campos nao vierem no payload -- sem isso, editar titulo/tipo/etc
+          // de uma tarefa "rotativa" (Momento Criativo e afins) apagava a rotacao
+          // por dia da semana sem a pessoa pedir. Edicao da propria rotacao ainda
+          // nao tem UI; por enquanto isso so preserva o que ja estava configurado.
+          recurrence: task.recurrence,
+          variants: task.variants
         }
       );
 

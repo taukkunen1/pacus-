@@ -28,6 +28,7 @@ import {
 import { showToast } from "../components/toast.js";
 import { appState } from "../state/app-state.js";
 import { isValidPoints, POINTS_HELP_TEXT } from "../utils/validation.js";
+import { promptTextarea } from "../components/modal.js";
 
 const PERIODS = [
   "morning",
@@ -77,14 +78,18 @@ function promptForPoints(defaultValue) {
   return points;
 }
 
-// Pede a descricao (opcional) da tarefa. Retorna undefined se a pessoa
-// cancelar o prompt (o chamador deve abortar nesse caso — undefined, e nao
-// null, porque null e um valor valido aqui: "sem descricao").
-function promptForDescription(currentValue) {
-  const raw = window.prompt(
-    "Descrição da tarefa (opcional):",
-    currentValue ?? ""
-  );
+// Pede a descricao (opcional) da tarefa, num modal com textarea (window.prompt
+// so aceita uma linha, o que nao serve pra descricoes com varios itens, um
+// por linha). Retorna undefined se a pessoa cancelar (o chamador deve abortar
+// nesse caso — undefined, e nao null, porque null e um valor valido aqui:
+// "sem descricao").
+async function promptForDescription(currentValue) {
+  const raw = await promptTextarea({
+    title: "Descrição da tarefa",
+    label: "Descrição (opcional) — um item por linha",
+    value: currentValue ?? "",
+    placeholder: "Ex.: 48 ÷ 6 = ___\n72 ÷ 8 = ___"
+  });
 
   if (raw === null) return undefined;
 
@@ -572,7 +577,7 @@ export async function renderHome(
             return;
           }
 
-          const description = promptForDescription(null);
+          const description = await promptForDescription(null);
           if (description === undefined) {
             return;
           }
@@ -675,7 +680,7 @@ export async function renderHome(
               return;
             }
 
-            const description = promptForDescription(
+            const description = await promptForDescription(
               task.description
             );
             if (description === undefined) {

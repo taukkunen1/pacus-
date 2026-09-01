@@ -10,6 +10,7 @@ import {
 import { periodLabel, typeLabel } from "../utils/format.js";
 import { showToast } from "../components/toast.js";
 import { isValidPoints, POINTS_HELP_TEXT } from "../utils/validation.js";
+import { promptTextarea } from "../components/modal.js";
 
 const PERIODS = ["morning", "afternoon", "evening"];
 const TYPES = ["mandatory", "expected", "challenge"];
@@ -301,10 +302,12 @@ export async function renderPacus(root, navigate) {
       return;
     }
 
-    const descriptionRaw = window.prompt(
-      "Descricao da tarefa (opcional):",
-      ""
-    );
+    const descriptionRaw = await promptTextarea({
+      title: "Descrição da tarefa",
+      label: "Descrição (opcional) — um item por linha",
+      value: "",
+      placeholder: "Ex.: 48 ÷ 6 = ___\n72 ÷ 8 = ___"
+    });
 
     const type = window
       .prompt(
@@ -400,10 +403,12 @@ export async function renderPacus(root, navigate) {
       return;
     }
 
-    const descriptionRaw = window.prompt(
-      "Descricao da tarefa (opcional):",
-      task.description ?? ""
-    );
+    const descriptionRaw = await promptTextarea({
+      title: "Descrição da tarefa",
+      label: "Descrição (opcional) — um item por linha",
+      value: task.description ?? "",
+      placeholder: "Ex.: 48 ÷ 6 = ___\n72 ÷ 8 = ___"
+    });
 
     const type = window
       .prompt(

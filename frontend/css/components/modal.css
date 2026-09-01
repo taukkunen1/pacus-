@@ -1,0 +1,51 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 43, 41, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  z-index: 100;
+}
+
+.modal-box {
+  width: 100%;
+  max-width: 420px;
+  background: var(--surface-2);
+  border: 1.5px solid rgba(234, 246, 243, 0.15);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.modal-title { margin: 0; }
+
+.modal-textarea {
+  background: rgba(234, 246, 243, 0.08);
+  border: 1.5px solid rgba(234, 246, 243, 0.2);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  color: var(--text-on-dark);
+  font-size: var(--step-md);
+  font-family: inherit;
+  resize: vertical;
+  min-height: 96px;
+}
+.modal-textarea:focus { border-color: var(--color-coral); }
+.modal-textarea::placeholder { color: var(--text-on-dark-dim); }
+
+.modal-hint {
+  font-size: var(--step-xs);
+  color: var(--text-on-dark-dim);
+  margin: 0;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

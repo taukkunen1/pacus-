@@ -112,6 +112,59 @@ public sealed class PointsHttpIntegrationTests
             precision: 10);
     }
 
+    // Cura da taxa antiga (0.05) congelada num documento de Settings criado antes da
+    // mudanca pra 0.06 -- ver comentario em PointsController.GetPointToBrlRateAsync.
+    // Simula esse estado inserindo o documento direto no Mongo (nao existe endpoint
+    // pra escolher essa taxa) e confere que o saldo em R$ ja vem com 0.06 na primeira
+    // leitura, alem do documento no banco ser corrigido (nao so o calculo em memoria).
+    [Fact]
+    public async Task GetBalance_WithLegacySettingsRate_ShouldSelfHealToCurrentDefault()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+
+        await InsertTransactionAsync(
+            factory,
+            family.FamilyId,
+            100,
+            "Tarefa concluída");
+
+        var mongoClient = new MongoClient(GetConnectionString(factory));
+        var database = mongoClient.GetDatabase(factory.DatabaseName);
+        var settingsCollection = database.GetCollection<Settings>("settings");
+
+        var familyObjectId = ObjectId.Parse(family.FamilyId);
+
+        await settingsCollection.InsertOneAsync(new Settings
+        {
+            Id = ObjectId.GenerateNewId(),
+            FamilyId = familyObjectId,
+            PointToBrlRate = Settings.LegacyDefaultPointToBrlRate,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+
+        await LoginAdultAsync(client, family);
+
+        var response = await client.GetAsync("/api/v1/points");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        // 100 * 0.06 = 6. Se a cura nao funcionasse viria 5 (100 * 0.05, taxa antiga).
+        Assert.Equal(6.0, body.GetProperty("brl").GetDouble(), precision: 10);
+
+        var storedSettings = await settingsCollection
+            .Find(s => s.FamilyId == familyObjectId)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(storedSettings);
+        Assert.Equal(Settings.DefaultPointToBrlRate, storedSettings.PointToBrlRate, precision: 10);
+    }
+
     [Fact]
     public async Task GetTransactions_ShouldReturnOnlyCurrentFamilyTransactions()
     {

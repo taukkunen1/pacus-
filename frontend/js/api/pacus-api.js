@@ -42,3 +42,12 @@ export function adjustGameTimer(deltaMinutes) {
     body: JSON.stringify({ deltaMinutes }),
   });
 }
+
+// Vinculo (relatedness -- ver docs/PROPOSITO.md e pacus/habitat.js). Restrito a adulto
+// no backend; icon deve ser uma chave de REACTION_ICONS (heart/clap/star/hug).
+export function setDailyReaction(icon, message) {
+  return apiClient("/daily-routines/today/reaction", {
+    method: "PUT",
+    body: JSON.stringify({ icon, message }),
+  });
+}

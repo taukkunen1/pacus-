@@ -607,6 +607,43 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
+    // Chaves semanticas dos icones disponiveis pra reacao (ver DailyReaction.Icon) —
+    // frontend mapeia cada uma pro emoji + frase padrao (ver pacus/habitat.js).
+    public static readonly HashSet<string> AllowedReactionIcons = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "heart", "clap", "star", "hug"
+    };
+
+    // Vinculo (relatedness -- ver docs/PROPOSITO.md e DailyReaction). Restrito a adulto;
+    // um por dia -- reagir de novo no mesmo dia substitui a reacao anterior (nao acumula,
+    // granularidade "por dia" escolhida pelo dono do produto). Nao trava nada, nao gera
+    // pontos -- e so vinculo, sem virar mais um mecanismo de recompensa.
+    public async Task<DailyRoutine> SetReactionAsync(
+        ObjectId userId, string icon, string? message, ObjectId actorId, string actorRole)
+    {
+        if (!actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase))
+            throw new UnauthorizedAccessException("Reagir ao dia e restrito ao painel adulto.");
+
+        icon ??= string.Empty;
+        if (!AllowedReactionIcons.Contains(icon))
+            throw new InvalidOperationException(
+                $"Icone de reacao invalido: {icon}. Use um destes: {string.Join(", ", AllowedReactionIcons)}.");
+
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new InvalidOperationException("Nenhuma rotina em aberto para este usuario.");
+
+        routine.Reaction = new DailyReaction
+        {
+            Icon = icon.ToLowerInvariant(),
+            Message = string.IsNullOrWhiteSpace(message) ? null : message.Trim(),
+            CreatedBy = actorId,
+            CreatedAt = DateTime.UtcNow,
+        };
+
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        return routine;
+    }
+
     private async Task SyncGameTimerAsync(DailyRoutine routine, ObjectId userId)
     {
         var settings = await _settingsRepository.GetByUserIdAsync(userId);

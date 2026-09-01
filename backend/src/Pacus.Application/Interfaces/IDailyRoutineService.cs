@@ -51,4 +51,8 @@ public interface IDailyRoutineService
     // ja aplica [RequireRole(Adult)], mas o service tambem confere por
     // seguranca (nunca confiar so no frontend/controller).
     Task<DailyRoutine> AdjustGameTimerAsync(ObjectId userId, int deltaMinutes, ObjectId actorId, string actorRole);
+
+    // Vinculo (relatedness -- ver docs/PROPOSITO.md e DailyReaction). Restrito a adulto;
+    // um por dia (reagir de novo substitui a reacao anterior, nao acumula).
+    Task<DailyRoutine> SetReactionAsync(ObjectId userId, string icon, string? message, ObjectId actorId, string actorRole);
 }

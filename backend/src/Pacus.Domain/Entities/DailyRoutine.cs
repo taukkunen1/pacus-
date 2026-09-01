@@ -40,6 +40,10 @@ public class DailyRoutine
     public DateTime? GameTimerPausedAt { get; set; }
     public long GameTimerPausedMs { get; set; } = 0;
 
+    // Reacao pessoal do adulto sobre o dia (relatedness -- ver docs/PROPOSITO.md e
+    // DailyReaction). Null enquanto ninguem reagiu hoje.
+    public DailyReaction? Reaction { get; set; }
+
     // Espelham a configuracao da familia (Settings) so para esta resposta —
     // nao vem do banco nem e persistido aqui, so preenchido na hora de devolver
     // a rotina pra API (evita o frontend precisar de outra chamada).

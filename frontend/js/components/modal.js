@@ -84,6 +84,51 @@ export function promptTextarea({
   });
 }
 
+// Modal so-leitura, pra revelar algo (ex.: a reacao do adulto sobre o dia -- ver
+// pacus/habitat.js e screens/home.js) sem o peso de um textarea/formulario. Resolve
+// quando a pessoa fecha (clique no botao, fora da caixa, ou Escape) -- nao ha
+// "cancelar" real aqui, e so leitura.
+export function showMessageModal({
+  title = "",
+  body = "",
+  confirmLabel = "Fechar"
+} = {}) {
+  return new Promise((resolve) => {
+    closeActiveModal();
+
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal-box modal-box--reveal" role="dialog" aria-modal="true" ${title ? `aria-label="${escapeHtml(title)}"` : ""}>
+        ${title ? `<h3 class="modal-title">${escapeHtml(title)}</h3>` : ""}
+        <p class="modal-reveal-body">${escapeHtml(body)}</p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-primary" data-modal-action="ok">${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    activeModal = overlay;
+
+    function finish() {
+      overlay.remove();
+      if (activeModal === overlay) activeModal = null;
+      resolve();
+    }
+
+    overlay.querySelector('[data-modal-action="ok"]').addEventListener("click", finish);
+
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) finish();
+    });
+
+    overlay.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" || event.key === "Enter") finish();
+    });
+  });
+}
+
 function closeActiveModal() {
   if (activeModal) {
     activeModal.remove();

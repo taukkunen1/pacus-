@@ -123,4 +123,27 @@ public class DailyRoutinesController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, new { error = ex.Message });
         }
     }
+
+    // Vinculo (relatedness -- ver docs/PROPOSITO.md): reacao pessoal do adulto sobre o
+    // dia. Restrito ao painel adulto — a crianca recebe 403 direto do RequireRole,
+    // nunca chega a bater no service (mesmo padrao do AdjustGameTimer acima).
+    [RequireRole(UserRole.Adult)]
+    [HttpPut("today/reaction")]
+    public async Task<IActionResult> SetReaction([FromBody] SetDailyReactionRequest request)
+    {
+        try
+        {
+            var routine = await _dailyRoutineService.SetReactionAsync(
+                _currentUser.FamilyId, request.Icon, request.Message, _currentUser.UserId, _currentUser.Role.ToString());
+            return Ok(routine);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = ex.Message });
+        }
+    }
 }

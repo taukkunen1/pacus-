@@ -49,3 +49,16 @@
   justify-content: flex-end;
   gap: var(--space-2);
 }
+
+/* Modal so-leitura (ex.: revelar a reacao do adulto -- ver components/modal.js
+   showMessageModal e pacus/habitat.js). Botao centralizado, sem opcao de cancelar --
+   e so um "fechar", nao uma decisao. */
+.modal-box--reveal .modal-actions { justify-content: center; }
+.modal-reveal-body {
+  font-size: var(--step-lg);
+  line-height: 1.5;
+  color: var(--text-on-dark);
+  text-align: center;
+  white-space: pre-line;
+  margin: var(--space-2) 0;
+}

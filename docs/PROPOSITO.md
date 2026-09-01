@@ -65,3 +65,18 @@ produto parecer ir nessa direção.
   ("você conseguiu", "você tentou de um jeito novo"), nunca de traço/resultado ("você é
   o melhor", "nota 10") — pesquisa de Dweck & Mueller (1998) sobre mindset de
   crescimento. Ver `frontend/js/utils/effort-messages.js`.
+- Ao pontuar uma tarefa nova, cuidado com o **efeito de supergratificação**
+  (overjustification — Lepper, Greene & Nisbett 1973): recompensar demais uma atividade
+  que a criança já faria por prazer próprio (ex.: uma tarefa criativa) pode reduzir o
+  interesse genuíno nela. Na conta real de hoje isso já está calibrado na direção certa
+  sem ter sido pensado assim — tarefas repetitivas/de manutenção (escovar dente, beber
+  água) valem pouco (1 PP) e tarefas que já são recompensadoras por si (Momento
+  Criativo, desafios) valem mais (3-4 PP). Manter esse padrão ao criar tarefas novas:
+  pontuação alta não é prêmio por "tarefa importante", é compensação por esforço que a
+  criança não faria sozinha de bom grado.
+- A **terceira necessidade da Teoria da Autodeterminação** (relatedness — vínculo com
+  outra pessoa, não só autonomia e competência) tem uma feature dedicada desde
+  2026-09-01: a reação pessoal do adulto sobre o dia (`DailyRoutine.Reaction`, ver
+  `pacus/habitat.js`). É vínculo, não recompensa — por isso não gera Pacus Points e não
+  é obrigatória. Hoje só numa direção (adulto → criança); abrir para os dois lados é
+  uma extensão natural, não decidida ainda.

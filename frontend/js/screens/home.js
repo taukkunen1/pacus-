@@ -6,7 +6,8 @@ import {
   getPacus,
   pauseGameTimer,
   resumeGameTimer,
-  adjustGameTimer
+  adjustGameTimer,
+  setDailyReaction
 } from "../api/pacus-api.js";
 
 import {
@@ -19,7 +20,7 @@ import {
 } from "../api/tasks-api.js";
 
 import { getPendingRedemptions } from "../api/store-api.js";
-import { renderTank } from "../pacus/habitat.js";
+import { renderTank, REACTION_ICONS } from "../pacus/habitat.js";
 import { renderTaskSection } from "../components/task-list.js";
 import { formatOperationalDate } from "../utils/date.js";
 import {
@@ -31,7 +32,7 @@ import { showToast } from "../components/toast.js";
 import { pickEffortMessage } from "../utils/effort-messages.js";
 import { appState } from "../state/app-state.js";
 import { isValidPoints, POINTS_HELP_TEXT } from "../utils/validation.js";
-import { promptTextarea } from "../components/modal.js";
+import { promptTextarea, showMessageModal } from "../components/modal.js";
 import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
 
 const PERIODS = [
@@ -161,6 +162,45 @@ function promptForReason(currentValue) {
   if (raw === null) return currentValue ?? null;
 
   return raw.trim() || null;
+}
+
+const REACTION_ORDER = ["heart", "clap", "star", "hug"];
+
+// Fluxo do adulto pra reagir ao dia (relatedness -- ver docs/PROPOSITO.md e
+// pacus/habitat.js): escolhe um icone (numero, mesmo padrao de promptForType) e recebe
+// a frase padrao daquele icone pra editar ou manter -- baixo atrito, mas ainda pessoal.
+// Retorna null se cancelar em qualquer etapa (o chamador deve abortar).
+async function promptForReactionChoice(currentReaction) {
+  const menuLines = REACTION_ORDER
+    .map((key, i) => `${i + 1}) ${REACTION_ICONS[key].emoji} ${REACTION_ICONS[key].label}`)
+    .join("\n");
+
+  const currentIndex = currentReaction
+    ? REACTION_ORDER.indexOf(currentReaction.icon)
+    : -1;
+
+  const choice = window.prompt(
+    `Como foi o dia da criança hoje?\n${menuLines}`,
+    String(currentIndex >= 0 ? currentIndex + 1 : 1)
+  );
+
+  if (choice === null) return null;
+
+  const icon = REACTION_ORDER[Number(choice.trim()) - 1] ?? REACTION_ORDER[0];
+
+  const suggestion =
+    currentReaction?.icon === icon
+      ? currentReaction.message ?? REACTION_ICONS[icon].defaultMessage
+      : REACTION_ICONS[icon].defaultMessage;
+
+  const message = window.prompt(
+    "Quer personalizar a mensagem? (opcional — deixe como está, edite, ou apague tudo pra deixar só o ícone)",
+    suggestion
+  );
+
+  if (message === null) return null;
+
+  return { icon, message: message.trim() || null };
 }
 
 function formatGameTimerRemaining(remainingMs) {
@@ -457,7 +497,7 @@ export async function renderHome(
         </div>
       </div>
 
-      ${renderTank(pacus)}
+      ${renderTank(pacus, undefined, { reaction: routine.reaction, isAdult })}
 
       ${renderGameTimer()}
 
@@ -590,6 +630,46 @@ export async function renderHome(
       });
 
     attachBottomNav(content, navigate);
+
+    content
+      .querySelectorAll('[data-action="view-reaction"]')
+      .forEach((el) => {
+        const reveal = () => {
+          const reaction = routine.reaction;
+          if (!reaction) return;
+
+          const icon = REACTION_ICONS[reaction.icon];
+          showMessageModal({
+            title: `${icon?.emoji ?? "💬"} Mensagem de hoje`,
+            body: reaction.message || icon?.defaultMessage || "Alguém pensou em você hoje!"
+          });
+        };
+
+        el.addEventListener("click", reveal);
+        // role="button" (ver pacus/habitat.js) nao dispara "click" sozinho no teclado
+        // como um <button> de verdade -- sem isso, Tab+Enter nao revelava a mensagem.
+        el.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            reveal();
+          }
+        });
+      });
+
+    content
+      .querySelector('[data-action="set-reaction"]')
+      ?.addEventListener("click", async () => {
+        const choice = await promptForReactionChoice(routine.reaction);
+        if (!choice) return;
+
+        try {
+          routine = await setDailyReaction(choice.icon, choice.message);
+          showToast("Reação registrada — o Pacus vai carregar isso com ele hoje.");
+          draw();
+        } catch (err) {
+          showToast(err.message, { error: true });
+        }
+      });
 
     content
       .querySelector("#add-task")

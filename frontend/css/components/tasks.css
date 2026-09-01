@@ -49,7 +49,13 @@
 
 .task-card {
   display: flex;
-  align-items: center;
+  /* flex-start, nao center: com uma descricao longa (varias linhas), o card
+     fica mais alto que o checkbox/badge/botoes -- center deixava esses
+     elementos boiando no meio do card em vez de alinhados com a primeira
+     linha do titulo. Com uma unica linha (caso mais comum) o efeito visual
+     e praticamente identico ao de antes, ja que os elementos tem alturas
+     bem proximas. */
+  align-items: flex-start;
   gap: var(--space-3);
   background: rgba(234, 246, 243, 0.07);
   border: 1.5px solid rgba(234, 246, 243, 0.1);

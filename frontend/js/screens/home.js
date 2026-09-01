@@ -29,6 +29,7 @@ import { showToast } from "../components/toast.js";
 import { appState } from "../state/app-state.js";
 import { isValidPoints, POINTS_HELP_TEXT } from "../utils/validation.js";
 import { promptTextarea } from "../components/modal.js";
+import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
 
 const PERIODS = [
   "morning",
@@ -452,46 +453,7 @@ export async function renderHome(
         </div>
       </div>
 
-      <nav
-        class="bottom-nav"
-        aria-label="Navegação principal"
-      >
-        <button
-          data-nav="today"
-          class="is-active"
-          type="button"
-        >
-          Hoje
-        </button>
-
-        <button
-          data-nav="history"
-          type="button"
-        >
-          Histórico
-        </button>
-
-        <button
-          data-nav="points"
-          type="button"
-        >
-          Pontos
-        </button>
-
-        <button
-          data-nav="pacus"
-          type="button"
-        >
-          PACUS
-        </button>
-
-        <button
-          data-nav="store"
-          type="button"
-        >
-          Loja
-        </button>
-      </nav>
+      ${renderBottomNav("today")}
     `;
 
     attachHandlers();
@@ -547,21 +509,7 @@ export async function renderHome(
         );
       });
 
-    content
-      .querySelectorAll("[data-nav]")
-      .forEach((button) => {
-        button.addEventListener(
-          "click",
-          () => {
-            location.hash =
-              button.dataset.nav;
-
-            navigate(
-              button.dataset.nav
-            );
-          }
-        );
-      });
+    attachBottomNav(content, navigate);
 
     content
       .querySelector("#add-task")

@@ -11,6 +11,7 @@ import { periodLabel, typeLabel } from "../utils/format.js";
 import { showToast } from "../components/toast.js";
 import { isValidPoints, POINTS_HELP_TEXT } from "../utils/validation.js";
 import { promptTextarea } from "../components/modal.js";
+import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
 
 const PERIODS = ["morning", "afternoon", "evening"];
 const TYPES = ["mandatory", "expected", "challenge"];
@@ -138,6 +139,8 @@ export async function renderPacus(root, navigate) {
           ${renderPermanentTasks()}
         </div>
       </section>
+
+      ${renderBottomNav("pacus")}
     `;
 
     content
@@ -146,6 +149,8 @@ export async function renderPacus(root, navigate) {
         "click",
         () => navigate("today")
       );
+
+    attachBottomNav(content, navigate);
 
     content
       .querySelector("#add-permanent-task")

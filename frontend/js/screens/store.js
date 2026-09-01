@@ -11,6 +11,7 @@ import { showToast } from "../components/toast.js";
 import { appState } from "../state/app-state.js";
 import { formatBrl } from "../utils/format.js";
 import { promptTextarea } from "../components/modal.js";
+import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
 
 const CATEGORIES = ["screen_time", "toy", "activity", "other"];
 const CATEGORY_LABELS = {
@@ -79,9 +80,12 @@ export async function renderStore(root, navigate = () => {}) {
           ${renderPending(pending)}
         </div>
       ` : ""}
+
+      ${renderBottomNav("store")}
     `;
 
     attachHandlers();
+    attachBottomNav(content, navigate);
   }
 
   function renderItems(list, currentBalance) {

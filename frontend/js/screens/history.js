@@ -1,6 +1,7 @@
 import { getHistory } from "../api/history-api.js";
 import { formatBrl } from "../utils/format.js";
 import { showToast } from "../components/toast.js";
+import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
 
 export async function renderHistory(root, navigate) {
   root.innerHTML = `<div class="screen"><div class="container"><h1>Histórico</h1><p class="task-empty">Carregando...</p></div></div>`;
@@ -17,12 +18,14 @@ export async function renderHistory(root, navigate) {
             <span><strong>${pct}%</strong><small>+${day.pointsEarned ?? 0} PP</small></span>
           </button>`;
         }).join("") : `<p class="task-empty">Nenhum dia encerrado ainda.</p>`}
-      </div>`;
+      </div>
+      ${renderBottomNav("history")}`;
     content.querySelector("#back")?.addEventListener("click", () => navigate("today"));
+    attachBottomNav(content, navigate);
     content.querySelectorAll(".history-day").forEach(btn => btn.addEventListener("click", async () => {
       try {
         const day = await getHistory({ date: btn.dataset.date });
-        renderHistoryDay(content, day);
+        renderHistoryDay(content, day, navigate);
       } catch (err) { showToast(err.message, { error: true }); }
     }));
   } catch (err) {
@@ -34,7 +37,7 @@ export async function renderHistory(root, navigate) {
 // backend, 0.06) direto no frontend -- esta tela nao busca a taxa configurada da
 // familia. Se isso incomodar, o certo e chamar GET /api/v1/points aqui tambem e usar
 // o "brl" de la, que ja reflete a taxa real da familia (ver PointsController).
-function renderHistoryDay(content, day) {
+function renderHistoryDay(content, day, navigate) {
   content.innerHTML = `
     <button class="btn btn-ghost" id="history-back">← Histórico</button>
     <p class="eyebrow">${day.date}</p>
@@ -48,7 +51,9 @@ function renderHistoryDay(content, day) {
       ${(day.tasks ?? []).map(task => `<div class="history-task ${task.status === "done" ? "done" : "pending"}">
         <span>${task.status === "done" ? "✓" : "○"}</span><span>${escapeHtml(task.title)}</span><strong>${task.status === "done" ? `+${task.points} PP` : "+0 PP"}</strong>
       </div>`).join("")}
-    </div>`;
+    </div>
+    ${renderBottomNav("history")}`;
   content.querySelector("#history-back")?.addEventListener("click", () => location.hash = "history");
+  attachBottomNav(content, navigate);
 }
 function escapeHtml(value = "") { const d = document.createElement("div"); d.textContent = value; return d.innerHTML; }

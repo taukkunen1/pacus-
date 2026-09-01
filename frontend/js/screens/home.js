@@ -77,6 +77,20 @@ function promptForPoints(defaultValue) {
   return points;
 }
 
+// Pede a descricao (opcional) da tarefa. Retorna undefined se a pessoa
+// cancelar o prompt (o chamador deve abortar nesse caso — undefined, e nao
+// null, porque null e um valor valido aqui: "sem descricao").
+function promptForDescription(currentValue) {
+  const raw = window.prompt(
+    "Descrição da tarefa (opcional):",
+    currentValue ?? ""
+  );
+
+  if (raw === null) return undefined;
+
+  return raw.trim() || null;
+}
+
 function formatGameTimerRemaining(remainingMs) {
   const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
   const h = Math.floor(totalSeconds / 3600);
@@ -551,6 +565,11 @@ export async function renderHome(
             return;
           }
 
+          const description = promptForDescription(null);
+          if (description === undefined) {
+            return;
+          }
+
           const points = promptForPoints(1);
           if (points === null) {
             return;
@@ -574,7 +593,7 @@ export async function renderHome(
 
           const payload = {
             title: title.trim(),
-            description: null,
+            description,
             type,
             period: activePeriod,
             points
@@ -649,6 +668,13 @@ export async function renderHome(
               return;
             }
 
+            const description = promptForDescription(
+              task.description
+            );
+            if (description === undefined) {
+              return;
+            }
+
             const points = promptForPoints(task.points);
             if (points === null) {
               return;
@@ -667,9 +693,7 @@ export async function renderHome(
                   {
                     title:
                       title.trim(),
-                    description:
-                      task.description ??
-                      null,
+                    description,
                     type,
                     period:
                       task.period,

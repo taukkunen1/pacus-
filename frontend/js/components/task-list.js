@@ -88,6 +88,16 @@ function taskCard(task, canManage) {
         <p class="task-title">
           ${escapeHtml(task.title)}
         </p>
+
+        ${
+          task.description
+            ? `
+              <p class="task-description">
+                ${escapeHtml(task.description)}
+              </p>
+            `
+            : ""
+        }
       </div>
 
       <span class="task-points ${pointsClass}">

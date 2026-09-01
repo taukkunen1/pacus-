@@ -96,6 +96,15 @@
   text-decoration: line-through;
   text-decoration-color: rgba(234, 246, 243, 0.4);
 }
+.task-description {
+  font-size: var(--step-xs, 0.8rem);
+  color: var(--text-on-dark-dim, rgba(234, 246, 243, 0.7));
+  margin-top: 2px;
+}
+.task-card.is-done .task-description {
+  text-decoration: line-through;
+  text-decoration-color: rgba(234, 246, 243, 0.4);
+}
 
 .task-points {
   flex-shrink: 0;

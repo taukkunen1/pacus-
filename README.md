@@ -13,7 +13,7 @@ Flutter será um cliente futuro da mesma API.
 - O histórico dos dias encerrados é preservado.
 - As tarefas do dia são independentes da configuração permanente.
 - Existem três tipos: `mandatory`, `expected`, `challenge`.
-- Cada tarefa vale 1, 2 ou 3 Pacus Points.
+- Cada tarefa vale de 1 a 10 Pacus Points, ou de -1 a -10 como penalidade (zero não é permitido).
 - Tarefa concluída ganha pontos; não concluída ganha zero e não perde saldo.
 - 1 Pacus Point equivale a R$ 0,05.
 - O PACUS cresce uma vez por dia encerrado, independentemente da conclusão das tarefas.
@@ -39,4 +39,7 @@ Sirva `frontend/` por um servidor HTTP, por exemplo `python -m http.server 5500 
 `backend/Dockerfile` gera uma imagem ASP.NET Core 10. `deploy/docker-compose.yml` documenta a execução com MongoDB Atlas externo. O provedor de hospedagem da API ainda precisa ser escolhido.
 
 ## Segurança
-Nunca commitar senha do MongoDB, JWT secret ou connection strings reais.
+Nunca commitar senha do MongoDB, JWT secret ou connection strings reais. Checklist completo de segurança/LGPD em `docs/SECURITY_LGPD_CHECKLIST.md`.
+
+## Estado atual do projeto
+Ver `docs/ESTADO_ATUAL.md` — verificação regra por regra do que está implementado, estrutura do projeto, status do checklist de segurança/LGPD e diferenças entre as branches `main` e `feature/next-migration`.

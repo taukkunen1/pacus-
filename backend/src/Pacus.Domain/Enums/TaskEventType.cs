@@ -9,5 +9,6 @@ public enum TaskEventType
     Reopened,
     Reordered,
     PointsProposed,
-    PointsAdjusted
+    PointsAdjusted,
+    OptionSelected
 }

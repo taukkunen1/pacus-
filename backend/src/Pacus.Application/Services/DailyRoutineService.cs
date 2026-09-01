@@ -4,6 +4,7 @@ using Pacus.Application.Interfaces;
 using Pacus.Application.Utils;
 using Pacus.Domain.Entities;
 using Pacus.Domain.Enums;
+using Pacus.Application.Exceptions;
 
 namespace Pacus.Application.Services;
 
@@ -80,19 +81,26 @@ public class DailyRoutineService : IDailyRoutineService
             .DefaultIfEmpty(0)
             .Max() + 1;
 
+        var dayOfWeek = ParseDayOfWeek(routine.Date);
+
         foreach (var template in missingTemplates)
         {
+            var resolved = ResolveTemplateForDay(template, dayOfWeek);
+            if (resolved is null) continue; // recorrencia nao inclui este dia (ex.: fim de semana)
+
             routine.Tasks.Add(new DailyTask
             {
                 Id = Guid.NewGuid().ToString(),
                 TaskTemplateId = template.Id.ToString(),
-                Title = template.Title,
-                Description = template.Description,
+                Title = resolved.Title,
+                Description = resolved.Description,
                 Type = template.Type,
                 Period = template.Period,
                 Order = nextOrder++,
-                Points = template.Points,
+                Points = resolved.Points,
                 Status = TaskItemStatus.Pending,
+                Options = new List<string>(template.Options),
+                Reason = template.Reason,
                 CompletedAt = null,
                 CreatedBy = userId.ToString(),
                 Origin = "template",
@@ -122,24 +130,30 @@ public class DailyRoutineService : IDailyRoutineService
         if (existing is not null) return existing;
 
         var templates = await _taskTemplateRepository.GetActiveByUserAsync(userId);
+        var dayOfWeek = ParseDayOfWeek(date);
 
-        var tasks = templates.Select(t => new DailyTask
-        {
-            Id = Guid.NewGuid().ToString(),
-            TaskTemplateId = t.Id.ToString(),
-            Title = t.Title,
-            Description = t.Description,
-            Type = t.Type,
-            Period = t.Period,
-            Order = t.Order,
-            Points = t.Points,
-            Status = TaskItemStatus.Pending,
-            CompletedAt = null,
-            CreatedBy = userId.ToString(),
-            Origin = "template",
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-        }).ToList();
+        var tasks = templates
+            .Select(t => (Template: t, Resolved: ResolveTemplateForDay(t, dayOfWeek)))
+            .Where(pair => pair.Resolved is not null) // recorrencia nao inclui este dia
+            .Select(pair => new DailyTask
+            {
+                Id = Guid.NewGuid().ToString(),
+                TaskTemplateId = pair.Template.Id.ToString(),
+                Title = pair.Resolved!.Title,
+                Description = pair.Resolved!.Description,
+                Type = pair.Template.Type,
+                Period = pair.Template.Period,
+                Order = pair.Template.Order,
+                Points = pair.Resolved!.Points,
+                Status = TaskItemStatus.Pending,
+                Options = new List<string>(pair.Template.Options),
+                Reason = pair.Template.Reason,
+                CompletedAt = null,
+                CreatedBy = userId.ToString(),
+                Origin = "template",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+            }).ToList();
 
         var routine = new DailyRoutine
         {
@@ -162,10 +176,10 @@ public class DailyRoutineService : IDailyRoutineService
         ObjectId userId, string taskId, bool completed, ObjectId actorId, string actorRole)
     {
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
-            ?? throw new InvalidOperationException("Nenhuma rotina em aberto para este usuario.");
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
 
         var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId)
-            ?? throw new InvalidOperationException($"Tarefa {taskId} nao encontrada na rotina atual.");
+            ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
 
         var wasCompleted = task.Status == TaskItemStatus.Done;
         if (wasCompleted == completed)
@@ -214,19 +228,58 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
+    // Crianca (ou adulto) escolhe qual das Options da tarefa vai seguir -- pensado pra
+    // ser chamado antes de concluir, mas nao trava a conclusao se pular (Options
+    // continua so uma sugestao de caminho, nunca um bloqueio). SelectedOption nulo
+    // limpa a escolha (ex.: a crianca mudou de ideia antes de concluir).
+    public async Task<DailyRoutine> SelectTaskOptionAsync(
+        ObjectId userId, string taskId, string? selectedOption, ObjectId actorId, string actorRole)
+    {
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
+
+        var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
+            ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
+
+        if (selectedOption is not null && !task.Options.Contains(selectedOption))
+            throw new ValidationException("Essa opcao nao existe para esta tarefa.");
+
+        task.SelectedOption = selectedOption;
+        task.UpdatedAt = DateTime.UtcNow;
+        await _dailyRoutineRepository.UpdateAsync(routine);
+
+        var role = ParseRole(actorRole);
+        await _taskEventRepository.CreateAsync(new TaskEvent
+        {
+            Id = ObjectId.GenerateNewId(),
+            UserId = userId,
+            DailyRoutineId = routine.Id,
+            TaskId = task.Id,
+            TaskTemplateId = TryParseObjectId(task.TaskTemplateId),
+            EventType = TaskEventType.OptionSelected,
+            ActorId = actorId,
+            ActorRole = role,
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        return routine;
+    }
+
     public async Task<DailyRoutine> CreateAdHocTaskAsync(
         ObjectId userId, CreateTaskRequest request, ObjectId actorId, string actorRole)
     {
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
-            ?? throw new InvalidOperationException("Nenhuma rotina em aberto para este usuario.");
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
 
         if (!Enum.TryParse<TaskType>(request.Type, ignoreCase: true, out var type))
-            throw new InvalidOperationException($"Tipo de tarefa invalido: {request.Type}");
+            throw new ValidationException($"Tipo de tarefa invalido: {request.Type}");
         if (!Enum.TryParse<TaskPeriod>(request.Period, ignoreCase: true, out var period))
-            throw new InvalidOperationException($"Periodo invalido: {request.Period}");
+            throw new ValidationException($"Periodo invalido: {request.Period}");
         ValidatePoints(request.Points);
         if (string.IsNullOrWhiteSpace(request.Title))
-            throw new InvalidOperationException("O titulo da tarefa e obrigatorio.");
+            throw new ValidationException("O titulo da tarefa e obrigatorio.");
+        var options = TaskTemplateService.ParseOptions(request.Options);
+        var reason = TaskTemplateService.ParseReason(request.Reason);
         await EnsureChildPermissionAsync(userId, actorRole, p => p.CanCreateTasks);
 
         var actorRoleEnum = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
@@ -245,6 +298,8 @@ public class DailyRoutineService : IDailyRoutineService
             Order = routine.Tasks.Count + 1,
             Active = false,
             Recurrence = "daily",
+            Options = options,
+            Reason = reason,
             CreatedBy = actorId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -262,6 +317,8 @@ public class DailyRoutineService : IDailyRoutineService
             Order = routine.Tasks.Count + 1,
             Points = request.Points,
             Status = TaskItemStatus.Pending,
+            Options = options,
+            Reason = reason,
             CompletedAt = null,
             CreatedBy = actorId.ToString(),
             Origin = actorRole.ToLowerInvariant(),
@@ -294,7 +351,7 @@ public class DailyRoutineService : IDailyRoutineService
         ObjectId userId, List<string> orderedTaskIds, ObjectId actorId, string actorRole)
     {
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
-            ?? throw new InvalidOperationException("Nenhuma rotina em aberto para este usuario.");
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
 
         await EnsureChildPermissionAsync(userId, actorRole, p => p.CanReorderTasks);
 
@@ -302,7 +359,7 @@ public class DailyRoutineService : IDailyRoutineService
         var requestedIds = orderedTaskIds.ToHashSet();
         if (!currentIds.SetEquals(requestedIds))
         {
-            throw new InvalidOperationException(
+            throw new ValidationException(
                 "A lista de ordenacao precisa conter exatamente as tarefas da rotina de hoje.");
         }
 
@@ -341,12 +398,12 @@ public class DailyRoutineService : IDailyRoutineService
         ValidatePoints(newPoints);
 
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
-            ?? throw new InvalidOperationException("Nenhuma rotina em aberto para este usuario.");
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
 
         await EnsureChildPermissionAsync(userId, actorRole, p => p.CanSetPoints);
 
         var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
-            ?? throw new InvalidOperationException($"Tarefa {taskId} nao encontrada na rotina atual.");
+            ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
 
         var oldPoints = task.Points;
         if (oldPoints == newPoints) return routine;
@@ -403,18 +460,20 @@ public class DailyRoutineService : IDailyRoutineService
         ObjectId userId, string taskId, DailyTaskUpdateRequest request, ObjectId actorId, string actorRole)
     {
         if (string.IsNullOrWhiteSpace(request.Title))
-            throw new InvalidOperationException("O titulo da tarefa e obrigatorio.");
+            throw new ValidationException("O titulo da tarefa e obrigatorio.");
         if (!Enum.TryParse<TaskType>(request.Type, true, out var type))
-            throw new InvalidOperationException($"Tipo de tarefa invalido: {request.Type}");
+            throw new ValidationException($"Tipo de tarefa invalido: {request.Type}");
         if (!Enum.TryParse<TaskPeriod>(request.Period, true, out var period))
-            throw new InvalidOperationException($"Periodo invalido: {request.Period}");
+            throw new ValidationException($"Periodo invalido: {request.Period}");
         ValidatePoints(request.Points);
+        var options = TaskTemplateService.ParseOptions(request.Options);
+        var reason = TaskTemplateService.ParseReason(request.Reason);
         await EnsureChildPermissionAsync(userId, actorRole, p => p.CanEditTasks);
 
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
-            ?? throw new InvalidOperationException("Nenhuma rotina em aberto para este usuario.");
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
         var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
-            ?? throw new InvalidOperationException($"Tarefa {taskId} nao encontrada na rotina atual.");
+            ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
 
         var oldPoints = task.Points;
         task.Title = request.Title.Trim();
@@ -422,6 +481,12 @@ public class DailyRoutineService : IDailyRoutineService
         task.Type = type;
         task.Period = period;
         task.Points = request.Points;
+        task.Options = options;
+        task.Reason = reason;
+        // Se a opcao escolhida antes nao existe mais na lista nova, descarta -- nao faz
+        // sentido manter uma "escolha" que nao e mais uma opcao valida da tarefa.
+        if (task.SelectedOption is not null && !options.Contains(task.SelectedOption))
+            task.SelectedOption = null;
         task.UpdatedAt = DateTime.UtcNow;
         routine.Stats = BuildStats(routine.Tasks);
         routine.PointsEarned = routine.Tasks.Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null).Sum(t => t.Points);
@@ -450,9 +515,9 @@ public class DailyRoutineService : IDailyRoutineService
     {
         await EnsureChildPermissionAsync(userId, actorRole, p => p.CanDeleteTasks);
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
-            ?? throw new InvalidOperationException("Nenhuma rotina em aberto para este usuario.");
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
         var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
-            ?? throw new InvalidOperationException($"Tarefa {taskId} nao encontrada na rotina atual.");
+            ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
 
         var wasDone = task.Status == TaskItemStatus.Done;
         task.DeletedAt = DateTime.UtcNow;
@@ -496,7 +561,7 @@ public class DailyRoutineService : IDailyRoutineService
     public async Task<DailyRoutine> PauseGameTimerAsync(ObjectId userId, ObjectId actorId, string actorRole)
     {
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
-            ?? throw new InvalidOperationException("Nenhuma rotina em aberto para este usuario.");
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
 
         if (routine.GameTimerUnlockedAt is null || routine.GameTimerPausedAt is not null)
             return routine; // nada pra pausar, ou ja esta pausado
@@ -510,7 +575,7 @@ public class DailyRoutineService : IDailyRoutineService
     public async Task<DailyRoutine> ResumeGameTimerAsync(ObjectId userId, ObjectId actorId, string actorRole)
     {
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
-            ?? throw new InvalidOperationException("Nenhuma rotina em aberto para este usuario.");
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
 
         if (routine.GameTimerPausedAt is null)
             return routine; // ja esta rodando
@@ -528,7 +593,7 @@ public class DailyRoutineService : IDailyRoutineService
             throw new UnauthorizedAccessException("Ajustar o tempo do game timer e restrito ao painel adulto.");
 
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
-            ?? throw new InvalidOperationException("Nenhuma rotina em aberto para este usuario.");
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
 
         await SyncGameTimerAsync(routine, userId); // garante GameTimerMinutes atualizado antes do clamp
 
@@ -538,6 +603,43 @@ public class DailyRoutineService : IDailyRoutineService
         routine.GameTimerExtraMinutes = totalMinutes < 0
             ? -routine.GameTimerMinutes
             : proposedExtra;
+
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        return routine;
+    }
+
+    // Chaves semanticas dos icones disponiveis pra reacao (ver DailyReaction.Icon) —
+    // frontend mapeia cada uma pro emoji + frase padrao (ver pacus/habitat.js).
+    public static readonly HashSet<string> AllowedReactionIcons = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "heart", "clap", "star", "hug"
+    };
+
+    // Vinculo (relatedness -- ver docs/PROPOSITO.md e DailyReaction). Restrito a adulto;
+    // um por dia -- reagir de novo no mesmo dia substitui a reacao anterior (nao acumula,
+    // granularidade "por dia" escolhida pelo dono do produto). Nao trava nada, nao gera
+    // pontos -- e so vinculo, sem virar mais um mecanismo de recompensa.
+    public async Task<DailyRoutine> SetReactionAsync(
+        ObjectId userId, string icon, string? message, ObjectId actorId, string actorRole)
+    {
+        if (!actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase))
+            throw new UnauthorizedAccessException("Reagir ao dia e restrito ao painel adulto.");
+
+        icon ??= string.Empty;
+        if (!AllowedReactionIcons.Contains(icon))
+            throw new ValidationException(
+                $"Icone de reacao invalido: {icon}. Use um destes: {string.Join(", ", AllowedReactionIcons)}.");
+
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
+
+        routine.Reaction = new DailyReaction
+        {
+            Icon = icon.ToLowerInvariant(),
+            Message = string.IsNullOrWhiteSpace(message) ? null : message.Trim(),
+            CreatedBy = actorId,
+            CreatedAt = DateTime.UtcNow,
+        };
 
         await _dailyRoutineRepository.UpdateAsync(routine);
         return routine;
@@ -568,10 +670,61 @@ public class DailyRoutineService : IDailyRoutineService
     private static ObjectId? TryParseObjectId(string? value) =>
         ObjectId.TryParse(value, out var id) ? id : null;
 
+    // Data operacional "YYYY-MM-DD" -> dia da semana. DateTime.ParseExact e suficiente
+    // aqui (nao precisa de timezone: a data ja veio resolvida no timezone da familia
+    // por TimezoneHelper.GetOperationalDate antes de chegar em qualquer chamador).
+    private static DayOfWeek ParseDayOfWeek(string date) =>
+        DateTime.ParseExact(date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture).DayOfWeek;
+
+    // Decide se/como um TaskTemplate aparece num dia especifico, de acordo com
+    // Recurrence. Retorna null quando a recorrencia nao inclui esse dia da semana
+    // (o chamador deve pular esse template pra essa data). Titulo/descricao/pontos
+    // no retorno ja vem resolvidos (iguais ao template, exceto em
+    // RecurrenceWeekdayRotation, onde titulo/descricao vem da variante do dia, e
+    // os pontos tambem vem da variante quando ela define um valor proprio --
+    // ex.: uma missao que exige supervisao de adulto pode valer mais que outra).
+    private static ResolvedTemplateContent? ResolveTemplateForDay(TaskTemplate template, DayOfWeek dayOfWeek)
+    {
+        var isWeekend = dayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+
+        if (template.Recurrence.Equals(TaskTemplate.RecurrenceWeekday, StringComparison.OrdinalIgnoreCase))
+        {
+            return isWeekend ? null : new ResolvedTemplateContent(template.Title, template.Description, template.Points);
+        }
+
+        if (template.Recurrence.Equals(TaskTemplate.RecurrenceWeekend, StringComparison.OrdinalIgnoreCase))
+        {
+            return isWeekend ? new ResolvedTemplateContent(template.Title, template.Description, template.Points) : null;
+        }
+
+        if (template.Recurrence.Equals(TaskTemplate.RecurrenceWeekdayRotation, StringComparison.OrdinalIgnoreCase))
+        {
+            var variant = template.Variants.FirstOrDefault(v => v.DayOfWeek == dayOfWeek);
+            return variant is null
+                ? null
+                : new ResolvedTemplateContent(variant.Title, variant.Description, variant.Points ?? template.Points);
+        }
+
+        if (template.Recurrence.Equals(TaskTemplate.RecurrenceCustom, StringComparison.OrdinalIgnoreCase))
+        {
+            // Mesmo conteudo do template todo dia escolhido -- so a lista de dias
+            // muda (ex.: "Ingles" so terca e quarta, "Escoteiro" so sabado).
+            return template.CustomDays.Contains(dayOfWeek)
+                ? new ResolvedTemplateContent(template.Title, template.Description, template.Points)
+                : null;
+        }
+
+        // RecurrenceDaily (ou qualquer valor desconhecido/legado): comportamento
+        // original, todo dia, com o conteudo do proprio template.
+        return new ResolvedTemplateContent(template.Title, template.Description, template.Points);
+    }
+
+    private sealed record ResolvedTemplateContent(string Title, string? Description, int Points);
+
     private static void ValidatePoints(int points)
     {
         if (points == 0 || points < -10 || points > 10)
-            throw new InvalidOperationException(
+            throw new ValidationException(
                 "Cada tarefa deve valer entre 1 e 10 Pacus Points, ou entre -1 e -10 (penalidade). Zero nao e permitido.");
     }
 

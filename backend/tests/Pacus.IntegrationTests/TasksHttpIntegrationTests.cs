@@ -19,6 +19,187 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
         _mongo = mongo;
     }
 
+    // Recorrencia "weekday_rotation" (ex.: Momento Criativo, uma atividade diferente
+    // por dia util) e nova nesta mudanca -- este teste confere o contrato HTTP de
+    // ponta a ponta: nomes de dia da semana em ingles minusculo na ida (o
+    // JsonStringEnumConverter do Program.cs usa CamelCase) precisam ser aceitos pelo
+    // Enum.TryParse(ignoreCase:true) do TaskTemplateService, e o retorno inclui
+    // recurrence + variants (a logica de materializar por dia fica coberta nos
+    // testes unitarios de DailyRoutineService, que conseguem controlar a data --
+    // aqui so valida o formato JSON de fato trafegado pela API).
+    [Fact]
+    public async Task Create_WeekdayRotation_ShouldPersistRecurrenceAndVariants()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/tasks",
+            new
+            {
+                title = "Momento Criativo",
+                description = (string?)null,
+                type = "challenge",
+                period = "afternoon",
+                points = 3,
+                recurrence = "weekday_rotation",
+                variants = new[]
+                {
+                    new { dayOfWeek = "monday", title = "Missão Detetive", description = (string?)null },
+                    new { dayOfWeek = "tuesday", title = "Desafio Engenheiro", description = (string?)null },
+                    new { dayOfWeek = "wednesday", title = "Chef por um Dia", description = (string?)null },
+                    new { dayOfWeek = "thursday", title = "Inventor Maluco", description = (string?)null },
+                    new { dayOfWeek = "friday", title = "Missão 20 Minutos", description = (string?)null },
+                }
+            });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal("weekday_rotation", body.GetProperty("recurrence").GetString());
+
+        var variants = body.GetProperty("variants").EnumerateArray().ToList();
+        Assert.Equal(5, variants.Count);
+        Assert.Equal("monday", variants[0].GetProperty("dayOfWeek").GetString());
+        Assert.Equal("Missão Detetive", variants[0].GetProperty("title").GetString());
+    }
+
+    // Points por variante (override do valor do template) e novo nesta mudanca --
+    // pedido do usuario pra poder valer mais em missoes que exigem supervisao de
+    // adulto. So testa o contrato JSON (a resolucao null-usa-o-do-template ja fica
+    // coberta em unit tests, que conseguem controlar a data materializada).
+    [Fact]
+    public async Task Create_WeekdayRotation_VariantWithOwnPoints_ShouldOverrideTemplatePoints()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/tasks",
+            new
+            {
+                title = "Momento Criativo",
+                description = (string?)null,
+                type = "challenge",
+                period = "afternoon",
+                points = 3,
+                recurrence = "weekday_rotation",
+                variants = new object[]
+                {
+                    new { dayOfWeek = "monday", title = "Missão Detetive", description = (string?)null },
+                    new { dayOfWeek = "wednesday", title = "Chef por um Dia", description = (string?)null, points = 5 },
+                }
+            });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var variants = body.GetProperty("variants").EnumerateArray().ToList();
+
+        var monday = variants.Single(v => v.GetProperty("dayOfWeek").GetString() == "monday");
+        Assert.False(monday.TryGetProperty("points", out var mondayPoints) && mondayPoints.ValueKind != JsonValueKind.Null);
+
+        var wednesday = variants.Single(v => v.GetProperty("dayOfWeek").GetString() == "wednesday");
+        Assert.Equal(5, wednesday.GetProperty("points").GetInt32());
+    }
+
+    [Fact]
+    public async Task Create_WeekdayRotation_WithSaturdayVariant_ShouldBeRejected()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/tasks",
+            new
+            {
+                title = "Momento Criativo",
+                description = (string?)null,
+                type = "challenge",
+                period = "afternoon",
+                points = 3,
+                recurrence = "weekday_rotation",
+                variants = new[]
+                {
+                    new { dayOfWeek = "saturday", title = "Passeio em família", description = (string?)null },
+                }
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    // Recorrencia "custom" (dias especificos, mesmo conteudo em todos -- ex.:
+    // "Inglês" so terca e quarta, "Escoteiro" so sabado) e nova nesta mudanca.
+    // Mesmo proposito do teste de weekday_rotation acima: validar o contrato JSON
+    // (nomes de dia em ingles minusculo) de ponta a ponta via HTTP real.
+    [Fact]
+    public async Task Create_CustomRecurrence_ShouldPersistCustomDays()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/tasks",
+            new
+            {
+                title = "Inglês",
+                description = (string?)null,
+                type = "challenge",
+                period = "afternoon",
+                points = 3,
+                recurrence = "custom",
+                customDays = new[] { "tuesday", "wednesday" }
+            });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal("custom", body.GetProperty("recurrence").GetString());
+
+        var customDays = body.GetProperty("customDays").EnumerateArray()
+            .Select(d => d.GetString())
+            .ToList();
+        Assert.Equal(new[] { "tuesday", "wednesday" }, customDays);
+    }
+
+    [Fact]
+    public async Task Create_CustomRecurrence_WithoutDays_ShouldBeRejected()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/tasks",
+            new
+            {
+                title = "Escoteiro",
+                description = (string?)null,
+                type = "expected",
+                period = "morning",
+                points = 2,
+                recurrence = "custom"
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task Delete_OtherFamilysTemplate_ShouldNotBeAllowed()
     {
@@ -38,7 +219,7 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
         var deleteResponse = await clientB.DeleteAsync(
             $"/api/v1/tasks/{templateIdFromFamilyA}");
 
-        Assert.Equal(HttpStatusCode.BadRequest, deleteResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, deleteResponse.StatusCode);
 
         // Confirma que o template da Familia A continua ativo/intacto.
         var listResponse = await clientA.GetAsync("/api/v1/tasks");
@@ -75,7 +256,7 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
                 points = 1
             });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]

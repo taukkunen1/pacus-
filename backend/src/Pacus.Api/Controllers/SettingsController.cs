@@ -60,4 +60,57 @@ public class SettingsController : ControllerBase
 
         return Ok(new { settings.GameTimerEnabled, settings.GameTimerMinutes });
     }
+
+    // Calendario de estagios do PACUS (ex.: Egg 2026-08-26 -> Adult 2026-09-26), usado por
+    // DayClosingService.DetermineStage. Antes so dava pra configurar direto no Mongo/API crua
+    // (foi como corrigimos o estagio/tamanho manualmente); agora tem endpoint dedicado.
+    // Leitura liberada pros dois papeis, igual o game-timer acima.
+    [HttpGet("growth-stages")]
+    public async Task<IActionResult> GetGrowthStages()
+    {
+        var settings = await _settingsRepository.GetByUserIdAsync(_currentUser.FamilyId);
+        var stages = (settings?.GrowthStages ?? new List<GrowthStageConfig>())
+            .OrderBy(s => s.Date)
+            .Select(s => new GrowthStageConfigDto(s.Stage.ToString(), s.Date));
+
+        return Ok(stages);
+    }
+
+    // So o adulto configura. Substitui a lista inteira (mais simples e previsivel do que
+    // um patch parcial) -- o frontend sempre manda o calendario completo de volta.
+    [RequireRole(UserRole.Adult)]
+    [HttpPut("growth-stages")]
+    public async Task<IActionResult> UpdateGrowthStages([FromBody] UpdateGrowthStagesRequest request)
+    {
+        var parsed = new List<GrowthStageConfig>();
+        foreach (var stage in request.Stages)
+        {
+            if (!Enum.TryParse<PacusStage>(stage.Stage, ignoreCase: true, out var parsedStage))
+                return BadRequest(new { error = $"Estagio invalido: '{stage.Stage}'." });
+
+            if (!DateTime.TryParseExact(stage.Date, "yyyy-MM-dd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out _))
+                return BadRequest(new { error = $"Data invalida (use AAAA-MM-DD): '{stage.Date}'." });
+
+            parsed.Add(new GrowthStageConfig { Stage = parsedStage, Date = stage.Date });
+        }
+
+        var settings = await _settingsRepository.GetByUserIdAsync(_currentUser.FamilyId)
+            ?? new Settings
+            {
+                Id = ObjectId.GenerateNewId(),
+                FamilyId = _currentUser.FamilyId,
+                CreatedAt = DateTime.UtcNow,
+            };
+
+        settings.GrowthStages = parsed;
+        settings.UpdatedAt = DateTime.UtcNow;
+        await _settingsRepository.UpsertAsync(settings);
+
+        var result = settings.GrowthStages.OrderBy(s => s.Date)
+            .Select(s => new GrowthStageConfigDto(s.Stage.ToString(), s.Date));
+
+        return Ok(result);
+    }
 }

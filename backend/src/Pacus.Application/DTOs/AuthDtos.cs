@@ -7,3 +7,7 @@ public record AdultLoginRequest(string Email, string Password);
 public record ChildLoginRequest(string UserId, string Pin);
 
 public record AuthResponse(string Token, string UserId, string Role, string Name, DateTime ExpiresAt);
+
+public record ResetAdultPasswordRequest(string Email, string RecoveryCode, string NewPassword);
+
+public record ResetAdultPasswordResponse(string Message, string NewRecoveryCode);

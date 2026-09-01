@@ -1,6 +1,9 @@
 import {
   getStoreItems,
+  getAllStoreItems,
   createStoreItem,
+  updateStoreItem,
+  setStoreItemActive,
   requestRedemption,
   getPendingRedemptions,
   approveRedemption,
@@ -10,6 +13,8 @@ import { getPoints } from "../api/points-api.js";
 import { showToast } from "../components/toast.js";
 import { appState } from "../state/app-state.js";
 import { formatBrl } from "../utils/format.js";
+import { promptTextarea } from "../components/modal.js";
+import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
 
 const CATEGORIES = ["screen_time", "toy", "activity", "other"];
 const CATEGORY_LABELS = {
@@ -38,7 +43,8 @@ export async function renderStore(root, navigate = () => {}) {
   let balance = { balance: 0, brl: 0 };
 
   async function load() {
-    const requests = [getStoreItems(), getPoints()];
+    // Adulto ve tambem os itens desativados (pra poder reativar); crianca so ve os ativos.
+    const requests = [isAdult ? getAllStoreItems() : getStoreItems(), getPoints()];
     if (isAdult) requests.push(getPendingRedemptions());
 
     const results = await Promise.all(requests);
@@ -69,7 +75,7 @@ export async function renderStore(root, navigate = () => {}) {
       </div>
 
       <div id="store-items">
-        ${renderItems(items, balance.balance)}
+        ${renderItems(items, balance.balance, isAdult)}
       </div>
 
       ${isAdult ? `
@@ -78,12 +84,15 @@ export async function renderStore(root, navigate = () => {}) {
           ${renderPending(pending)}
         </div>
       ` : ""}
+
+      ${renderBottomNav("store")}
     `;
 
     attachHandlers();
+    attachBottomNav(content, navigate);
   }
 
-  function renderItems(list, currentBalance) {
+  function renderItems(list, currentBalance, isAdultView) {
     if (!list.length) {
       return `<p class="task-empty">Nenhum item na loja ainda.</p>`;
     }
@@ -97,9 +106,21 @@ export async function renderStore(root, navigate = () => {}) {
         const screenTimeNote = item.screenTimeMinutes
           ? `<span>+${item.screenTimeMinutes}min de tela</span>`
           : "";
+        const inactiveNote = item.active === false ? `<span>desativado</span>` : "";
+
+        const adultActions = isAdultView
+          ? `
+            <button class="btn btn-ghost" data-store-action="edit" data-item-id="${escapeHtml(String(item.id))}">
+              Editar
+            </button>
+            <button class="btn btn-ghost" data-store-action="toggle-active" data-item-id="${escapeHtml(String(item.id))}" data-active="${item.active !== false}">
+              ${item.active === false ? "Reativar" : "Desativar"}
+            </button>
+          `
+          : "";
 
         return `
-          <article class="task-card">
+          <article class="task-card${item.active === false ? " task-card--inactive" : ""}">
             <div class="task-card__content">
               <strong class="task-title">
                 ${item.icon ? `${escapeHtml(item.icon)} ` : ""}${escapeHtml(item.title)}
@@ -112,19 +133,23 @@ export async function renderStore(root, navigate = () => {}) {
                 <span>${item.cost} PP</span>
                 ${limitNote}
                 ${screenTimeNote}
+                ${inactiveNote}
                 ${item.stock !== null && item.stock !== undefined ? `<span>estoque: ${item.stock}</span>` : ""}
               </div>
             </div>
 
             <div class="task-actions">
-              <button
-                class="btn ${affordable ? "btn-primary" : "btn-ghost"}"
-                data-store-action="redeem"
-                data-item-id="${escapeHtml(String(item.id))}"
-                ${affordable ? "" : "disabled"}
-              >
-                Resgatar
-              </button>
+              ${item.active !== false ? `
+                <button
+                  class="btn ${affordable ? "btn-primary" : "btn-ghost"}"
+                  data-store-action="redeem"
+                  data-item-id="${escapeHtml(String(item.id))}"
+                  ${affordable ? "" : "disabled"}
+                >
+                  Resgatar
+                </button>
+              ` : ""}
+              ${adultActions}
             </div>
           </article>
         `;
@@ -171,76 +196,51 @@ export async function renderStore(root, navigate = () => {}) {
     content.querySelector("#back")?.addEventListener("click", () => navigate("today"));
 
     content.querySelector("#add-item")?.addEventListener("click", async () => {
-      const title = window.prompt("Nome do item:");
-      if (!title?.trim()) return;
-
-      const descriptionRaw = window.prompt("Descrição (opcional):", "");
-
-      const cost = Number(window.prompt("Custo em Pacus Points:", "100"));
-      if (!Number.isInteger(cost) || cost <= 0) {
-        showToast("Custo inválido. Use um número inteiro maior que zero.", { error: true });
-        return;
-      }
-
-      const category = window
-        .prompt(`Categoria: ${CATEGORIES.join(", ")}`, "other")
-        ?.trim()
-        .toLowerCase();
-
-      if (!CATEGORIES.includes(category)) {
-        showToast(`Categoria inválida. Use uma de: ${CATEGORIES.join(", ")}.`, { error: true });
-        return;
-      }
-
-      const icon = window.prompt("Emoji do item (opcional):", "") || null;
-
-      const stockRaw = window.prompt(
-        "Estoque (deixe em branco para ilimitado):",
-        ""
-      );
-      const stock = stockRaw?.trim() ? Number(stockRaw) : null;
-      if (stock !== null && (!Number.isInteger(stock) || stock <= 0)) {
-        showToast("Estoque inválido. Deixe em branco para ilimitado ou use um número inteiro maior que zero.", { error: true });
-        return;
-      }
-
-      const dailyLimitRaw = window.prompt(
-        "Limite de resgates por dia (deixe em branco para sem limite):",
-        ""
-      );
-      const dailyLimit = dailyLimitRaw?.trim() ? Number(dailyLimitRaw) : null;
-      if (dailyLimit !== null && (!Number.isInteger(dailyLimit) || dailyLimit <= 0)) {
-        showToast("Limite diário inválido. Deixe em branco para sem limite ou use um número inteiro maior que zero.", { error: true });
-        return;
-      }
-
-      const screenTimeRaw = window.prompt(
-        "Minutos de tempo de tela concedidos ao aprovar (deixe em branco se não for tempo de tela):",
-        category === "screen_time" ? "60" : ""
-      );
-      const screenTimeMinutes = screenTimeRaw?.trim() ? Number(screenTimeRaw) : null;
-      if (screenTimeMinutes !== null && (!Number.isInteger(screenTimeMinutes) || screenTimeMinutes <= 0)) {
-        showToast("Minutos de tela inválidos. Deixe em branco ou use um número inteiro maior que zero.", { error: true });
-        return;
-      }
+      const payload = await promptItemFields();
+      if (!payload) return;
 
       try {
-        await createStoreItem({
-          title: title.trim(),
-          description: descriptionRaw?.trim() || null,
-          cost,
-          category,
-          icon,
-          stock,
-          dailyLimit,
-          screenTimeMinutes
-        });
-
+        await createStoreItem(payload);
         showToast("Item criado.");
         await refresh();
       } catch (err) {
         showToast(err.message, { error: true });
       }
+    });
+
+    content.querySelectorAll("[data-store-action=edit]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const itemId = button.dataset.itemId;
+        const existing = items.find((item) => String(item.id) === itemId);
+        if (!itemId || !existing) return;
+
+        const payload = await promptItemFields(existing);
+        if (!payload) return;
+
+        try {
+          await updateStoreItem(itemId, payload);
+          showToast("Item atualizado.");
+          await refresh();
+        } catch (err) {
+          showToast(err.message, { error: true });
+        }
+      });
+    });
+
+    content.querySelectorAll("[data-store-action=toggle-active]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const itemId = button.dataset.itemId;
+        const isCurrentlyActive = button.dataset.active === "true";
+        if (!itemId) return;
+
+        try {
+          await setStoreItemActive(itemId, !isCurrentlyActive);
+          showToast(isCurrentlyActive ? "Item desativado." : "Item reativado.");
+          await refresh();
+        } catch (err) {
+          showToast(err.message, { error: true });
+        }
+      });
     });
 
     content.querySelectorAll("[data-store-action=redeem]").forEach((button) => {
@@ -287,6 +287,80 @@ export async function renderStore(root, navigate = () => {}) {
         }
       });
     });
+  }
+
+  // Usado tanto por "+ Novo item" quanto por "Editar" -- se `existing` for passado, os
+  // prompts vem pre-preenchidos com os valores atuais do item. Devolve null se o adulto
+  // cancelar em qualquer etapa (mesmo padrão dos outros fluxos baseados em window.prompt).
+  async function promptItemFields(existing = null) {
+    const title = window.prompt("Nome do item:", existing?.title ?? "");
+    if (!title?.trim()) return null;
+
+    const descriptionRaw = await promptTextarea({
+      title: "Descrição do item",
+      label: "Descrição (opcional) — um item por linha",
+      value: existing?.description ?? "",
+      placeholder: "Ex.: válido só aos fins de semana"
+    });
+
+    const cost = Number(window.prompt("Custo em Pacus Points:", String(existing?.cost ?? 100)));
+    if (!Number.isInteger(cost) || cost <= 0) {
+      showToast("Custo inválido. Use um número inteiro maior que zero.", { error: true });
+      return null;
+    }
+
+    const category = window
+      .prompt(`Categoria: ${CATEGORIES.join(", ")}`, existing?.category ?? "other")
+      ?.trim()
+      .toLowerCase();
+
+    if (!CATEGORIES.includes(category)) {
+      showToast(`Categoria inválida. Use uma de: ${CATEGORIES.join(", ")}.`, { error: true });
+      return null;
+    }
+
+    const icon = window.prompt("Emoji do item (opcional):", existing?.icon ?? "") || null;
+
+    const stockRaw = window.prompt(
+      "Estoque (deixe em branco para ilimitado):",
+      existing?.stock !== null && existing?.stock !== undefined ? String(existing.stock) : ""
+    );
+    const stock = stockRaw?.trim() ? Number(stockRaw) : null;
+    if (stock !== null && (!Number.isInteger(stock) || stock <= 0)) {
+      showToast("Estoque inválido. Deixe em branco para ilimitado ou use um número inteiro maior que zero.", { error: true });
+      return null;
+    }
+
+    const dailyLimitRaw = window.prompt(
+      "Limite de resgates por dia (deixe em branco para sem limite):",
+      existing?.dailyLimit ? String(existing.dailyLimit) : ""
+    );
+    const dailyLimit = dailyLimitRaw?.trim() ? Number(dailyLimitRaw) : null;
+    if (dailyLimit !== null && (!Number.isInteger(dailyLimit) || dailyLimit <= 0)) {
+      showToast("Limite diário inválido. Deixe em branco para sem limite ou use um número inteiro maior que zero.", { error: true });
+      return null;
+    }
+
+    const screenTimeRaw = window.prompt(
+      "Minutos de tempo de tela concedidos ao aprovar (deixe em branco se não for tempo de tela):",
+      existing?.screenTimeMinutes ? String(existing.screenTimeMinutes) : (category === "screen_time" ? "60" : "")
+    );
+    const screenTimeMinutes = screenTimeRaw?.trim() ? Number(screenTimeRaw) : null;
+    if (screenTimeMinutes !== null && (!Number.isInteger(screenTimeMinutes) || screenTimeMinutes <= 0)) {
+      showToast("Minutos de tela inválidos. Deixe em branco ou use um número inteiro maior que zero.", { error: true });
+      return null;
+    }
+
+    return {
+      title: title.trim(),
+      description: descriptionRaw?.trim() || null,
+      cost,
+      category,
+      icon,
+      stock,
+      dailyLimit,
+      screenTimeMinutes
+    };
   }
 
   try {

@@ -6,7 +6,8 @@ import {
   getPacus,
   pauseGameTimer,
   resumeGameTimer,
-  adjustGameTimer
+  adjustGameTimer,
+  setDailyReaction
 } from "../api/pacus-api.js";
 
 import {
@@ -14,10 +15,12 @@ import {
   createTask,
   updateDailyTask,
   deleteDailyTask,
-  reorderDailyTasks
+  reorderDailyTasks,
+  selectTaskOption
 } from "../api/tasks-api.js";
 
-import { renderTank } from "../pacus/habitat.js";
+import { getPendingRedemptions } from "../api/store-api.js";
+import { renderTank, REACTION_ICONS } from "../pacus/habitat.js";
 import { renderTaskSection } from "../components/task-list.js";
 import { formatOperationalDate } from "../utils/date.js";
 import {
@@ -26,8 +29,12 @@ import {
   typeLabel
 } from "../utils/format.js";
 import { showToast } from "../components/toast.js";
+import { pickEffortMessage } from "../utils/effort-messages.js";
 import { appState } from "../state/app-state.js";
 import { isValidPoints, POINTS_HELP_TEXT } from "../utils/validation.js";
+import { promptTextarea, showMessageModal } from "../components/modal.js";
+import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
+import { withSlowLoadHint, SLOW_LOAD_MESSAGE } from "../utils/slow-load-hint.js";
 
 const PERIODS = [
   "morning",
@@ -77,18 +84,124 @@ function promptForPoints(defaultValue) {
   return points;
 }
 
-// Pede a descricao (opcional) da tarefa. Retorna undefined se a pessoa
-// cancelar o prompt (o chamador deve abortar nesse caso — undefined, e nao
-// null, porque null e um valor valido aqui: "sem descricao").
-function promptForDescription(currentValue) {
-  const raw = window.prompt(
-    "Descrição da tarefa (opcional):",
-    currentValue ?? ""
-  );
+// Pede a descricao (opcional) da tarefa, num modal com textarea (window.prompt
+// so aceita uma linha, o que nao serve pra descricoes com varios itens, um
+// por linha). Retorna undefined se a pessoa cancelar (o chamador deve abortar
+// nesse caso — undefined, e nao null, porque null e um valor valido aqui:
+// "sem descricao").
+async function promptForDescription(currentValue) {
+  const raw = await promptTextarea({
+    title: "Descrição da tarefa",
+    label: "Descrição (opcional) — um item por linha",
+    value: currentValue ?? "",
+    placeholder: "Ex.: 48 ÷ 6 = ___\n72 ÷ 8 = ___"
+  });
 
   if (raw === null) return undefined;
 
   return raw.trim() || null;
+}
+
+// Pergunta as opcoes de escolha (2-4) que a crianca vai poder selecionar
+// antes de concluir a tarefa (Teoria da Autodeterminacao -- docs/PROPOSITO.md).
+// Opcional: cancelar/deixar em branco na primeira pergunta = tarefa sem
+// opcoes (comportamento normal). Retorna null se a pessoa cancelar depois de
+// ja ter comecado a preencher (o chamador deve abortar a criacao/edicao
+// inteira nesse caso, igual aos outros prompts desta tela).
+function promptForOptions(currentOptions) {
+  const hasCurrent = Array.isArray(currentOptions) && currentOptions.length > 0;
+
+  const wantsOptions = window.confirm(
+    hasCurrent
+      ? "Esta tarefa tem opções pra escolher. Editar as opções?\n\nOK = Sim\nCancelar = Manter como está"
+      : "Adicionar opções pra criança escolher entre missões (ex.: torre de copos / ponte de papel)?\n\nOK = Sim\nCancelar = Não, tarefa comum"
+  );
+
+  if (!wantsOptions) {
+    return hasCurrent ? currentOptions : [];
+  }
+
+  const options = [];
+  for (let i = 1; i <= 4; i++) {
+    const suggestion = currentOptions?.[i - 1] ?? "";
+    const raw = window.prompt(
+      `Opção ${i}${i > 2 ? " (deixe em branco pra parar)" : ""}:`,
+      suggestion
+    );
+
+    if (raw === null) return null;
+
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      if (i <= 2) {
+        showToast(
+          "Uma tarefa com opções precisa de pelo menos 2.",
+          { error: true }
+        );
+        return null;
+      }
+      break;
+    }
+
+    options.push(trimmed);
+  }
+
+  return options;
+}
+
+// Pergunta o "por que isso importa" da tarefa -- parentalidade autonomo-
+// suportiva (Joussemet, Landry & Koestner 2008; ver docs/PROPOSITO.md): dar a
+// razao por tras da regra, nao so a regra. Opcional, uma frase curta (window.
+// prompt de uma linha e suficiente aqui -- diferente da descricao, que pode
+// ter varios itens). Retorna null se cancelado (sem alterar o motivo atual).
+function promptForReason(currentValue) {
+  const raw = window.prompt(
+    "Por que essa tarefa importa? (opcional — o que a criança vê como motivo, não como fazer)",
+    currentValue ?? ""
+  );
+
+  if (raw === null) return currentValue ?? null;
+
+  return raw.trim() || null;
+}
+
+const REACTION_ORDER = ["heart", "clap", "star", "hug"];
+
+// Fluxo do adulto pra reagir ao dia (relatedness -- ver docs/PROPOSITO.md e
+// pacus/habitat.js): escolhe um icone (numero, mesmo padrao de promptForType) e recebe
+// a frase padrao daquele icone pra editar ou manter -- baixo atrito, mas ainda pessoal.
+// Retorna null se cancelar em qualquer etapa (o chamador deve abortar).
+async function promptForReactionChoice(currentReaction) {
+  const menuLines = REACTION_ORDER
+    .map((key, i) => `${i + 1}) ${REACTION_ICONS[key].emoji} ${REACTION_ICONS[key].label}`)
+    .join("\n");
+
+  const currentIndex = currentReaction
+    ? REACTION_ORDER.indexOf(currentReaction.icon)
+    : -1;
+
+  const choice = window.prompt(
+    `Como foi o dia da criança hoje?\n${menuLines}`,
+    String(currentIndex >= 0 ? currentIndex + 1 : 1)
+  );
+
+  if (choice === null) return null;
+
+  const icon = REACTION_ORDER[Number(choice.trim()) - 1] ?? REACTION_ORDER[0];
+
+  const suggestion =
+    currentReaction?.icon === icon
+      ? currentReaction.message ?? REACTION_ICONS[icon].defaultMessage
+      : REACTION_ICONS[icon].defaultMessage;
+
+  const message = window.prompt(
+    "Quer personalizar a mensagem? (opcional — deixe como está, edite, ou apague tudo pra deixar só o ícone)",
+    suggestion
+  );
+
+  if (message === null) return null;
+
+  return { icon, message: message.trim() || null };
 }
 
 function formatGameTimerRemaining(remainingMs) {
@@ -143,10 +256,16 @@ export async function renderHome(
 
   try {
     [routine, balance] =
-      await Promise.all([
-        getTodayRoutine(),
-        getPointsBalance()
-      ]);
+      await withSlowLoadHint(
+        Promise.all([
+          getTodayRoutine(),
+          getPointsBalance()
+        ]),
+        () => {
+          const loadingEl = content.querySelector("p.task-empty");
+          if (loadingEl) loadingEl.textContent = SLOW_LOAD_MESSAGE;
+        }
+      );
   } catch (err) {
     content.innerHTML = `
       <p class="error-text">
@@ -165,6 +284,17 @@ export async function renderHome(
     console.warn("PACUS nao encontrado. A tela de hoje continuara sem o estagio do PACUS.", err);
   }
 
+  // Numerozinho na aba "Loja" avisando o adulto de resgate(s) aguardando aprovacao --
+  // so uma contagem leve, sem mudar nada na tela de hoje em si.
+  let pendingRedemptionsCount = 0;
+  if (isAdult) {
+    try {
+      const pending = await getPendingRedemptions();
+      pendingRedemptionsCount = pending?.length ?? 0;
+    } catch (err) {
+      console.warn("Nao foi possivel carregar resgates pendentes.", err);
+    }
+  }
 
   function totalTasks() {
     return routine.tasks.filter(
@@ -374,7 +504,7 @@ export async function renderHome(
         </div>
       </div>
 
-      ${renderTank(pacus)}
+      ${renderTank(pacus, undefined, { reaction: routine.reaction, isAdult })}
 
       ${renderGameTimer()}
 
@@ -447,46 +577,10 @@ export async function renderHome(
         </div>
       </div>
 
-      <nav
-        class="bottom-nav"
-        aria-label="Navegação principal"
-      >
-        <button
-          data-nav="today"
-          class="is-active"
-          type="button"
-        >
-          Hoje
-        </button>
-
-        <button
-          data-nav="history"
-          type="button"
-        >
-          Histórico
-        </button>
-
-        <button
-          data-nav="points"
-          type="button"
-        >
-          Pontos
-        </button>
-
-        <button
-          data-nav="pacus"
-          type="button"
-        >
-          PACUS
-        </button>
-
-        <button
-          data-nav="store"
-          type="button"
-        >
-          Loja
-        </button>
-      </nav>
+      ${renderBottomNav("today", {
+        today: !isAdult ? Math.max(0, totalTasks() - doneTasks()) : 0,
+        store: isAdult ? pendingRedemptionsCount : 0
+      })}
     `;
 
     attachHandlers();
@@ -542,20 +636,46 @@ export async function renderHome(
         );
       });
 
-    content
-      .querySelectorAll("[data-nav]")
-      .forEach((button) => {
-        button.addEventListener(
-          "click",
-          () => {
-            location.hash =
-              button.dataset.nav;
+    attachBottomNav(content, navigate);
 
-            navigate(
-              button.dataset.nav
-            );
+    content
+      .querySelectorAll('[data-action="view-reaction"]')
+      .forEach((el) => {
+        const reveal = () => {
+          const reaction = routine.reaction;
+          if (!reaction) return;
+
+          const icon = REACTION_ICONS[reaction.icon];
+          showMessageModal({
+            title: `${icon?.emoji ?? "💬"} Mensagem de hoje`,
+            body: reaction.message || icon?.defaultMessage || "Alguém pensou em você hoje!"
+          });
+        };
+
+        el.addEventListener("click", reveal);
+        // role="button" (ver pacus/habitat.js) nao dispara "click" sozinho no teclado
+        // como um <button> de verdade -- sem isso, Tab+Enter nao revelava a mensagem.
+        el.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            reveal();
           }
-        );
+        });
+      });
+
+    content
+      .querySelector('[data-action="set-reaction"]')
+      ?.addEventListener("click", async () => {
+        const choice = await promptForReactionChoice(routine.reaction);
+        if (!choice) return;
+
+        try {
+          routine = await setDailyReaction(choice.icon, choice.message);
+          showToast("Reação registrada — o Pacus vai carregar isso com ele hoje.");
+          draw();
+        } catch (err) {
+          showToast(err.message, { error: true });
+        }
       });
 
     content
@@ -572,7 +692,7 @@ export async function renderHome(
             return;
           }
 
-          const description = promptForDescription(null);
+          const description = await promptForDescription(null);
           if (description === undefined) {
             return;
           }
@@ -587,6 +707,13 @@ export async function renderHome(
           if (!type) {
             return;
           }
+
+          const options = promptForOptions(null);
+          if (options === null) {
+            return;
+          }
+
+          const reason = promptForReason(null);
 
           // So o adulto pode transformar a tarefa em permanente (mexe nas
           // regras da familia) — o backend tambem bloqueia isso pra crianca.
@@ -603,7 +730,9 @@ export async function renderHome(
             description,
             type,
             period: activePeriod,
-            points
+            points,
+            options,
+            reason
           };
 
           try {
@@ -675,7 +804,7 @@ export async function renderHome(
               return;
             }
 
-            const description = promptForDescription(
+            const description = await promptForDescription(
               task.description
             );
             if (description === undefined) {
@@ -693,6 +822,13 @@ export async function renderHome(
               return;
             }
 
+            const options = promptForOptions(task.options);
+            if (options === null) {
+              return;
+            }
+
+            const reason = promptForReason(task.reason);
+
             try {
               routine =
                 await updateDailyTask(
@@ -704,7 +840,9 @@ export async function renderHome(
                     type,
                     period:
                       task.period,
-                    points
+                    points,
+                    options,
+                    reason
                   }
                 );
 
@@ -841,6 +979,44 @@ export async function renderHome(
       });
 
     content
+      .querySelectorAll(
+        "[data-task-action=select-option]"
+      )
+      .forEach((button) => {
+        button.addEventListener(
+          "click",
+          async () => {
+            const card =
+              button.closest(".task-card");
+
+            const taskId = card?.dataset.taskId;
+            if (!taskId) return;
+
+            const task = routine.tasks.find(
+              (item) => String(item.id) === String(taskId)
+            );
+            if (!task) return;
+
+            const chosen = button.dataset.optionValue;
+            // Clicar de novo na mesma opcao ja escolhida desmarca -- da pra
+            // criança mudar de ideia sem precisar de outra opcao "neutra".
+            const nextValue =
+              task.selectedOption === chosen ? null : chosen;
+
+            try {
+              routine = await selectTaskOption(taskId, nextValue);
+              draw();
+            } catch (err) {
+              showToast(
+                err.message,
+                { error: true }
+              );
+            }
+          }
+        );
+      });
+
+    content
       .querySelectorAll(".task-check")
       .forEach((button) => {
         button.addEventListener(
@@ -893,6 +1069,24 @@ export async function renderHome(
 
               balance =
                 await getPointsBalance();
+
+              // Reforço de ESFORÇO (nao de resultado/traço), so ao concluir -- ver
+              // utils/effort-messages.js e docs/PROPOSITO.md. Reabrir a tarefa nao
+              // mostra frase nenhuma, so o toggle silencioso de sempre.
+              if (willComplete) {
+                const justCompleted = routine.tasks.find(
+                  (item) => String(item.id) === String(taskId)
+                );
+
+                if (justCompleted) {
+                  const message = pickEffortMessage(
+                    justCompleted,
+                    routine.tasks
+                  );
+
+                  showToast(`${message} +${justCompleted.points} PP`);
+                }
+              }
 
               draw();
             } catch (err) {

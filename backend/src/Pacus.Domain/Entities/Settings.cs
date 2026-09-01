@@ -16,6 +16,16 @@ public class Settings
     // Constante exposta porque PointsController usa o mesmo fallback quando a familia
     // ainda nao tem um documento de Settings salvo (GetByUserIdAsync retorna null).
     public const double DefaultPointToBrlRate = 0.06;
+
+    // Taxa antiga, antes da mudanca de 0.05 -> 0.06. Nunca existiu (nem existe) um
+    // endpoint pra familia escolher essa taxa -- o valor so era gravado no Mongo de
+    // forma implicita, pelo default da propriedade C# no momento em que o documento
+    // de Settings era criado (ex.: ao ligar o tempo de jogo pela primeira vez). Toda
+    // familia cujo Settings foi criado antes dessa mudanca ficou com 0.05 congelado
+    // no banco pra sempre, mesmo depois do default do codigo virar 0.06. Exposta pra
+    // PointsController conseguir detectar e curar esse valor antigo na leitura.
+    public const double LegacyDefaultPointToBrlRate = 0.05;
+
     public double PointToBrlRate { get; set; } = DefaultPointToBrlRate;
     public List<GrowthStageConfig> GrowthStages { get; set; } = new();
     public ChildPermissions ChildPermissions { get; set; } = new();

@@ -1,4 +1,5 @@
 using MongoDB.Bson;
+using Pacus.Application.Exceptions;
 using Pacus.Application.Interfaces;
 using Pacus.Domain.Entities;
 using Pacus.Domain.Enums;
@@ -9,18 +10,26 @@ namespace Pacus.UnitTests.Fakes;
 
 public class FakeDailyRoutineRepository : IDailyRoutineRepository
 {
+    // Guarda clones (nao a mesma referencia que o service manipula) pra simular o
+    // isolamento de um round-trip real com o Mongo -- essencial pra poder testar a
+    // concorrencia otimista (achado #5 da auditoria de API de 2026-09-01, ver
+    // docs/ESTADO_ATUAL.md e DailyRoutineRepository.UpdateAsync): sem isso, duas
+    // "leituras" no teste devolveriam a mesma instancia em memoria e a mutacao de uma
+    // apareceria magicamente na outra, o que nunca acontece com o banco de verdade.
     private readonly List<DailyRoutine> _routines = new();
 
     public Task<DailyRoutine?> GetByUserAndDateAsync(ObjectId userId, string date) =>
         Task.FromResult(
             _routines.FirstOrDefault(
                 r => r.FamilyId == userId &&
-                     r.Date == date));
+                     r.Date == date) is { } found
+                ? Clone(found)
+                : null);
 
     public Task<DailyRoutine> CreateAsync(
         DailyRoutine routine)
     {
-        _routines.Add(routine);
+        _routines.Add(Clone(routine));
 
         return Task.FromResult(routine);
     }
@@ -28,22 +37,89 @@ public class FakeDailyRoutineRepository : IDailyRoutineRepository
     public Task UpdateAsync(
         DailyRoutine routine)
     {
+        var expectedVersion = routine.Version;
+
         var index =
             _routines.FindIndex(
-                r => r.Id == routine.Id);
+                r => r.Id == routine.Id && r.Version == expectedVersion);
 
-        if (index >= 0)
+        if (index < 0)
         {
-            _routines[index] = routine;
+            throw new ConflictException(
+                "Esta rotina foi alterada por outra requisicao enquanto isso era processado. Tente novamente.");
         }
+
+        routine.Version = expectedVersion + 1;
+        _routines[index] = Clone(routine);
 
         return Task.CompletedTask;
     }
 
-    public Task<List<DailyRoutine>> GetHistoryAsync(
+    private static DailyRoutine Clone(DailyRoutine source) => new()
+    {
+        Id = source.Id,
+        FamilyId = source.FamilyId,
+        Date = source.Date,
+        Timezone = source.Timezone,
+        Status = source.Status,
+        Tasks = source.Tasks.Select(CloneTask).ToList(),
+        Stats = new DailyRoutineStats
+        {
+            Mandatory = new TaskTypeStat { Done = source.Stats.Mandatory.Done, Total = source.Stats.Mandatory.Total },
+            Expected = new TaskTypeStat { Done = source.Stats.Expected.Done, Total = source.Stats.Expected.Total },
+            Challenge = new TaskTypeStat { Done = source.Stats.Challenge.Done, Total = source.Stats.Challenge.Total },
+            PointsEarned = source.Stats.PointsEarned,
+            CompletionRate = source.Stats.CompletionRate,
+        },
+        PointsEarned = source.PointsEarned,
+        ClosedAt = source.ClosedAt,
+        CreatedAt = source.CreatedAt,
+        GameTimerUnlockedAt = source.GameTimerUnlockedAt,
+        GameTimerExtraMinutes = source.GameTimerExtraMinutes,
+        GameTimerPausedAt = source.GameTimerPausedAt,
+        GameTimerPausedMs = source.GameTimerPausedMs,
+        Reaction = source.Reaction is null
+            ? null
+            : new DailyReaction
+            {
+                Icon = source.Reaction.Icon,
+                Message = source.Reaction.Message,
+                CreatedBy = source.Reaction.CreatedBy,
+                CreatedAt = source.Reaction.CreatedAt,
+            },
+        GameTimerEnabled = source.GameTimerEnabled,
+        GameTimerMinutes = source.GameTimerMinutes,
+        Version = source.Version,
+    };
+
+    private static DailyTask CloneTask(DailyTask t) => new()
+    {
+        Id = t.Id,
+        TaskTemplateId = t.TaskTemplateId,
+        Title = t.Title,
+        Description = t.Description,
+        Reason = t.Reason,
+        Type = t.Type,
+        Period = t.Period,
+        Order = t.Order,
+        Points = t.Points,
+        Status = t.Status,
+        Options = new List<string>(t.Options),
+        SelectedOption = t.SelectedOption,
+        CompletedAt = t.CompletedAt,
+        CreatedBy = t.CreatedBy,
+        Origin = t.Origin,
+        DeletedAt = t.DeletedAt,
+        CreatedAt = t.CreatedAt,
+        UpdatedAt = t.UpdatedAt,
+    };
+
+    public Task<(List<DailyRoutine> Items, long TotalCount)> GetHistoryAsync(
         ObjectId userId,
         string? from,
-        string? to)
+        string? to,
+        int page,
+        int pageSize)
     {
         var query =
             _routines.Where(
@@ -73,11 +149,20 @@ public class FakeDailyRoutineRepository : IDailyRoutineRepository
                             StringComparison.Ordinal) <= 0);
         }
 
-        return Task.FromResult(
+        var ordered =
             query
                 .OrderByDescending(
                     r => r.Date)
-                .ToList());
+                .ToList();
+
+        var page_ =
+            ordered
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(Clone)
+                .ToList();
+
+        return Task.FromResult((page_, (long)ordered.Count));
     }
 
     public Task<DailyRoutine?> GetLatestOpenAsync(
@@ -90,7 +175,9 @@ public class FakeDailyRoutineRepository : IDailyRoutineRepository
                         r.Status == RoutineStatus.Open)
                 .OrderByDescending(
                     r => r.Date)
-                .FirstOrDefault());
+                .FirstOrDefault() is { } found
+                ? Clone(found)
+                : null);
 
     public Task<List<DailyRoutine>> GetAllByFamilyAsync(
         ObjectId familyId) =>
@@ -98,6 +185,7 @@ public class FakeDailyRoutineRepository : IDailyRoutineRepository
             _routines
                 .Where(r => r.FamilyId == familyId)
                 .OrderByDescending(r => r.Date)
+                .Select(Clone)
                 .ToList());
 
     public Task DeleteAllByFamilyAsync(
@@ -234,17 +322,27 @@ public class FakePointTransactionRepository
                 .Sum(
                     t => t.Points));
 
-    public Task<List<PointTransaction>> GetHistoryAsync(
+    public Task<(List<PointTransaction> Items, long TotalCount)> GetHistoryAsync(
         ObjectId userId,
-        int limit = 100) =>
-        Task.FromResult(
+        int page,
+        int pageSize)
+    {
+        var ordered =
             Transactions
                 .Where(
                     t => t.FamilyId == userId)
                 .OrderByDescending(
                     t => t.CreatedAt)
-                .Take(limit)
-                .ToList());
+                .ToList();
+
+        var page_ =
+            ordered
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+        return Task.FromResult((page_, (long)ordered.Count));
+    }
 
     public Task<List<PointTransaction>> GetAllByFamilyAsync(
         ObjectId familyId) =>

@@ -1,6 +1,8 @@
 # PACUS
 
-PACUS é um aplicativo de rotina com histórico diário, tarefas dinâmicas, Pacus Points e crescimento independente do desempenho.
+PACUS é um sistema de apoio à rotina familiar que ajuda crianças a desenvolver autonomia, responsabilidade e hábitos positivos por meio de pequenas tarefas diárias, acompanhamento dos adultos e reforço positivo — sem transformar a rotina numa experiência de punição. Veja o propósito completo (e o porquê de decisões como "tarefa não concluída nunca desconta saldo") em [`docs/PROPOSITO.md`](docs/PROPOSITO.md).
+
+Na prática, hoje isso é um app de rotina com histórico diário, tarefas dinâmicas, Pacus Points e um bichinho virtual (o PACUS) que cresce independente do desempenho.
 
 ## Arquitetura
 
@@ -43,7 +45,7 @@ Sirva `frontend/` por um servidor HTTP, por exemplo `python -m http.server 5500 
 `.github/workflows/pages.yml` prepara deploy do frontend no GitHub Pages.
 
 ## Deploy da API
-`backend/Dockerfile` gera uma imagem ASP.NET Core 10. `deploy/docker-compose.yml` documenta a execução com MongoDB Atlas externo. O provedor de hospedagem da API ainda precisa ser escolhido.
+`backend/Dockerfile` gera uma imagem ASP.NET Core 10. `deploy/docker-compose.yml` documenta a execução com MongoDB Atlas externo. Hospedada em produção no Render (`pacus.onrender.com`).
 
 ## Segurança
 Nunca commitar senha do MongoDB, JWT secret ou connection strings reais. Checklist completo de segurança/LGPD em `docs/SECURITY_LGPD_CHECKLIST.md`.

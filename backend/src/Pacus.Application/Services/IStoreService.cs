@@ -8,6 +8,13 @@ public interface IStoreService
 {
     Task<StoreItem> CreateItemAsync(ObjectId familyId, ObjectId createdBy, CreateStoreItemRequest request);
 
+    // Edita um item existente da familia. Lanca InvalidOperationException se o item nao
+    // existir/for de outra familia, ou se os limites informados forem invalidos.
+    Task<StoreItem> UpdateItemAsync(ObjectId familyId, string itemId, CreateStoreItemRequest request);
+
+    // Ativa/desativa (nunca apaga -- resgates antigos continuam referenciando o item).
+    Task<StoreItem> SetItemActiveAsync(ObjectId familyId, string itemId, bool active);
+
     // Lanca InvalidOperationException se o item nao existe, estiver inativo, ou sem estoque.
     Task<Redemption> RequestRedemptionAsync(ObjectId familyId, ObjectId childId, ObjectId storeItemId);
 

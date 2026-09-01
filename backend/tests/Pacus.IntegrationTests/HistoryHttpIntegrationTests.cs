@@ -137,13 +137,16 @@ public sealed class HistoryHttpIntegrationTests
             HttpStatusCode.OK,
             response.StatusCode);
 
-        var history =
+        var body =
             await response.Content
                 .ReadFromJsonAsync<JsonElement>();
 
+        // Endpoint paginado (achado #4 da auditoria de API de 2026-09-01 -- ver
+        // docs/ESTADO_ATUAL.md): a resposta agora e um PagedResult, nao mais um
+        // array solto.
         Assert.Equal(
             JsonValueKind.Array,
-            history.ValueKind);
+            body.GetProperty("items").ValueKind);
     }
 
     [Fact]

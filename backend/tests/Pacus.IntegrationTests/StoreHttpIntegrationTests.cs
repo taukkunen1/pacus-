@@ -208,7 +208,7 @@ public class StoreHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
             });
 
         Assert.Equal(
-            HttpStatusCode.BadRequest,
+            HttpStatusCode.NotFound,
             response.StatusCode);
     }
 
@@ -592,7 +592,7 @@ public class StoreHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
             $"/api/v1/store/redemptions/{redemptionId}/approve",
             content: null);
 
-        Assert.Equal(HttpStatusCode.BadRequest, approveResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, approveResponse.StatusCode);
 
         // Confirma que o resgate da Familia A continua pendente (nao foi mexido).
         await LoginAdultAsync(client, familyA);
@@ -631,7 +631,7 @@ public class StoreHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
             $"/api/v1/store/redemptions/{redemptionId}/reject",
             content: null);
 
-        Assert.Equal(HttpStatusCode.BadRequest, rejectResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, rejectResponse.StatusCode);
     }
 
     [Fact]

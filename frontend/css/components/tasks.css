@@ -106,6 +106,10 @@
   font-size: var(--step-xs, 0.8rem);
   color: var(--text-on-dark-dim, rgba(234, 246, 243, 0.7));
   margin-top: 2px;
+  /* pre-line: preserva as quebras de linha digitadas no modal (HTML por
+     padrao colapsa \n em espaco) mas ainda deixa o texto quebrar
+     naturalmente se uma linha for mais larga que o card. */
+  white-space: pre-line;
 }
 .task-card.is-done .task-description {
   text-decoration: line-through;

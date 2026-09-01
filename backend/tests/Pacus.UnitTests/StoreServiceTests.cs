@@ -8,15 +8,28 @@ namespace Pacus.UnitTests;
 
 public class StoreServiceTests
 {
-    private static (StoreService store, FakeStoreRepository storeRepo, FakePointTransactionRepository pointsRepo)
+    private static (StoreService store, FakeStoreRepository storeRepo, FakePointTransactionRepository pointsRepo,
+        FakeDailyRoutineRepository routines)
         BuildSystem()
     {
         var storeRepo = new FakeStoreRepository();
         var pointsRepo = new FakePointTransactionRepository();
         var pointsService = new PointsService(pointsRepo);
         var auditLogRepo = new FakeAuditLogRepository();
-        var store = new StoreService(storeRepo, pointsService, auditLogRepo);
-        return (store, storeRepo, pointsRepo);
+
+        // Usado somente quando um item concede tempo de tela (ScreenTimeMinutes) --
+        // nenhum teste existente seta esse campo, entao esta dependencia fica ociosa
+        // ate os testes novos de "1 hora de tela" que a usam de proposito.
+        var routines = new FakeDailyRoutineRepository();
+        var dailyRoutineService = new DailyRoutineService(
+            routines,
+            new FakeTaskTemplateRepository(),
+            new FakeTaskEventRepository(),
+            new PointsService(new FakePointTransactionRepository()),
+            new FakeSettingsRepository());
+
+        var store = new StoreService(storeRepo, pointsService, auditLogRepo, dailyRoutineService);
+        return (store, storeRepo, pointsRepo, routines);
     }
 
     private static async Task GivePoints(FakePointTransactionRepository pointsRepo, ObjectId familyId, int amount)
@@ -29,7 +42,7 @@ public class StoreServiceTests
     [Fact]
     public async Task AprovarResgate_DebitaOSaldoExatamente()
     {
-        var (store, storeRepo, pointsRepo) = BuildSystem();
+        var (store, storeRepo, pointsRepo, _) = BuildSystem();
         var familyId = ObjectId.GenerateNewId();
         await GivePoints(pointsRepo, familyId, 500);
 
@@ -48,7 +61,7 @@ public class StoreServiceTests
     [Fact]
     public async Task AprovarResgate_SaldoInsuficiente_LancaExcecaoENaoDebitaEstoque()
     {
-        var (store, storeRepo, pointsRepo) = BuildSystem();
+        var (store, storeRepo, pointsRepo, _) = BuildSystem();
         var familyId = ObjectId.GenerateNewId();
         await GivePoints(pointsRepo, familyId, 100); // menos que o custo do item
 
@@ -67,7 +80,7 @@ public class StoreServiceTests
     [Fact]
     public async Task RejeitarResgate_NaoDebitaPontos()
     {
-        var (store, _, pointsRepo) = BuildSystem();
+        var (store, _, pointsRepo, _) = BuildSystem();
         var familyId = ObjectId.GenerateNewId();
         await GivePoints(pointsRepo, familyId, 500);
 
@@ -84,7 +97,7 @@ public class StoreServiceTests
     [Fact]
     public async Task ResgateJaRevisado_NaoPodeSerRevisadoDeNovo()
     {
-        var (store, _, pointsRepo) = BuildSystem();
+        var (store, _, pointsRepo, _) = BuildSystem();
         var familyId = ObjectId.GenerateNewId();
         await GivePoints(pointsRepo, familyId, 500);
 
@@ -101,7 +114,7 @@ public class StoreServiceTests
     [Fact]
     public async Task EstoqueFinito_ZeraEDesativaItemAposResgateAprovado()
     {
-        var (store, storeRepo, pointsRepo) = BuildSystem();
+        var (store, storeRepo, pointsRepo, _) = BuildSystem();
         var familyId = ObjectId.GenerateNewId();
         await GivePoints(pointsRepo, familyId, 1000);
 
@@ -118,7 +131,7 @@ public class StoreServiceTests
     [Fact]
     public async Task EstoqueIlimitado_NaoEDescontadoNemDesativado()
     {
-        var (store, storeRepo, pointsRepo) = BuildSystem();
+        var (store, storeRepo, pointsRepo, _) = BuildSystem();
         var familyId = ObjectId.GenerateNewId();
         await GivePoints(pointsRepo, familyId, 500);
 
@@ -130,5 +143,66 @@ public class StoreServiceTests
         var updatedItem = await storeRepo.GetItemByIdAsync(item.Id);
         Assert.Null(updatedItem!.Stock);
         Assert.True(updatedItem.Active);
+    }
+
+    // "1 hora de tela = 100 pontos, limite 1x resgate por dia" (pedido do dono do produto).
+    [Fact]
+    public async Task ItemComLimiteDiario_ImpedeSegundoResgateNoMesmoDiaOperacional()
+    {
+        var (store, _, pointsRepo, _) = BuildSystem();
+        var familyId = ObjectId.GenerateNewId();
+        await GivePoints(pointsRepo, familyId, 1000);
+
+        var item = await store.CreateItemAsync(familyId, familyId,
+            new CreateStoreItemRequest("1 hora de tela", null, 100, "screen_time", "🎮", null, DailyLimit: 1, ScreenTimeMinutes: 60));
+
+        var first = await store.RequestRedemptionAsync(familyId, familyId, item.Id);
+        Assert.Equal(RedemptionStatus.Pending, first.Status);
+
+        // Nem precisa esperar a revisao do adulto -- a segunda SOLICITACAO no mesmo dia
+        // ja e bloqueada, mesmo com a primeira ainda Pending.
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => store.RequestRedemptionAsync(familyId, familyId, item.Id));
+        Assert.Contains("Limite diario", ex.Message);
+    }
+
+    [Fact]
+    public async Task ItemComLimiteDiario_ResgateRejeitadoNaoContaParaOLimite()
+    {
+        var (store, _, pointsRepo, _) = BuildSystem();
+        var familyId = ObjectId.GenerateNewId();
+        await GivePoints(pointsRepo, familyId, 1000);
+
+        var item = await store.CreateItemAsync(familyId, familyId,
+            new CreateStoreItemRequest("1 hora de tela", null, 100, "screen_time", "🎮", null, DailyLimit: 1, ScreenTimeMinutes: 60));
+
+        var first = await store.RequestRedemptionAsync(familyId, familyId, item.Id);
+        await store.RejectRedemptionAsync(familyId, first.Id.ToString(), familyId);
+
+        // Rejeitado nao consome a vaga do dia -- uma nova solicitacao deve funcionar.
+        var second = await store.RequestRedemptionAsync(familyId, familyId, item.Id);
+        Assert.Equal(RedemptionStatus.Pending, second.Status);
+    }
+
+    // "retire os pacus points utilizados" -- aprovar um item que concede tempo de tela
+    // credita os minutos direto no game timer do dia (mesmo mecanismo dos botoes +5/-5
+    // min do adulto em DailyRoutinesController), alem de debitar o saldo (ja coberto
+    // pelos testes acima).
+    [Fact]
+    public async Task ItemComTempoDeTela_ConcedeMinutosNoGameTimerAoAprovar()
+    {
+        var (store, _, pointsRepo, routines) = BuildSystem();
+        var familyId = ObjectId.GenerateNewId();
+        await GivePoints(pointsRepo, familyId, 500);
+
+        var item = await store.CreateItemAsync(familyId, familyId,
+            new CreateStoreItemRequest("1 hora de tela", null, 100, "screen_time", "🎮", null, DailyLimit: 1, ScreenTimeMinutes: 60));
+
+        var redemption = await store.RequestRedemptionAsync(familyId, familyId, item.Id);
+        await store.ApproveRedemptionAsync(familyId, redemption.Id.ToString(), familyId);
+
+        var today = Pacus.Application.Utils.TimezoneHelper.GetOperationalDate("America/Sao_Paulo");
+        var routine = await routines.GetByUserAndDateAsync(familyId, today);
+        Assert.Equal(60, routine!.GameTimerExtraMinutes);
     }
 }

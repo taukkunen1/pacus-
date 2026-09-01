@@ -132,6 +132,16 @@ public class StoreController : ControllerBase
         }
     }
 
+    // Fila de resgates aguardando revisao do adulto.
+    [RequireRole(UserRole.Adult)]
+    [HttpGet("redemptions/pending")]
+    public async Task<IActionResult> GetPendingRedemptions()
+    {
+        var redemptions = await _storeRepository.GetPendingRedemptionsByFamilyAsync(_currentUser.FamilyId);
+
+        return Ok(redemptions.Select(ToRedemptionResponse));
+    }
+
     private static StoreItemResponse ToStoreItemResponse(StoreItem item)
     {
         return new StoreItemResponse(
@@ -144,6 +154,8 @@ public class StoreController : ControllerBase
             item.Icon,
             item.Active,
             item.Stock,
+            item.DailyLimit,
+            item.ScreenTimeMinutes,
             item.CreatedBy.ToString(),
             item.CreatedAt,
             item.UpdatedAt);

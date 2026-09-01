@@ -5,6 +5,7 @@ using Pacus.Application.DTOs;
 using Pacus.Application.Interfaces;
 using Pacus.Application.Services;
 using Pacus.Application.Utils;
+using Pacus.Domain.Entities;
 using Pacus.Domain.Enums;
 
 namespace Pacus.Api.Controllers;
@@ -17,17 +18,20 @@ public class PointsController : ControllerBase
     private readonly IPointsService _pointsService;
     private readonly IPointTransactionRepository _pointTransactionRepository;
     private readonly IAuditLogRepository _auditLogRepository;
+    private readonly ISettingsRepository _settingsRepository;
     private readonly ICurrentUserService _currentUser;
 
     public PointsController(
         IPointsService pointsService,
         IPointTransactionRepository pointTransactionRepository,
         IAuditLogRepository auditLogRepository,
+        ISettingsRepository settingsRepository,
         ICurrentUserService currentUser)
     {
         _pointsService = pointsService;
         _pointTransactionRepository = pointTransactionRepository;
         _auditLogRepository = auditLogRepository;
+        _settingsRepository = settingsRepository;
         _currentUser = currentUser;
     }
 
@@ -35,7 +39,8 @@ public class PointsController : ControllerBase
     public async Task<IActionResult> GetBalance()
     {
         var balance = await _pointsService.GetBalanceAsync(_currentUser.FamilyId);
-        return Ok(new { balance, brl = balance * 0.05 });
+        var rate = await GetPointToBrlRateAsync();
+        return Ok(new { balance, brl = balance * rate });
     }
 
     [HttpGet("transactions")]
@@ -91,6 +96,18 @@ public class PointsController : ControllerBase
         }
 
         var newBalance = await _pointsService.GetBalanceAsync(_currentUser.FamilyId);
-        return Ok(new { balance = newBalance, brl = newBalance * 0.05 });
+        var rate = await GetPointToBrlRateAsync();
+        return Ok(new { balance = newBalance, brl = newBalance * rate });
+    }
+
+    // Antes este valor estava fixo (0.05) direto nos dois endpoints acima, ignorando
+    // Settings.PointToBrlRate por completo -- ou seja, mudar a taxa aqui nunca refletia
+    // no saldo em R$ mostrado pro usuario. Corrigido: le a taxa configurada da familia,
+    // com o mesmo fallback (Settings.DefaultPointToBrlRate) usado quando ainda nao existe
+    // um documento de Settings salvo.
+    private async Task<double> GetPointToBrlRateAsync()
+    {
+        var settings = await _settingsRepository.GetByUserIdAsync(_currentUser.FamilyId);
+        return settings?.PointToBrlRate ?? Settings.DefaultPointToBrlRate;
     }
 }

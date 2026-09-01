@@ -15,10 +15,17 @@ Flutter será um cliente futuro da mesma API.
 - Existem três tipos: `mandatory`, `expected`, `challenge`.
 - Cada tarefa vale de 1 a 10 Pacus Points, ou de -1 a -10 como penalidade (zero não é permitido).
 - Tarefa concluída ganha pontos; não concluída ganha zero e não perde saldo.
-- 1 Pacus Point equivale a R$ 0,05.
+- 1 Pacus Point equivale a R$ 0,06 (configurável por família em `Settings.PointToBrlRate`).
 - O PACUS cresce uma vez por dia encerrado, independentemente da conclusão das tarefas.
 - A criança pode alterar somente as tarefas do dia atual, conforme permissões.
 - O adulto administra regras permanentes, configurações e histórico autorizado.
+
+## Loja de Pacus Points
+O adulto cadastra itens (brinquedo, atividade, tempo de tela, outro); a criança solicita o resgate e o adulto aprova ou rejeita. Ao aprovar, o saldo é debitado (nunca na solicitação). Cada item pode opcionalmente ter:
+- **Limite diário** (`dailyLimit`) — quantas vezes por dia operacional este item pode ser resgatado (pedidos rejeitados não contam para o limite).
+- **Tempo de tela concedido** (`screenTimeMinutes`) — ao aprovar, soma automaticamente esses minutos no game timer do dia (mesmo mecanismo dos botões +5/-5 min do adulto).
+
+Toda família nova já recebe o item padrão **"1 hora de tela" = 100 Pacus Points, 1 resgate por dia, +60min no game timer ao aprovar**.
 
 ## Desenvolvimento local
 

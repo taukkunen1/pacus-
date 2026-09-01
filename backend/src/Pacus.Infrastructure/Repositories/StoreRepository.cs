@@ -2,6 +2,7 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using Pacus.Application.Interfaces;
 using Pacus.Domain.Entities;
+using Pacus.Domain.Enums;
 using Pacus.Infrastructure.Mongo;
 
 namespace Pacus.Infrastructure.Repositories;
@@ -40,6 +41,20 @@ public class StoreRepository : IStoreRepository
 
     public Task UpdateRedemptionAsync(Redemption redemption) =>
         _context.Redemptions.ReplaceOneAsync(r => r.Id == redemption.Id, redemption);
+
+    public Task<List<Redemption>> GetRedemptionsByItemSinceAsync(ObjectId familyId, ObjectId storeItemId, DateTime sinceUtc) =>
+        _context.Redemptions.Find(r =>
+                r.FamilyId == familyId &&
+                r.StoreItemId == storeItemId &&
+                r.RequestedAt >= sinceUtc)
+            .ToListAsync();
+
+    public Task<List<Redemption>> GetPendingRedemptionsByFamilyAsync(ObjectId familyId) =>
+        _context.Redemptions.Find(r =>
+                r.FamilyId == familyId &&
+                r.Status == RedemptionStatus.Pending)
+            .SortBy(r => r.RequestedAt)
+            .ToListAsync();
 
     public Task<List<StoreItem>> GetAllItemsByFamilyAsync(ObjectId familyId) =>
         _context.StoreItems.Find(i => i.FamilyId == familyId)

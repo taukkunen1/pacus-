@@ -11,7 +11,12 @@ public class Settings
     // o nome do campo ja gravado no Mongo (convencao camelCase), sem precisar de migracao.
     [BsonElement("userId")]
     public ObjectId FamilyId { get; set; }
-    public double PointToBrlRate { get; set; } = 0.05;
+
+    // Valor de referencia (nao e uma conversao financeira real -- ver docs/TERMOS_DE_USO.md).
+    // Constante exposta porque PointsController usa o mesmo fallback quando a familia
+    // ainda nao tem um documento de Settings salvo (GetByUserIdAsync retorna null).
+    public const double DefaultPointToBrlRate = 0.06;
+    public double PointToBrlRate { get; set; } = DefaultPointToBrlRate;
     public List<GrowthStageConfig> GrowthStages { get; set; } = new();
     public ChildPermissions ChildPermissions { get; set; } = new();
 

@@ -323,7 +323,7 @@ Log histórico separado de `pacus` (que guarda só o estado atual) — útil par
 {
   "_id": ObjectId,
   "userId": ObjectId,
-  "pointToBrlRate": 0.05,
+  "pointToBrlRate": 0.06,
   "growthStages": [
     { "stage": "egg", "date": "2026-08-09" },
     { "stage": "cracking", "date": "2026-08-14" },

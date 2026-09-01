@@ -500,6 +500,28 @@ public class FakeStoreRepository
         return Task.CompletedTask;
     }
 
+    public Task<List<Redemption>> GetRedemptionsByItemSinceAsync(
+        ObjectId familyId, ObjectId storeItemId, DateTime sinceUtc) =>
+        Task.FromResult(
+            _redemptions
+                .Where(
+                    r =>
+                        r.FamilyId == familyId &&
+                        r.StoreItemId == storeItemId &&
+                        r.RequestedAt >= sinceUtc)
+                .ToList());
+
+    public Task<List<Redemption>> GetPendingRedemptionsByFamilyAsync(
+        ObjectId familyId) =>
+        Task.FromResult(
+            _redemptions
+                .Where(
+                    r =>
+                        r.FamilyId == familyId &&
+                        r.Status == RedemptionStatus.Pending)
+                .OrderBy(r => r.RequestedAt)
+                .ToList());
+
     public Task<List<StoreItem>> GetAllItemsByFamilyAsync(
         ObjectId familyId) =>
         Task.FromResult(

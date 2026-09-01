@@ -6,7 +6,9 @@ public record CreateStoreItemRequest(
     int Cost,
     string Category,
     string? Icon,
-    int? Stock
+    int? Stock,
+    int? DailyLimit = null,
+    int? ScreenTimeMinutes = null
 );
 
 public record RequestRedemptionRequest(string StoreItemId);
@@ -21,6 +23,8 @@ public record StoreItemResponse(
     string? Icon,
     bool Active,
     int? Stock,
+    int? DailyLimit,
+    int? ScreenTimeMinutes,
     string CreatedBy,
     DateTime CreatedAt,
     DateTime UpdatedAt

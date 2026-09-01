@@ -479,6 +479,13 @@ export async function renderHome(
         >
           PACUS
         </button>
+
+        <button
+          data-nav="store"
+          type="button"
+        >
+          Loja
+        </button>
       </nav>
     `;
 

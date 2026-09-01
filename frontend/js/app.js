@@ -4,6 +4,7 @@ import { renderHome } from "./screens/home.js";
 import { renderHistory } from "./screens/history.js";
 import { renderPoints } from "./screens/points.js";
 import { renderPacus } from "./screens/pacus.js";
+import { renderStore } from "./screens/store.js";
 import { setUser } from "./state/app-state.js";
 
 const ROLE_CLAIM = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
@@ -14,6 +15,7 @@ function navigate(screen = "today") {
   if (screen === "history") return renderHistory(root, navigate);
   if (screen === "points") return renderPoints(root, navigate);
   if (screen === "pacus") return renderPacus(root, navigate);
+  if (screen === "store") return renderStore(root, navigate);
   return renderHome(root, navigate);
 }
 

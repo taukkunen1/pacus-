@@ -18,6 +18,17 @@ public class StoreItem
     public string? Icon { get; set; }
     public bool Active { get; set; } = true;
     public int? Stock { get; set; } // null = ilimitado
+
+    // Limite de resgates deste item por dia operacional (fuso da familia), somando
+    // solicitacoes Pending/Approved/Delivered do dia (Rejected nao conta -- ver
+    // StoreService.RequestRedemptionAsync). null = sem limite diario.
+    public int? DailyLimit { get; set; }
+
+    // Ao aprovar um resgate deste item, quantos minutos extras somar no game timer
+    // do dia (StoreService.ApproveRedemptionAsync chama DailyRoutineService.AdjustGameTimerAsync).
+    // null = este item nao concede tempo de tela.
+    public int? ScreenTimeMinutes { get; set; }
+
     public ObjectId CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

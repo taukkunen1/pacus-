@@ -10,14 +10,14 @@ Verificado direto no código-fonte de `feature/next-migration` em 2026-09-01. Ca
 | Histórico de dias encerrados é preservado | ✅ Implementado | `DayClosingService` marca `routine.Status = Closed` e grava `ClosedAt`; rotina não é apagada, só fechada |
 | Tarefas do dia independentes da configuração permanente | ✅ Implementado | `DailyTask` é cópia imutável do `TaskTemplate` no momento da geração (comentário explícito na entidade: "Alterar o TaskTemplate de origem nunca reescreve tarefas já geradas") |
 | Três tipos: `mandatory`, `expected`, `challenge` | ✅ Implementado | `enum TaskType` (`Pacus.Domain/Enums/TaskType.cs`) |
-| Tarefa vale 1, 2 ou 3 Pacus Points | ⚠️ Parcialmente diferente | Validação real em `DailyRoutineService` aceita **1 a 10** (ou -1 a -10 como penalidade), não só 1/2/3 — checklist item A-relacionado já documenta isso como regra atual. README está desatualizado nesse ponto específico. |
+| Tarefa vale 1, 2 ou 3 Pacus Points | ✅ Corrigido no README | Validação real em `DailyRoutineService` aceita 1 a 10 (ou -1 a -10 como penalidade), não só 1/2/3 — README corrigido nesta sessão para refletir a faixa real. |
 | Concluída ganha pontos; não concluída ganha zero e não perde saldo | ✅ Implementado | `ToggleTaskAsync` em `DailyRoutineService` |
-| 1 Pacus Point = R$ 0,05 | ✅ Implementado | `Settings.PointToBrlRate = 0.05` (configurável), usado em `PointsController.GetBalance` |
+| 1 Pacus Point = R$ 0,06 | ✅ Implementado (e corrigido) | `Settings.PointToBrlRate` (default `0,06` — pedido do dono do produto para subir de `0,05`). **Achado nesta sessão:** `PointsController` tinha `0.05` fixo em dois endpoints, ignorando por completo o campo `Settings.PointToBrlRate` — mudar a taxa nunca refletia no saldo em R$. Corrigido: o controller agora lê `Settings.PointToBrlRate` da família, com fallback em `Settings.DefaultPointToBrlRate`. |
 | PACUS cresce uma vez por dia encerrado, independente da conclusão das tarefas | ✅ Implementado | `DayClosingService.GrowPacusOnceAsync`, protegido por `lastGrowthDate` (idempotente), chamado incondicionalmente ao fechar o dia — não olha se as tarefas foram concluídas |
 | Criança só altera tarefas do dia atual, conforme permissões | ✅ Implementado | `EnsureChildPermissionAsync` com flags granulares (`CanCreateTasks`, `CanEditTasks`, `CanSetPoints`, `CanReorderTasks`) checadas em cada ação de `DailyRoutineService` |
 | Adulto administra regras permanentes, configurações e histórico autorizado | ✅ Implementado | `TasksController` (templates permanentes) tem `[RequireRole(UserRole.Adult)]` na classe inteira |
 
-**Ação sugerida:** atualizar a linha "Cada tarefa vale 1, 2 ou 3 Pacus Points" no `README.md` para refletir a faixa real (1–10, com penalidade de -1 a -10).
+Ambas as pendências acima ("Ação sugerida" original) já foram corrigidas nesta sessão, no README e no código.
 
 ## Estrutura do projeto
 
@@ -54,3 +54,16 @@ Investigado a pedido seu. Resultado:
   - Backend não precisou de nenhuma mudança — `DailyTask`, `DailyTaskUpdateRequest` e o endpoint `PUT /api/v1/daily-tasks/{id}` já suportavam descrição de ponta a ponta.
 
 Três arquivos de frontend continuam como stub sem uso real em lugar nenhum do código (`components/task-editor.js`, `components/task-card.js`, `state/task-state.js`) — sobras do esqueleto inicial do projeto, não referenciadas por nenhum import. Seguro remover quando quiser limpar, sem afetar nada.
+
+## Loja de Pacus Points
+
+O backend já tinha toda a base pronta (`StoreItem`, `Redemption`, fluxo de aprovação com auditoria, débito de saldo) mas **sem nenhum item cadastrado e sem tela no frontend** — a loja existia só como API, invisível na prática. Construído nesta sessão, a partir do pedido "1 hora de tela = 100 pontos, limite 1x resgate por dia, retira os pontos usados":
+
+- **`StoreItem` ganhou dois campos novos, genéricos** (reutilizáveis por qualquer item, não só o de tela):
+  - `dailyLimit` (int?) — limite de resgates por dia operacional. Pedidos `Rejected` não contam para o limite (um "não" do adulto não deveria travar o dia inteiro).
+  - `screenTimeMinutes` (int?) — ao aprovar um resgate deste item, credita esses minutos automaticamente no game timer do dia (`DailyRoutineService.AdjustGameTimerAsync`, o mesmo mecanismo dos botões +5/-5 min do adulto). Isso conecta a loja ao sistema de tempo de tela que já existia, em vez de ser só um rótulo cosmético.
+- **`StoreService`**: `RequestRedemptionAsync` valida o limite diário antes de criar a solicitação; `ApproveRedemptionAsync` garante que a rotina de hoje existe (`GetOrCreateTodayAsync`) *antes* de debitar qualquer ponto, para nunca aprovar um resgate e falhar ao conceder o tempo de tela depois.
+- **Item padrão "1 hora de tela"** (100 pontos, `dailyLimit: 1`, `screenTimeMinutes: 60`) é criado automaticamente em `BootstrapService` para toda família nova. **Famílias já existentes no banco não recebem esse item retroativamente** — esta sessão não tem acesso ao MongoDB de produção; um adulto pode criar o mesmo item manualmente pela tela nova, ou você pode pedir um script de backfill.
+- **Frontend novo**: `screens/store.js` (+ `api/store-api.js`), aba "Loja" na navegação inferior. Criança vê os itens e resgata (botão desabilitado se o saldo não alcançar); adulto também cria itens (com os campos novos) e vê a fila "Aguardando aprovação" com Aprovar/Rejeitar. Endpoint novo: `GET /api/v1/store/redemptions/pending`.
+- **Testes**: 3 testes novos em `StoreServiceTests.cs` (limite diário bloqueia segunda solicitação no mesmo dia; rejeitado não consome a vaga; aprovar credita os minutos no game timer). Suíte inteira (27 testes) verde. Build Release limpo, 0 erros, 0 warnings.
+- **Não validado nesta sessão**: os testes de integração (`Pacus.IntegrationTests`, que sobem MongoDB via Testcontainers) não rodaram aqui porque o Docker deste ambiente não tem daemon ativo — vão rodar de verdade no CI do GitHub ao dar push.

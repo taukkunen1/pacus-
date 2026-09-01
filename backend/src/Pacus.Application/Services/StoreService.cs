@@ -12,6 +12,7 @@ public class StoreService : IStoreService
     private readonly IStoreRepository _storeRepository;
     private readonly IPointsService _pointsService;
     private readonly IAuditLogRepository _auditLogRepository;
+    private readonly IDailyRoutineService _dailyRoutineService;
 
     // TODO: assim como o timezone nos outros services, isso deveria vir de settings
     // da familia em vez de fixo — ver mesmo TODO em DailyRoutinesController.
@@ -20,15 +21,23 @@ public class StoreService : IStoreService
     public StoreService(
         IStoreRepository storeRepository,
         IPointsService pointsService,
-        IAuditLogRepository auditLogRepository)
+        IAuditLogRepository auditLogRepository,
+        IDailyRoutineService dailyRoutineService)
     {
         _storeRepository = storeRepository;
         _pointsService = pointsService;
         _auditLogRepository = auditLogRepository;
+        _dailyRoutineService = dailyRoutineService;
     }
 
     public async Task<StoreItem> CreateItemAsync(ObjectId familyId, ObjectId createdBy, CreateStoreItemRequest request)
     {
+        if (request.DailyLimit is not null && request.DailyLimit <= 0)
+            throw new InvalidOperationException("O limite diario, quando informado, deve ser maior que zero.");
+
+        if (request.ScreenTimeMinutes is not null && request.ScreenTimeMinutes <= 0)
+            throw new InvalidOperationException("Os minutos de tempo de tela, quando informados, devem ser maiores que zero.");
+
         var item = new StoreItem
         {
             Id = ObjectId.GenerateNewId(),
@@ -40,6 +49,8 @@ public class StoreService : IStoreService
             Icon = request.Icon,
             Active = true,
             Stock = request.Stock,
+            DailyLimit = request.DailyLimit,
+            ScreenTimeMinutes = request.ScreenTimeMinutes,
             CreatedBy = createdBy,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -57,6 +68,9 @@ public class StoreService : IStoreService
         if (item.Stock is not null && item.Stock <= 0)
             throw new InvalidOperationException("Item sem estoque disponivel.");
 
+        if (item.DailyLimit is not null)
+            await EnsureDailyLimitNotReachedAsync(familyId, item);
+
         var redemption = new Redemption
         {
             Id = ObjectId.GenerateNewId(),
@@ -72,6 +86,25 @@ public class StoreService : IStoreService
         return await _storeRepository.CreateRedemptionAsync(redemption);
     }
 
+    // Conta quantos resgates deste item ja existem no dia operacional de hoje (Rejected nao
+    // conta -- um pedido negado nao deveria consumir a vaga do dia). Busca uma janela de 2 dias
+    // em UTC (bem mais que qualquer fuso precisa) e filtra pelo dia operacional exato depois,
+    // mesmo padrao usado no resto do backend (ver TimezoneHelper).
+    private async Task EnsureDailyLimitNotReachedAsync(ObjectId familyId, StoreItem item)
+    {
+        var today = TimezoneHelper.GetOperationalDate(DefaultTimezone);
+        var sinceUtc = DateTime.UtcNow.AddDays(-2);
+
+        var recent = await _storeRepository.GetRedemptionsByItemSinceAsync(familyId, item.Id, sinceUtc);
+        var usedToday = recent.Count(r =>
+            r.Status != RedemptionStatus.Rejected &&
+            TimezoneHelper.GetOperationalDate(DefaultTimezone, r.RequestedAt) == today);
+
+        if (usedToday >= item.DailyLimit)
+            throw new InvalidOperationException(
+                $"Limite diario deste item ja atingido ({item.DailyLimit}x por dia). Tente novamente amanha.");
+    }
+
     public async Task<Redemption> ApproveRedemptionAsync(ObjectId familyId, string redemptionId, ObjectId reviewedBy)
     {
         var redemption = await GetOwnedPendingRedemptionAsync(familyId, redemptionId);
@@ -79,6 +112,17 @@ public class StoreService : IStoreService
         var balance = await _pointsService.GetBalanceAsync(familyId);
         if (balance < redemption.Cost)
             throw new InvalidOperationException("Saldo de Pacus Points insuficiente para aprovar este resgate.");
+
+        var item = await _storeRepository.GetItemByIdAsync(redemption.StoreItemId);
+
+        // Se o item concede tempo de tela, garante que a rotina de hoje existe ANTES de
+        // debitar qualquer ponto — AdjustGameTimerAsync exige uma rotina em aberto e nao a
+        // cria sozinho. Fazer isso primeiro evita o cenario de aprovar o resgate (debitar
+        // pontos, marcar Approved) e so depois descobrir que o timer nao pode ser ajustado.
+        if (item?.ScreenTimeMinutes is int minutes)
+        {
+            await _dailyRoutineService.GetOrCreateTodayAsync(familyId, DefaultTimezone);
+        }
 
         // Debita o saldo — gera a transacao ANTES de marcar aprovado, para que uma falha aqui
         // nao deixe a redemption "aprovada" sem o correspondente registro auditavel de gasto.
@@ -100,8 +144,15 @@ public class StoreService : IStoreService
         redemption.ReviewedAt = DateTime.UtcNow;
         await _storeRepository.UpdateRedemptionAsync(redemption);
 
+        // Concede o tempo de tela comprado -- soma direto no game timer do dia (mesmo
+        // mecanismo dos botoes +5/-5 min do adulto). actorRole "adult" porque aprovar
+        // resgate ja e uma acao restrita a adulto (RequireRole no controller).
+        if (item?.ScreenTimeMinutes is int screenTimeMinutes)
+        {
+            await _dailyRoutineService.AdjustGameTimerAsync(familyId, screenTimeMinutes, reviewedBy, "adult");
+        }
+
         // Baixa de estoque para itens finitos (ex. o Hot Wheels tem 1 unidade).
-        var item = await _storeRepository.GetItemByIdAsync(redemption.StoreItemId);
         if (item is not null && item.Stock is not null)
         {
             item.Stock -= 1;
@@ -113,6 +164,10 @@ public class StoreService : IStoreService
         // Log de auditoria (checklist de seguranca, item A5) — aprovar resgate e uma
         // acao administrativa sensivel (debita pontos da familia), registrada separada
         // do dado em si.
+        var screenTimeNote = item?.ScreenTimeMinutes is int grantedMinutes
+            ? $", +{grantedMinutes}min de tempo de tela"
+            : string.Empty;
+
         await _auditLogRepository.CreateAsync(new AuditLog
         {
             Id = ObjectId.GenerateNewId(),
@@ -120,7 +175,7 @@ public class StoreService : IStoreService
             Action = "redemption.approved",
             EntityType = "Redemption",
             EntityId = redemption.Id.ToString(),
-            Details = $"Resgate aprovado: {redemption.ItemTitle} ({redemption.Cost} pontos)",
+            Details = $"Resgate aprovado: {redemption.ItemTitle} ({redemption.Cost} pontos{screenTimeNote})",
             ActorId = reviewedBy,
             ActorRole = UserRole.Adult,
             CreatedAt = DateTime.UtcNow,

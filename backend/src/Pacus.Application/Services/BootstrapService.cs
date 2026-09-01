@@ -11,15 +11,18 @@ public class BootstrapService : IBootstrapService
 {
     private readonly IUserRepository _userRepository;
     private readonly IPacusRepository _pacusRepository;
+    private readonly IStoreRepository _storeRepository;
     private readonly IPasswordHasher _passwordHasher;
 
     public BootstrapService(
         IUserRepository userRepository,
         IPacusRepository pacusRepository,
+        IStoreRepository storeRepository,
         IPasswordHasher passwordHasher)
     {
         _userRepository = userRepository;
         _pacusRepository = pacusRepository;
+        _storeRepository = storeRepository;
         _passwordHasher = passwordHasher;
     }
 
@@ -83,6 +86,30 @@ public class BootstrapService : IBootstrapService
         };
 
         await _pacusRepository.CreateAsync(pacus);
+
+        // Item padrao da loja de Pacus Points para toda familia nova -- pedido do dono do
+        // produto: "1 hora de tela = 100 pontos", 1 resgate por dia, credita 60min no game
+        // timer do dia ao ser aprovado (StoreService.ApproveRedemptionAsync). O adulto pode
+        // editar/desativar depois pela tela de loja como qualquer outro item.
+        var screenTimeItem = new StoreItem
+        {
+            Id = ObjectId.GenerateNewId(),
+            FamilyId = familyId,
+            Title = "1 hora de tela",
+            Description = "Resgata 1 hora extra de tempo de tela para hoje.",
+            Cost = 100,
+            Category = "screen_time",
+            Icon = "🎮",
+            Active = true,
+            Stock = null,
+            DailyLimit = 1,
+            ScreenTimeMinutes = 60,
+            CreatedBy = adult.Id,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+
+        await _storeRepository.CreateItemAsync(screenTimeItem);
 
         return new BootstrapResponse(
             adult.Id.ToString(),

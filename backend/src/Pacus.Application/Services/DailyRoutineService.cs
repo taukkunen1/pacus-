@@ -96,7 +96,7 @@ public class DailyRoutineService : IDailyRoutineService
                 Type = template.Type,
                 Period = template.Period,
                 Order = nextOrder++,
-                Points = template.Points,
+                Points = resolved.Points,
                 Status = TaskItemStatus.Pending,
                 CompletedAt = null,
                 CreatedBy = userId.ToString(),
@@ -141,7 +141,7 @@ public class DailyRoutineService : IDailyRoutineService
                 Type = pair.Template.Type,
                 Period = pair.Template.Period,
                 Order = pair.Template.Order,
-                Points = pair.Template.Points,
+                Points = pair.Resolved!.Points,
                 Status = TaskItemStatus.Pending,
                 CompletedAt = null,
                 CreatedBy = userId.ToString(),
@@ -585,27 +585,31 @@ public class DailyRoutineService : IDailyRoutineService
 
     // Decide se/como um TaskTemplate aparece num dia especifico, de acordo com
     // Recurrence. Retorna null quando a recorrencia nao inclui esse dia da semana
-    // (o chamador deve pular esse template pra essa data). Titulo/descricao no
-    // retorno ja vem resolvidos (iguais ao template, exceto em
-    // RecurrenceWeekdayRotation, onde vem da variante do dia).
+    // (o chamador deve pular esse template pra essa data). Titulo/descricao/pontos
+    // no retorno ja vem resolvidos (iguais ao template, exceto em
+    // RecurrenceWeekdayRotation, onde titulo/descricao vem da variante do dia, e
+    // os pontos tambem vem da variante quando ela define um valor proprio --
+    // ex.: uma missao que exige supervisao de adulto pode valer mais que outra).
     private static ResolvedTemplateContent? ResolveTemplateForDay(TaskTemplate template, DayOfWeek dayOfWeek)
     {
         var isWeekend = dayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
 
         if (template.Recurrence.Equals(TaskTemplate.RecurrenceWeekday, StringComparison.OrdinalIgnoreCase))
         {
-            return isWeekend ? null : new ResolvedTemplateContent(template.Title, template.Description);
+            return isWeekend ? null : new ResolvedTemplateContent(template.Title, template.Description, template.Points);
         }
 
         if (template.Recurrence.Equals(TaskTemplate.RecurrenceWeekend, StringComparison.OrdinalIgnoreCase))
         {
-            return isWeekend ? new ResolvedTemplateContent(template.Title, template.Description) : null;
+            return isWeekend ? new ResolvedTemplateContent(template.Title, template.Description, template.Points) : null;
         }
 
         if (template.Recurrence.Equals(TaskTemplate.RecurrenceWeekdayRotation, StringComparison.OrdinalIgnoreCase))
         {
             var variant = template.Variants.FirstOrDefault(v => v.DayOfWeek == dayOfWeek);
-            return variant is null ? null : new ResolvedTemplateContent(variant.Title, variant.Description);
+            return variant is null
+                ? null
+                : new ResolvedTemplateContent(variant.Title, variant.Description, variant.Points ?? template.Points);
         }
 
         if (template.Recurrence.Equals(TaskTemplate.RecurrenceCustom, StringComparison.OrdinalIgnoreCase))
@@ -613,16 +617,16 @@ public class DailyRoutineService : IDailyRoutineService
             // Mesmo conteudo do template todo dia escolhido -- so a lista de dias
             // muda (ex.: "Ingles" so terca e quarta, "Escoteiro" so sabado).
             return template.CustomDays.Contains(dayOfWeek)
-                ? new ResolvedTemplateContent(template.Title, template.Description)
+                ? new ResolvedTemplateContent(template.Title, template.Description, template.Points)
                 : null;
         }
 
         // RecurrenceDaily (ou qualquer valor desconhecido/legado): comportamento
         // original, todo dia, com o conteudo do proprio template.
-        return new ResolvedTemplateContent(template.Title, template.Description);
+        return new ResolvedTemplateContent(template.Title, template.Description, template.Points);
     }
 
-    private sealed record ResolvedTemplateContent(string Title, string? Description);
+    private sealed record ResolvedTemplateContent(string Title, string? Description, int Points);
 
     private static void ValidatePoints(int points)
     {

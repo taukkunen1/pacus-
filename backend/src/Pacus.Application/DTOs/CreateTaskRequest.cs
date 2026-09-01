@@ -20,7 +20,11 @@ public record CreateTaskRequest(
 public record TaskVariantRequest(
     string DayOfWeek,
     string Title,
-    string? Description
+    string? Description,
+    // Opcional -- null usa os Points do template (mesma pontuacao todo dia).
+    // Preenchido, so essa variante vale diferente (ex.: uma missao que exige
+    // supervisao de adulto vale mais que uma rapida e sozinha).
+    int? Points = null
 );
 
 public record AdjustPointsRequest(int Points);

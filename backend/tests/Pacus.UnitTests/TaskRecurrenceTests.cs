@@ -76,8 +76,39 @@ public class TaskRecurrenceTests
         Assert.Equal("Missão 20 Minutos", friday.Tasks.Single().Title);
         Assert.Empty(saturday.Tasks); // sem variante pra sabado -- nao aparece
 
-        // Type/Period/Points vem do template, iguais em toda variante.
+        // Type/Period vem do template, iguais em toda variante. Points tambem,
+        // quando a variante nao define um valor proprio (ver teste abaixo pro
+        // caso em que define).
         Assert.Equal(3, monday.Tasks.Single().Points);
+    }
+
+    [Fact]
+    public async Task RecorrenciaWeekdayRotation_VarianteComPontosProprios_SobrescreveOsDoTemplate()
+    {
+        var (templates, dailyRoutine) = BuildSystem(out _);
+        var userId = ObjectId.GenerateNewId();
+
+        // Points do template (3) e o padrao -- so a variante de quarta define um
+        // valor proprio (5), porque "Chef por um Dia" exige supervisao de adulto.
+        await templates.CreateAsync(userId, userId,
+            new CreateTaskRequest(
+                "Momento Criativo",
+                null,
+                "challenge",
+                "afternoon",
+                3,
+                Recurrence: "weekday_rotation",
+                Variants: new List<TaskVariantRequest>
+                {
+                    new("Monday", "Missão Detetive", null),
+                    new("Wednesday", "Chef por um Dia", "Com supervisão de um adulto.", Points: 5),
+                }));
+
+        var monday = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-31", "America/Sao_Paulo");
+        var wednesday = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-02", "America/Sao_Paulo");
+
+        Assert.Equal(3, monday.Tasks.Single().Points); // sem override -- usa o do template
+        Assert.Equal(5, wednesday.Tasks.Single().Points); // override da variante
     }
 
     [Fact]

@@ -68,6 +68,48 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
         Assert.Equal("Missão Detetive", variants[0].GetProperty("title").GetString());
     }
 
+    // Points por variante (override do valor do template) e novo nesta mudanca --
+    // pedido do usuario pra poder valer mais em missoes que exigem supervisao de
+    // adulto. So testa o contrato JSON (a resolucao null-usa-o-do-template ja fica
+    // coberta em unit tests, que conseguem controlar a data materializada).
+    [Fact]
+    public async Task Create_WeekdayRotation_VariantWithOwnPoints_ShouldOverrideTemplatePoints()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/tasks",
+            new
+            {
+                title = "Momento Criativo",
+                description = (string?)null,
+                type = "challenge",
+                period = "afternoon",
+                points = 3,
+                recurrence = "weekday_rotation",
+                variants = new object[]
+                {
+                    new { dayOfWeek = "monday", title = "Missão Detetive", description = (string?)null },
+                    new { dayOfWeek = "wednesday", title = "Chef por um Dia", description = (string?)null, points = 5 },
+                }
+            });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var variants = body.GetProperty("variants").EnumerateArray().ToList();
+
+        var monday = variants.Single(v => v.GetProperty("dayOfWeek").GetString() == "monday");
+        Assert.False(monday.TryGetProperty("points", out var mondayPoints) && mondayPoints.ValueKind != JsonValueKind.Null);
+
+        var wednesday = variants.Single(v => v.GetProperty("dayOfWeek").GetString() == "wednesday");
+        Assert.Equal(5, wednesday.GetProperty("points").GetInt32());
+    }
+
     [Fact]
     public async Task Create_WeekdayRotation_WithSaturdayVariant_ShouldBeRejected()
     {

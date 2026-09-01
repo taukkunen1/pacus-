@@ -230,11 +230,18 @@ public class TaskTemplateService : ITaskTemplateService
                     $"Toda variante precisa de titulo (faltando em {dayOfWeek}).");
             }
 
+            if (variant.Points is { } variantPoints && (variantPoints == 0 || variantPoints < -10 || variantPoints > 10))
+            {
+                throw new InvalidOperationException(
+                    $"Pontos invalidos na variante de {dayOfWeek}: cada tarefa deve valer entre 1 e 10 Pacus Points, ou entre -1 e -10 (penalidade). Zero nao e permitido.");
+            }
+
             variants.Add(new TaskTemplateVariant
             {
                 DayOfWeek = dayOfWeek,
                 Title = variant.Title,
                 Description = variant.Description,
+                Points = variant.Points,
             });
         }
 

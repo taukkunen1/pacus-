@@ -27,11 +27,15 @@ const WEEKDAYS = [
   { key: "Friday", label: "Sexta-feira" }
 ];
 
-// Pergunta o titulo + descricao de cada dia util pra uma tarefa "rotativa"
-// (atividade diferente de segunda a sexta, ex.: Momento Criativo). Retorna
-// null se a pessoa cancelar em qualquer dia (o chamador deve abortar a
-// criacao inteira nesse caso, pra nao criar uma rotina pela metade).
-async function promptWeekdayVariants() {
+// Pergunta o titulo + descricao + pontos de cada dia util pra uma tarefa
+// "rotativa" (atividade diferente de segunda a sexta, ex.: Momento Criativo).
+// `defaultPoints` e o valor ja escolhido pra tarefa como um todo (perguntado
+// antes, na tela principal) -- serve de sugestao pra cada dia, mas cada
+// missao pode valer diferente (ex.: uma que exige supervisao de um adulto
+// vale mais que uma rapida e sozinha). Retorna null se a pessoa cancelar em
+// qualquer dia (o chamador deve abortar a criacao inteira nesse caso, pra
+// nao criar uma rotina pela metade).
+async function promptWeekdayVariants(defaultPoints) {
   const variants = [];
 
   for (const { key, label } of WEEKDAYS) {
@@ -53,10 +57,29 @@ async function promptWeekdayVariants() {
       placeholder: "Como funciona, o que a criança precisa fazer..."
     });
 
+    const pointsRaw = window.prompt(
+      `Pontos de ${label}:\n${POINTS_HELP_TEXT}`,
+      String(defaultPoints)
+    );
+
+    if (pointsRaw === null) {
+      return null;
+    }
+
+    const dayPoints = Number(pointsRaw);
+    if (!isValidPoints(dayPoints)) {
+      showToast(
+        `Pontos inválidos em ${label}. ${POINTS_HELP_TEXT}.`,
+        { error: true }
+      );
+      return null;
+    }
+
     variants.push({
       dayOfWeek: key,
       title: dayTitle.trim(),
-      description: dayDescription?.trim() || null
+      description: dayDescription?.trim() || null,
+      points: dayPoints
     });
   }
 
@@ -113,8 +136,10 @@ function parseCustomDaysInput(raw) {
 // null se a pessoa cancelar em qualquer etapa -- o chamador deve abortar).
 // `existingTask` (opcional, usado na edicao) pre-seleciona a opcao e os dias
 // que a tarefa ja tinha configurados, pra "aceitar o padrao" bastar apertar
-// Enter na maioria dos casos.
-async function promptRecurrenceChoice(existingTask) {
+// Enter na maioria dos casos. `basePoints` e o valor de pontos ja escolhido
+// pra tarefa nesta mesma tela (usado como sugestao pra opcao 5, atividade
+// diferente por dia).
+async function promptRecurrenceChoice(existingTask, basePoints) {
   const currentRecurrence = existingTask?.recurrence ?? "daily";
   const defaultChoice =
     {
@@ -173,7 +198,7 @@ async function promptRecurrenceChoice(existingTask) {
       // Nao pre-preenche as atividades de cada dia mesmo editando uma tarefa
       // rotativa existente -- limitacao aceitavel do formato "um prompt por
       // vez"; a pessoa precisa redigitar as 5 atividades pra manter a rotacao.
-      const variants = await promptWeekdayVariants();
+      const variants = await promptWeekdayVariants(basePoints);
       if (!variants) return null;
       return { recurrence: "weekday_rotation", variants };
     }
@@ -554,7 +579,7 @@ export async function renderPacus(root, navigate) {
 
     // Em quais dias essa tarefa aparece -- sem isso toda tarefa permanente
     // aparecia igual em todos os dias, sem excecao.
-    const recurrenceChoice = await promptRecurrenceChoice();
+    const recurrenceChoice = await promptRecurrenceChoice(null, points);
     if (!recurrenceChoice) {
       return;
     }
@@ -664,7 +689,7 @@ export async function renderPacus(root, navigate) {
     // a recorrencia pro padrao ("daily") sempre que o payload de edicao nao manda
     // esses campos, apagando silenciosamente uma configuracao como "Inglês" so
     // terca e quarta so por editar o titulo.
-    const recurrenceChoice = await promptRecurrenceChoice(task);
+    const recurrenceChoice = await promptRecurrenceChoice(task, points);
     if (!recurrenceChoice) {
       return;
     }

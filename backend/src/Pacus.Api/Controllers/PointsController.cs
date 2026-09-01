@@ -46,11 +46,22 @@ public class PointsController : ControllerBase
         return Ok(new { balance, brl = balance * rate });
     }
 
+    // Paginado (achado #4 da auditoria de API de 2026-09-01 -- ver docs/ESTADO_ATUAL.md):
+    // o extrato cresce uma transacao a cada tarefa concluida, ajuste ou resgate, pra
+    // sempre. E a resposta usa PointTransactionResponse.ToResponse() em vez da entidade
+    // de dominio crua (mesmo espirito do achado #3).
     [HttpGet("transactions")]
-    public async Task<IActionResult> GetTransactions()
+    public async Task<IActionResult> GetTransactions(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = PaginationHelper.DefaultPageSize)
     {
-        var transactions = await _pointTransactionRepository.GetHistoryAsync(_currentUser.FamilyId);
-        return Ok(transactions);
+        PaginationHelper.Validate(page, pageSize);
+
+        var (items, totalCount) = await _pointTransactionRepository.GetHistoryAsync(
+            _currentUser.FamilyId, page, pageSize);
+
+        return Ok(new PagedResult<PointTransactionResponse>(
+            items.Select(t => t.ToResponse()).ToList(), page, pageSize, totalCount));
     }
 
     // Define o saldo para um valor absoluto — pensado para migrar um saldo que a familia

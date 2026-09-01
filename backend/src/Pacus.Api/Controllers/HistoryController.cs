@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Pacus.Api.Auth;
 using Pacus.Application.DTOs;
 using Pacus.Application.Interfaces;
+using Pacus.Application.Utils;
 
 namespace Pacus.Api.Controllers;
 
@@ -24,9 +25,16 @@ public class HistoryController : ControllerBase
 
     // Respostas usam .ToResponse() (DailyRoutineDto.cs) em vez de devolver a
     // entidade de dominio crua (achado #3 da auditoria de API de 2026-09-01 --
-    // ver docs/ESTADO_ATUAL.md).
+    // ver docs/ESTADO_ATUAL.md). A listagem por periodo (sem "date") e paginada
+    // (achado #4 da mesma auditoria): cresce um dia a mais pra sempre, entao
+    // devolver tudo de uma vez nao escala.
     [HttpGet]
-    public async Task<IActionResult> Get([FromQuery] string? date, [FromQuery] string? from, [FromQuery] string? to)
+    public async Task<IActionResult> Get(
+        [FromQuery] string? date,
+        [FromQuery] string? from,
+        [FromQuery] string? to,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = PaginationHelper.DefaultPageSize)
     {
         if (!string.IsNullOrEmpty(date))
         {
@@ -34,7 +42,12 @@ public class HistoryController : ControllerBase
             return routine is null ? NotFound() : Ok(routine.ToResponse());
         }
 
-        var history = await _dailyRoutineRepository.GetHistoryAsync(_currentUser.FamilyId, from, to);
-        return Ok(history.Select(r => r.ToResponse()));
+        PaginationHelper.Validate(page, pageSize);
+
+        var (items, totalCount) = await _dailyRoutineRepository.GetHistoryAsync(
+            _currentUser.FamilyId, from, to, page, pageSize);
+
+        return Ok(new PagedResult<DailyRoutineResponse>(
+            items.Select(r => r.ToResponse()).ToList(), page, pageSize, totalCount));
     }
 }

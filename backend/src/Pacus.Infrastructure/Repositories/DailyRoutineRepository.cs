@@ -24,7 +24,12 @@ public class DailyRoutineRepository : IDailyRoutineRepository
     public Task UpdateAsync(DailyRoutine routine) =>
         _context.DailyRoutines.ReplaceOneAsync(r => r.Id == routine.Id, routine);
 
-    public async Task<List<DailyRoutine>> GetHistoryAsync(ObjectId userId, string? from, string? to)
+    // Paginado (achado #4 da auditoria de API de 2026-09-01 -- ver docs/ESTADO_ATUAL.md):
+    // antes devolvia a lista inteira de dias encerrados sem limite, que so cresce com o
+    // tempo (um documento a mais por dia). TotalCount vem de uma segunda query
+    // (CountDocumentsAsync) -- o Mongo nao devolve isso de graca junto com Skip/Limit.
+    public async Task<(List<DailyRoutine> Items, long TotalCount)> GetHistoryAsync(
+        ObjectId userId, string? from, string? to, int page, int pageSize)
     {
         var filterBuilder = Builders<DailyRoutine>.Filter;
         var filter = filterBuilder.Eq(r => r.FamilyId, userId) &
@@ -35,9 +40,14 @@ public class DailyRoutineRepository : IDailyRoutineRepository
         if (!string.IsNullOrEmpty(to))
             filter &= filterBuilder.Lte(r => r.Date, to);
 
-        return await _context.DailyRoutines.Find(filter)
+        var totalCount = await _context.DailyRoutines.CountDocumentsAsync(filter);
+        var items = await _context.DailyRoutines.Find(filter)
             .SortByDescending(r => r.Date)
+            .Skip((page - 1) * pageSize)
+            .Limit(pageSize)
             .ToListAsync();
+
+        return (items, totalCount);
     }
 
     public Task<DailyRoutine?> GetLatestOpenAsync(ObjectId userId) =>

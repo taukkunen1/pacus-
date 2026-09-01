@@ -40,10 +40,12 @@ public class FakeDailyRoutineRepository : IDailyRoutineRepository
         return Task.CompletedTask;
     }
 
-    public Task<List<DailyRoutine>> GetHistoryAsync(
+    public Task<(List<DailyRoutine> Items, long TotalCount)> GetHistoryAsync(
         ObjectId userId,
         string? from,
-        string? to)
+        string? to,
+        int page,
+        int pageSize)
     {
         var query =
             _routines.Where(
@@ -73,11 +75,19 @@ public class FakeDailyRoutineRepository : IDailyRoutineRepository
                             StringComparison.Ordinal) <= 0);
         }
 
-        return Task.FromResult(
+        var ordered =
             query
                 .OrderByDescending(
                     r => r.Date)
-                .ToList());
+                .ToList();
+
+        var page_ =
+            ordered
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+        return Task.FromResult((page_, (long)ordered.Count));
     }
 
     public Task<DailyRoutine?> GetLatestOpenAsync(
@@ -234,17 +244,27 @@ public class FakePointTransactionRepository
                 .Sum(
                     t => t.Points));
 
-    public Task<List<PointTransaction>> GetHistoryAsync(
+    public Task<(List<PointTransaction> Items, long TotalCount)> GetHistoryAsync(
         ObjectId userId,
-        int limit = 100) =>
-        Task.FromResult(
+        int page,
+        int pageSize)
+    {
+        var ordered =
             Transactions
                 .Where(
                     t => t.FamilyId == userId)
                 .OrderByDescending(
                     t => t.CreatedAt)
-                .Take(limit)
-                .ToList());
+                .ToList();
+
+        var page_ =
+            ordered
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+        return Task.FromResult((page_, (long)ordered.Count));
+    }
 
     public Task<List<PointTransaction>> GetAllByFamilyAsync(
         ObjectId familyId) =>

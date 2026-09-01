@@ -202,9 +202,15 @@ public sealed class PointsHttpIntegrationTests
             HttpStatusCode.OK,
             response.StatusCode);
 
-        var transactions =
+        var body =
             await response.Content
                 .ReadFromJsonAsync<JsonElement>();
+
+        // Endpoint paginado (achado #4 da auditoria de API de 2026-09-01 -- ver
+        // docs/ESTADO_ATUAL.md): a resposta agora e um PagedResult, nao mais um
+        // array solto.
+        var transactions =
+            body.GetProperty("items");
 
         Assert.Equal(
             JsonValueKind.Array,
@@ -212,6 +218,10 @@ public sealed class PointsHttpIntegrationTests
 
         Assert.Single(
             transactions.EnumerateArray());
+
+        Assert.Equal(
+            1,
+            body.GetProperty("totalCount").GetInt64());
 
         var transaction =
             transactions[0];
@@ -513,7 +523,8 @@ public sealed class PointsHttpIntegrationTests
         var response = await client.GetAsync("/api/v1/points/transactions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var transactions = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var transactions = body.GetProperty("items");
 
         Assert.DoesNotContain(
             transactions.EnumerateArray(),

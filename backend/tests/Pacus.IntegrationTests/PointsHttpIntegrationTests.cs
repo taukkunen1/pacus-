@@ -102,10 +102,14 @@ public sealed class PointsHttpIntegrationTests
             body.GetProperty("balance").GetInt32());
 
         // 90 * Settings.DefaultPointToBrlRate (0.06, sem Settings salvo pra familia) = 5.4.
-        // Era 4.5 com a taxa antiga (0.05) -- atualizado junto da mudanca de taxa.
+        // Era 4.5 com a taxa antiga (0.05), que por coincidencia batia exato em double.
+        // 0.06 nao bate: 90 * 0.06 == 5.3999999999999995 em IEEE754, nao 5.4 exato --
+        // por isso a comparacao com precisao (ver overload Assert.Equal(double,double,int))
+        // em vez de igualdade exata, que e a forma certa de comparar double de qualquer jeito.
         Assert.Equal(
             5.4,
-            body.GetProperty("brl").GetDouble());
+            body.GetProperty("brl").GetDouble(),
+            precision: 10);
     }
 
     [Fact]

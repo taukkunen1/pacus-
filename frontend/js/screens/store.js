@@ -10,6 +10,7 @@ import { getPoints } from "../api/points-api.js";
 import { showToast } from "../components/toast.js";
 import { appState } from "../state/app-state.js";
 import { formatBrl } from "../utils/format.js";
+import { promptTextarea } from "../components/modal.js";
 
 const CATEGORIES = ["screen_time", "toy", "activity", "other"];
 const CATEGORY_LABELS = {
@@ -174,7 +175,12 @@ export async function renderStore(root, navigate = () => {}) {
       const title = window.prompt("Nome do item:");
       if (!title?.trim()) return;
 
-      const descriptionRaw = window.prompt("Descrição (opcional):", "");
+      const descriptionRaw = await promptTextarea({
+        title: "Descrição do item",
+        label: "Descrição (opcional) — um item por linha",
+        value: "",
+        placeholder: "Ex.: válido só aos fins de semana"
+      });
 
       const cost = Number(window.prompt("Custo em Pacus Points:", "100"));
       if (!Number.isInteger(cost) || cost <= 0) {

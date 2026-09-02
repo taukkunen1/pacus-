@@ -157,6 +157,12 @@ function taskCard(task, canManage) {
   `;
 }
 
+const PERIOD_WORDS = {
+  morning: "manhã",
+  afternoon: "tarde",
+  evening: "noite"
+};
+
 export function renderTaskSection(
   title,
   tasks,
@@ -166,12 +172,15 @@ export function renderTaskSection(
     options.canManage === true;
 
   const type = String(options.type ?? "").toLowerCase();
+  const period = String(options.period ?? "").toLowerCase();
 
   const doneCount = tasks.filter(
     (task) =>
       task.status === "done" ||
       task.status === 1
   ).length;
+
+  const allDone = tasks.length > 0 && doneCount === tasks.length;
 
   const body = tasks.length
     ? `
@@ -189,15 +198,47 @@ export function renderTaskSection(
         </p>
       `;
 
+  // "Voce cuidou de tudo da manha" -- quando as tarefas obrigatorias de um
+  // periodo estao 100% concluidas, trocamos o cabecalho frio "OBRIGATORIAS
+  // 5/5" (linguagem de performance/contagem) por uma frase que nomeia a
+  // conquista de autonomia da crianca, com uma pequena reacao do Pacus. Ver
+  // docs/PROPOSITO.md -- elogio de esforco/cuidado, nao de resultado numerico.
+  // So pra "mandatory": e o tipo que carrega o sentido de "responsabilidade"
+  // pedido pelo dono do produto (2026-09-02); "expected"/"challenge" mantem o
+  // cabecalho padrao de contagem.
+  const showCelebration = allDone && type === "mandatory";
+
+  const periodPhrase = PERIOD_WORDS[period]
+    ? `da ${PERIOD_WORDS[period]}`
+    : "por aqui";
+
+  const header = showCelebration
+    ? `
+        <div class="task-section__celebration">
+          <span class="task-section__celebration-icon" aria-hidden="true">🐟✨</span>
+          <div class="task-section__celebration-text">
+            <p class="task-section__celebration-title">
+              Você cuidou de tudo ${periodPhrase}.
+            </p>
+            <p class="task-section__celebration-subtitle">
+              ${doneCount} responsabilidade${doneCount === 1 ? "" : "s"} concluída${doneCount === 1 ? "" : "s"}.
+            </p>
+          </div>
+        </div>
+      `
+    : `
+        <p class="task-section__title">
+          <span class="task-section__dot"></span>
+          ${escapeHtml(title)}
+          <span class="task-section__count">
+            ${doneCount}/${tasks.length}
+          </span>
+        </p>
+      `;
+
   return `
-    <div class="task-section task-section--${escapeHtml(type)}">
-      <p class="task-section__title">
-        <span class="task-section__dot"></span>
-        ${escapeHtml(title)}
-        <span class="task-section__count">
-          ${doneCount}/${tasks.length}
-        </span>
-      </p>
+    <div class="task-section task-section--${escapeHtml(type)} ${showCelebration ? "task-section--complete" : ""}">
+      ${header}
 
       ${body}
     </div>

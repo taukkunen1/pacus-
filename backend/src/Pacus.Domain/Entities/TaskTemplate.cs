@@ -19,10 +19,31 @@ public class TaskTemplate
     // Description, mas "por que isso importa") -- parentalidade autonomo-suportiva
     // (Joussemet, Landry & Koestner 2008; ver docs/PROPOSITO.md): dar a razao por
     // tras da regra, nao so a regra, muda como a crianca internaliza a
-    // responsabilidade. Opcional -- null/vazio = sem motivo explicito (nao bloqueia
-    // nada, so deixa de aparecer o card). Copiado como esta pra cada DailyTask
-    // gerado (mesma logica de Options acima).
+    // responsabilidade.
+    //
+    // Legado (pre-2026-09-02): um unico texto fixo, copiado sempre igual pra cada
+    // DailyTask gerado -- a mesma frase todo santo dia. Mantido so pra nao quebrar
+    // leitura de documentos antigos do Mongo que nunca foram regravados; nao e mais
+    // escrito por TaskTemplateService (ver Reasons abaixo e EffectiveReasons).
     public string? Reason { get; set; }
+
+    // Pool de frases pertinentes pra essa tarefa -- fonte de verdade atual do "por
+    // que importa" (substitui Reason acima). DailyRoutineService sorteia UMA destas
+    // a cada DailyTask gerado (ver PickReason), pra nao repetir sempre a mesma frase
+    // todo dia mantendo a explicacao sempre relevante pra tarefa. Vazio = sem motivo
+    // explicito (nao bloqueia nada, so deixa de aparecer o card). Cada tarefa pode
+    // ter 1 a 8 frases; uma unica frase tambem e valida (comportamento igual ao
+    // Reason legado, so que guardado na lista nova).
+    public List<string> Reasons { get; set; } = new();
+
+    // Le Reasons quando presente; cai pro Reason legado (como lista de 1 item)
+    // quando o documento e antigo e nunca foi regravado desde esta mudanca. Nao
+    // serializado -- e so uma leitura conveniente, gravar sempre vai por Reasons.
+    [BsonIgnore]
+    public List<string> EffectiveReasons =>
+        Reasons.Count > 0
+            ? Reasons
+            : (string.IsNullOrEmpty(Reason) ? new List<string>() : new List<string> { Reason });
 
     public TaskType Type { get; set; }
     public TaskPeriod Period { get; set; }

@@ -122,7 +122,7 @@ function parseCustomDaysInput(raw) {
         .trim()
         .toLowerCase()
         .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "") // remove acento: "sáb" -> "sab"
+        .replace(/[\u0300-\u036f]/g, "") // remove acento: "sáb" -> "sab"
         .slice(0, 3)
     )
     .filter(Boolean);
@@ -264,18 +264,44 @@ function promptForOptions(currentOptions) {
 }
 
 // Pergunta o "por que isso importa" da tarefa -- parentalidade autonomo-
-// suportiva (ver docs/PROPOSITO.md e a mesma funcao em home.js, duplicada
-// aqui pelo mesmo motivo que promptForOptions). Opcional; cancelar mantem o
-// motivo atual (nao aborta a criacao/edicao, diferente dos campos obrigatorios).
-function promptForReason(currentValue) {
-  const raw = window.prompt(
-    "Por que essa tarefa importa? (opcional — o que a criança vê como motivo, não como fazer)",
-    currentValue ?? ""
+// suportiva (ver docs/PROPOSITO.md). Ate 2026-09-02 isso era uma unica frase
+// fixa (promptForReason), sempre igual em todo dia gerado; a pedido do dono do
+// produto agora e uma LISTA (1 a 6 frases) -- DailyRoutineService sorteia uma
+// diferente a cada tarefa do dia gerada, entao a explicacao continua sempre
+// pertinente sem repetir a mesma frase todo santo dia. Opcional; cancelar
+// mantem a lista atual (nao aborta a criacao/edicao, diferente dos campos
+// obrigatorios). Mesma logica de promptForOptions acima, so que sem minimo de
+// 2 (um unico motivo tambem e valido, igual o campo antigo).
+function promptForReasons(currentReasons) {
+  const hasCurrent = Array.isArray(currentReasons) && currentReasons.length > 0;
+
+  const wantsReasons = window.confirm(
+    hasCurrent
+      ? `Esta tarefa tem ${currentReasons.length} motivo${currentReasons.length > 1 ? "s" : ""} cadastrado${currentReasons.length > 1 ? "s" : ""}. Editar os motivos?\n\nOK = Sim\nCancelar = Manter como está`
+      : "Adicionar o \"por que\" que a criança vê (pode cadastrar mais de uma frase — o app sorteia uma diferente a cada dia)?\n\nOK = Sim\nCancelar = Não, sem motivo"
   );
 
-  if (raw === null) return currentValue ?? null;
+  if (!wantsReasons) {
+    return hasCurrent ? currentReasons : [];
+  }
 
-  return raw.trim() || null;
+  const reasons = [];
+  for (let i = 1; i <= 6; i++) {
+    const suggestion = currentReasons?.[i - 1] ?? "";
+    const raw = window.prompt(
+      `Motivo ${i}${i > 1 ? " (deixe em branco pra parar)" : " (não como fazer, e sim por que importa)"}:`,
+      suggestion
+    );
+
+    if (raw === null) return currentReasons ?? [];
+
+    const trimmed = raw.trim();
+    if (!trimmed) break;
+
+    reasons.push(trimmed);
+  }
+
+  return reasons;
 }
 
 export async function renderPacus(root, navigate) {
@@ -897,7 +923,7 @@ export async function renderPacus(root, navigate) {
       return;
     }
 
-    const reason = promptForReason(null);
+    const reasons = promptForReasons(null);
 
     try {
       const created = await createTask({
@@ -908,7 +934,7 @@ export async function renderPacus(root, navigate) {
         period,
         points,
         options,
-        reason,
+        reasons,
         ...recurrenceChoice
       });
 
@@ -1016,7 +1042,15 @@ export async function renderPacus(root, navigate) {
       return;
     }
 
-    const reason = promptForReason(task.reason);
+    // task.reasons e o campo atual (pool); task.reason e o legado, so ainda
+    // presente em tarefas nunca reeditadas desde essa mudanca (ver
+    // TaskTemplate.EffectiveReasons no backend) -- usado aqui so pra pre-
+    // preencher o primeiro prompt, a gravacao em si sempre vai por reasons.
+    const currentReasons =
+      task.reasons?.length > 0
+        ? task.reasons
+        : (task.reason ? [task.reason] : []);
+    const reasons = promptForReasons(currentReasons);
 
     try {
       const updated = await updateTask(
@@ -1029,7 +1063,7 @@ export async function renderPacus(root, navigate) {
           period,
           points,
           options,
-          reason,
+          reasons,
           ...recurrenceChoice
         }
       );

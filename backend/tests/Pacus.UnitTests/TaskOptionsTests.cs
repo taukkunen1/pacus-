@@ -142,21 +142,24 @@ public class TaskOptionsTests
     }
 
     // Cobre o campo Reason ("por que isso importa" -- parentalidade
-    // autonomo-suportiva, ver docs/PROPOSITO.md e TaskTemplate.Reason).
+    // autonomo-suportiva, ver docs/PROPOSITO.md e TaskTemplate.Reason/Reasons).
+    // ParseSingleReason e o parser de UM motivo (usado ao editar um DailyTask
+    // especifico); ParseReasons (pool, ver TaskReasonTests.cs) e o parser novo
+    // usado por TaskTemplateService.Create/UpdateAsync.
     [Fact]
-    public void ParseReason_NuloOuVazio_RetornaNull()
+    public void ParseSingleReason_NuloOuVazio_RetornaNull()
     {
-        Assert.Null(TaskTemplateService.ParseReason(null));
-        Assert.Null(TaskTemplateService.ParseReason(""));
-        Assert.Null(TaskTemplateService.ParseReason("   "));
+        Assert.Null(TaskTemplateService.ParseSingleReason(null));
+        Assert.Null(TaskTemplateService.ParseSingleReason(""));
+        Assert.Null(TaskTemplateService.ParseSingleReason("   "));
     }
 
     [Fact]
-    public void ParseReason_ComTexto_RetornaTrimado()
+    public void ParseSingleReason_ComTexto_RetornaTrimado()
     {
         Assert.Equal(
             "Aprender coisas novas te ajuda a crescer.",
-            TaskTemplateService.ParseReason("  Aprender coisas novas te ajuda a crescer.  "));
+            TaskTemplateService.ParseSingleReason("  Aprender coisas novas te ajuda a crescer.  "));
     }
 
     [Fact]

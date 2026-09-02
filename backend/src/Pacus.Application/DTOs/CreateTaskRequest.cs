@@ -23,8 +23,13 @@ public record CreateTaskRequest(
     // Op-in de escolha (Teoria da Autodeterminacao, ver docs/PROPOSITO.md): 2-4 opcoes
     // curtas que a crianca escolhe entre si antes de concluir. Null/vazio = sem opcoes.
     List<string>? Options = null,
-    // "Por que isso importa" -- ver TaskTemplate.Reason. Opcional, null/vazio = sem motivo.
-    string? Reason = null
+    // Legado -- mantido so pra clientes antigos que ainda mandam um unico "reason".
+    // Ver TaskTemplate.Reason. Ignorado quando Reasons abaixo vem preenchido.
+    string? Reason = null,
+    // "Por que isso importa" -- ver TaskTemplate.Reasons. Pool de frases pertinentes;
+    // DailyRoutineService sorteia uma diferente a cada dia gerado. Null/vazio = sem
+    // motivo explicito.
+    List<string>? Reasons = null
 );
 
 public record TaskVariantRequest(

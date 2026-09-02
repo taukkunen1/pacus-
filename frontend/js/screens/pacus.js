@@ -9,8 +9,7 @@ import {
 } from "../api/tasks-api.js";
 import { periodLabel, typeLabel } from "../utils/format.js";
 import { showToast } from "../components/toast.js";
-import { isValidPoints, POINTS_HELP_TEXT } from "../utils/validation.js";
-import { promptTextarea } from "../components/modal.js";
+import { promptPermanentTaskForm, promptInput } from "../components/modal.js";
 import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
 import { appState } from "../state/app-state.js";
 import {
@@ -21,84 +20,11 @@ import {
   generateRecoveryCode
 } from "../api/family-api.js";
 
-const PERIODS = ["morning", "afternoon", "evening"];
-const TYPES = ["mandatory", "expected", "challenge"];
-
-// Rotulo em portugues + nome em ingles do enum DayOfWeek do backend (Enum.TryParse
-// so aceita "Monday", "Tuesday" etc). So segunda a sexta: recurrence
-// "weekday_rotation" e so pra dias uteis (ver TaskTemplateService no backend).
-const WEEKDAYS = [
-  { key: "Monday", label: "Segunda-feira" },
-  { key: "Tuesday", label: "Terça-feira" },
-  { key: "Wednesday", label: "Quarta-feira" },
-  { key: "Thursday", label: "Quinta-feira" },
-  { key: "Friday", label: "Sexta-feira" }
-];
-
-// Pergunta o titulo + descricao + pontos de cada dia util pra uma tarefa
-// "rotativa" (atividade diferente de segunda a sexta, ex.: Momento Criativo).
-// `defaultPoints` e o valor ja escolhido pra tarefa como um todo (perguntado
-// antes, na tela principal) -- serve de sugestao pra cada dia, mas cada
-// missao pode valer diferente (ex.: uma que exige supervisao de um adulto
-// vale mais que uma rapida e sozinha). Retorna null se a pessoa cancelar em
-// qualquer dia (o chamador deve abortar a criacao inteira nesse caso, pra
-// nao criar uma rotina pela metade).
-async function promptWeekdayVariants(defaultPoints) {
-  const variants = [];
-
-  for (const { key, label } of WEEKDAYS) {
-    const dayTitle = window.prompt(
-      `Atividade de ${label} (título curto):`
-    );
-
-    if (!dayTitle?.trim()) {
-      return null;
-    }
-
-    // Descricao e opcional aqui -- cancelar o modal (ex.: Esc) so significa
-    // "sem descricao pra esse dia", nao aborta a criacao da tarefa inteira
-    // (diferente do titulo, que e obrigatorio).
-    const dayDescription = await promptTextarea({
-      title: `${label} — detalhes`,
-      label: "Descrição (opcional) — um item por linha",
-      value: "",
-      placeholder: "Como funciona, o que a criança precisa fazer..."
-    });
-
-    const pointsRaw = window.prompt(
-      `Pontos de ${label}:\n${POINTS_HELP_TEXT}`,
-      String(defaultPoints)
-    );
-
-    if (pointsRaw === null) {
-      return null;
-    }
-
-    const dayPoints = Number(pointsRaw);
-    if (!isValidPoints(dayPoints)) {
-      showToast(
-        `Pontos inválidos em ${label}. ${POINTS_HELP_TEXT}.`,
-        { error: true }
-      );
-      return null;
-    }
-
-    variants.push({
-      dayOfWeek: key,
-      title: dayTitle.trim(),
-      description: dayDescription?.trim() || null,
-      points: dayPoints
-    });
-  }
-
-  return variants;
-}
-
-// Abreviacao em portugues (o que a pessoa digita) -> nome em ingles do enum
-// DayOfWeek do backend (o que a API espera). Cobre a semana inteira -- usado
-// so pela recorrencia "custom" (dias especificos, ex.: "Ingles" so terca e
-// quarta, "Escoteiro" so sabado), diferente de WEEKDAYS acima (so uteis, so
-// pra "atividade diferente por dia").
+// Abreviacao em portugues -> nome em ingles do enum DayOfWeek do backend
+// (Enum.TryParse so aceita "Monday", "Tuesday" etc). Cobre a semana inteira --
+// usado so pelo selo de recorrencia customizada na lista de tarefas
+// permanentes (ver recurrenceBadge abaixo); a escolha dos dias em si agora e
+// feita com checkboxes no painel de components/modal.js promptPermanentTaskForm.
 const DAY_ABBR = [
   { abbr: "seg", key: "Monday" },
   { abbr: "ter", key: "Tuesday" },
@@ -108,201 +34,6 @@ const DAY_ABBR = [
   { abbr: "sab", key: "Saturday" },
   { abbr: "dom", key: "Sunday" }
 ];
-
-// "seg, Qua ,sáb" -> ["Monday", "Wednesday", "Saturday"]. Retorna null se
-// algum token nao bater com nenhuma abreviacao (o chamador deve tratar como
-// entrada invalida) ou se a lista ficar vazia.
-function parseCustomDaysInput(raw) {
-  if (!raw?.trim()) return null;
-
-  const tokens = raw
-    .split(",")
-    .map((token) =>
-      token
-        .trim()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") // remove acento: "sáb" -> "sab"
-        .slice(0, 3)
-    )
-    .filter(Boolean);
-
-  if (!tokens.length) return null;
-
-  const days = [];
-  for (const token of tokens) {
-    const match = DAY_ABBR.find((d) => d.abbr === token);
-    if (!match) return null;
-    if (!days.includes(match.key)) days.push(match.key);
-  }
-
-  return days;
-}
-
-// Pergunta quando a tarefa deve aparecer e retorna { recurrence, variants?,
-// customDays? } pronto pra mandar no payload de createTask/updateTask (ou
-// null se a pessoa cancelar em qualquer etapa -- o chamador deve abortar).
-// `existingTask` (opcional, usado na edicao) pre-seleciona a opcao e os dias
-// que a tarefa ja tinha configurados, pra "aceitar o padrao" bastar apertar
-// Enter na maioria dos casos. `basePoints` e o valor de pontos ja escolhido
-// pra tarefa nesta mesma tela (usado como sugestao pra opcao 5, atividade
-// diferente por dia).
-async function promptRecurrenceChoice(existingTask, basePoints) {
-  const currentRecurrence = existingTask?.recurrence ?? "daily";
-  const defaultChoice =
-    {
-      daily: "1",
-      weekday: "2",
-      weekend: "3",
-      custom: "4",
-      weekday_rotation: "5"
-    }[currentRecurrence] ?? "1";
-
-  const choice = window.prompt(
-    "Quando essa tarefa deve aparecer?\n" +
-      "1) Todos os dias\n" +
-      "2) Dias úteis (segunda a sexta)\n" +
-      "3) Fim de semana (sábado e domingo)\n" +
-      "4) Dias específicos (você escolhe quais)\n" +
-      "5) Atividade diferente a cada dia útil (ex.: Momento Criativo)",
-    defaultChoice
-  );
-
-  if (choice === null) return null;
-
-  switch (choice.trim()) {
-    case "2":
-      return { recurrence: "weekday" };
-
-    case "3":
-      return { recurrence: "weekend" };
-
-    case "4": {
-      const currentDaysHint = (existingTask?.customDays ?? [])
-        .map((day) => DAY_ABBR.find((d) => d.key.toLowerCase() === String(day).toLowerCase())?.abbr)
-        .filter(Boolean)
-        .join(",");
-
-      const raw = window.prompt(
-        "Quais dias? Separe por vírgula: seg,ter,qua,qui,sex,sab,dom",
-        currentDaysHint
-      );
-
-      if (raw === null) return null;
-
-      const customDays = parseCustomDaysInput(raw);
-      if (!customDays) {
-        showToast(
-          "Dias inválidos. Use seg,ter,qua,qui,sex,sab,dom separados por vírgula.",
-          { error: true }
-        );
-        return null;
-      }
-
-      return { recurrence: "custom", customDays };
-    }
-
-    case "5": {
-      // Nao pre-preenche as atividades de cada dia mesmo editando uma tarefa
-      // rotativa existente -- limitacao aceitavel do formato "um prompt por
-      // vez"; a pessoa precisa redigitar as 5 atividades pra manter a rotacao.
-      const variants = await promptWeekdayVariants(basePoints);
-      if (!variants) return null;
-      return { recurrence: "weekday_rotation", variants };
-    }
-
-    default:
-      return { recurrence: "daily" };
-  }
-}
-
-// Pergunta as opcoes de escolha (2-4) que a crianca vai poder selecionar
-// antes de concluir a tarefa (Teoria da Autodeterminacao -- docs/PROPOSITO.md).
-// Mesma logica de frontend/js/screens/home.js (duplicada aqui em vez de
-// compartilhada -- os dois arquivos ja duplicam varios outros prompts, e nao
-// ha um modulo comum de "prompts de tarefa" ainda). Retorna null se a pessoa
-// cancelar depois de comecar a preencher (o chamador deve abortar).
-function promptForOptions(currentOptions) {
-  const hasCurrent = Array.isArray(currentOptions) && currentOptions.length > 0;
-
-  const wantsOptions = window.confirm(
-    hasCurrent
-      ? "Esta tarefa tem opções pra escolher. Editar as opções?\n\nOK = Sim\nCancelar = Manter como está"
-      : "Adicionar opções pra criança escolher entre missões (ex.: torre de copos / ponte de papel)?\n\nOK = Sim\nCancelar = Não, tarefa comum"
-  );
-
-  if (!wantsOptions) {
-    return hasCurrent ? currentOptions : [];
-  }
-
-  const options = [];
-  for (let i = 1; i <= 4; i++) {
-    const suggestion = currentOptions?.[i - 1] ?? "";
-    const raw = window.prompt(
-      `Opção ${i}${i > 2 ? " (deixe em branco pra parar)" : ""}:`,
-      suggestion
-    );
-
-    if (raw === null) return null;
-
-    const trimmed = raw.trim();
-    if (!trimmed) {
-      if (i <= 2) {
-        showToast(
-          "Uma tarefa com opções precisa de pelo menos 2.",
-          { error: true }
-        );
-        return null;
-      }
-      break;
-    }
-
-    options.push(trimmed);
-  }
-
-  return options;
-}
-
-// Pergunta o "por que isso importa" da tarefa -- parentalidade autonomo-
-// suportiva (ver docs/PROPOSITO.md). Ate 2026-09-02 isso era uma unica frase
-// fixa (promptForReason), sempre igual em todo dia gerado; a pedido do dono do
-// produto agora e uma LISTA (1 a 6 frases) -- DailyRoutineService sorteia uma
-// diferente a cada tarefa do dia gerada, entao a explicacao continua sempre
-// pertinente sem repetir a mesma frase todo santo dia. Opcional; cancelar
-// mantem a lista atual (nao aborta a criacao/edicao, diferente dos campos
-// obrigatorios). Mesma logica de promptForOptions acima, so que sem minimo de
-// 2 (um unico motivo tambem e valido, igual o campo antigo).
-function promptForReasons(currentReasons) {
-  const hasCurrent = Array.isArray(currentReasons) && currentReasons.length > 0;
-
-  const wantsReasons = window.confirm(
-    hasCurrent
-      ? `Esta tarefa tem ${currentReasons.length} motivo${currentReasons.length > 1 ? "s" : ""} cadastrado${currentReasons.length > 1 ? "s" : ""}. Editar os motivos?\n\nOK = Sim\nCancelar = Manter como está`
-      : "Adicionar o \"por que\" que a criança vê (pode cadastrar mais de uma frase — o app sorteia uma diferente a cada dia)?\n\nOK = Sim\nCancelar = Não, sem motivo"
-  );
-
-  if (!wantsReasons) {
-    return hasCurrent ? currentReasons : [];
-  }
-
-  const reasons = [];
-  for (let i = 1; i <= 6; i++) {
-    const suggestion = currentReasons?.[i - 1] ?? "";
-    const raw = window.prompt(
-      `Motivo ${i}${i > 1 ? " (deixe em branco pra parar)" : " (não como fazer, e sim por que importa)"}:`,
-      suggestion
-    );
-
-    if (raw === null) return currentReasons ?? [];
-
-    const trimmed = raw.trim();
-    if (!trimmed) break;
-
-    reasons.push(trimmed);
-  }
-
-  return reasons;
-}
 
 export async function renderPacus(root, navigate) {
   root.innerHTML = `
@@ -587,10 +318,13 @@ export async function renderPacus(root, navigate) {
   }
 
   async function changeTimezone() {
-    const timezone = window.prompt(
-      "Fuso horário da família (formato IANA, ex.: America/Sao_Paulo):",
-      familyTimezone || "America/Sao_Paulo"
-    );
+    const timezone = await promptInput({
+      title: "Fuso horário da família",
+      label: "Fuso horário (formato IANA)",
+      value: familyTimezone || "America/Sao_Paulo",
+      placeholder: "America/Sao_Paulo",
+      hint: "Ex.: America/Sao_Paulo, America/Manaus, America/Fortaleza."
+    });
     if (!timezone?.trim()) return;
 
     try {
@@ -631,13 +365,25 @@ export async function renderPacus(root, navigate) {
     let childId = children[0].id;
     if (children.length > 1) {
       const names = children.map((c, i) => `${i + 1}) ${c.name}`).join("\n");
-      const choice = Number(window.prompt(`Qual criança?\n${names}`, "1"));
+      const choice = Number(
+        await promptInput({
+          title: "Trocar PIN",
+          label: "Qual criança? (digite o número)",
+          value: "1",
+          hint: names
+        })
+      );
       const chosen = children[choice - 1];
       if (!chosen) return;
       childId = chosen.id;
     }
 
-    const newPin = window.prompt("Novo PIN (4 dígitos):");
+    const newPin = await promptInput({
+      title: "Trocar PIN",
+      label: "Novo PIN (4 dígitos)",
+      placeholder: "0000",
+      type: "text"
+    });
     if (!newPin?.trim()) return;
 
     if (!/^[0-9]{4}$/.test(newPin.trim())) {
@@ -655,17 +401,35 @@ export async function renderPacus(root, navigate) {
 
   async function addGrowthStage() {
     const stageNames = ["egg", "cracking", "hatching", "baby", "young", "adult"];
-    const stage = window
-      .prompt(`Estágio: ${stageNames.join(", ")}`, "adult")
+    const stageLabels = {
+      egg: "Ovo",
+      cracking: "Rachando",
+      hatching: "Eclodindo",
+      baby: "Filhote",
+      young: "Jovem",
+      adult: "Adulto"
+    };
+    const stage = (
+      await promptInput({
+        title: "Novo estágio de crescimento",
+        label: "Estágio",
+        value: "adult",
+        hint: `Opções: ${stageNames.map((s) => stageLabels[s]).join(", ")}.`
+      })
+    )
       ?.trim()
       .toLowerCase();
 
     if (!stageNames.includes(stage)) {
-      showToast(`Estágio inválido. Use um de: ${stageNames.join(", ")}.`, { error: true });
+      showToast(`Estágio inválido. Use um de: ${stageNames.map((s) => stageLabels[s]).join(", ")}.`, { error: true });
       return;
     }
 
-    const date = window.prompt("A partir de qual data (AAAA-MM-DD)?", "");
+    const date = await promptInput({
+      title: "Novo estágio de crescimento",
+      label: "A partir de qual data?",
+      type: "date"
+    });
     if (!date?.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(date.trim())) {
       showToast("Data inválida. Use o formato AAAA-MM-DD.", { error: true });
       return;
@@ -845,98 +609,23 @@ export async function renderPacus(root, navigate) {
     return "";
   }
 
+  // Painel unico (components/modal.js promptPermanentTaskForm), mesmo padrao
+  // do editor de tarefas do dia: Tipo e Periodo como grupos de botoes,
+  // recorrencia com os blocos de dias/variantes revelados so quando fazem
+  // sentido, Opcoes e Motivos como listas editaveis -- tudo isso substitui a
+  // antiga cadeia de window.prompt/window.confirm (que pedia, por exemplo,
+  // digitar "mandatory, expected ou challenge" por extenso).
   async function createPermanentTask() {
-    const title = window.prompt(
-      "Nome da tarefa permanente:"
-    );
-
-    if (!title?.trim()) {
-      return;
-    }
-
-    const descriptionRaw = await promptTextarea({
-      title: "Descrição da tarefa",
-      label: "Descrição (opcional) — um item por linha",
-      value: "",
-      placeholder: "Ex.: 48 ÷ 6 = ___\n72 ÷ 8 = ___"
+    const result = await promptPermanentTaskForm({
+      title: "Nova tarefa permanente",
+      values: { type: "challenge", points: 1, period: "morning" },
+      confirmLabel: "Adicionar"
     });
 
-    const type = window
-      .prompt(
-        "Tipo: mandatory, expected ou challenge",
-        "challenge"
-      )
-      ?.trim()
-      .toLowerCase();
-
-    if (!TYPES.includes(type)) {
-      showToast(
-        "Tipo invalido. Use mandatory, expected ou challenge.",
-        { error: true }
-      );
-
-      return;
-    }
-
-    const period = window
-      .prompt(
-        "Periodo: morning, afternoon ou evening",
-        "morning"
-      )
-      ?.trim()
-      .toLowerCase();
-
-    if (!PERIODS.includes(period)) {
-      showToast(
-        "Periodo invalido. Use morning, afternoon ou evening.",
-        { error: true }
-      );
-
-      return;
-    }
-
-    const points = Number(
-      window.prompt(
-        POINTS_HELP_TEXT,
-        "1"
-      )
-    );
-
-    if (!isValidPoints(points)) {
-      showToast(
-        `Valor invalido. ${POINTS_HELP_TEXT}.`,
-        { error: true }
-      );
-
-      return;
-    }
-
-    // Em quais dias essa tarefa aparece -- sem isso toda tarefa permanente
-    // aparecia igual em todos os dias, sem excecao.
-    const recurrenceChoice = await promptRecurrenceChoice(null, points);
-    if (!recurrenceChoice) {
-      return;
-    }
-
-    const options = promptForOptions(null);
-    if (options === null) {
-      return;
-    }
-
-    const reasons = promptForReasons(null);
+    if (!result) return;
 
     try {
-      const created = await createTask({
-        title: title.trim(),
-        description:
-          descriptionRaw?.trim() || null,
-        type,
-        period,
-        points,
-        options,
-        reasons,
-        ...recurrenceChoice
-      });
+      const created = await createTask(result);
 
       tasks = [created, ...tasks];
 
@@ -944,147 +633,32 @@ export async function renderPacus(root, navigate) {
 
       draw();
     } catch (err) {
-      showToast(
-        err.message,
-        { error: true }
-      );
+      showToast(err.message, { error: true });
     }
   }
 
   async function editPermanentTask(id) {
-    const task = tasks.find(
-      (item) =>
-        String(item.id) === String(id)
-    );
+    const task = tasks.find((item) => String(item.id) === String(id));
+    if (!task) return;
 
-    if (!task) {
-      return;
-    }
-
-    const title = window.prompt(
-      "Nome da tarefa:",
-      task.title
-    );
-
-    if (!title?.trim()) {
-      return;
-    }
-
-    const descriptionRaw = await promptTextarea({
-      title: "Descrição da tarefa",
-      label: "Descrição (opcional) — um item por linha",
-      value: task.description ?? "",
-      placeholder: "Ex.: 48 ÷ 6 = ___\n72 ÷ 8 = ___"
+    const result = await promptPermanentTaskForm({
+      title: "Editar tarefa",
+      values: task,
+      confirmLabel: "Salvar"
     });
 
-    const type = window
-      .prompt(
-        "Tipo: mandatory, expected ou challenge",
-        task.type
-      )
-      ?.trim()
-      .toLowerCase();
-
-    if (!TYPES.includes(type)) {
-      showToast(
-        "Tipo invalido. Use mandatory, expected ou challenge.",
-        { error: true }
-      );
-
-      return;
-    }
-
-    const period = window
-      .prompt(
-        "Periodo: morning, afternoon ou evening",
-        task.period
-      )
-      ?.trim()
-      .toLowerCase();
-
-    if (!PERIODS.includes(period)) {
-      showToast(
-        "Periodo invalido. Use morning, afternoon ou evening.",
-        { error: true }
-      );
-
-      return;
-    }
-
-    const points = Number(
-      window.prompt(
-        POINTS_HELP_TEXT,
-        String(task.points)
-      )
-    );
-
-    if (!isValidPoints(points)) {
-      showToast(
-        `Valor invalido. ${POINTS_HELP_TEXT}.`,
-        { error: true }
-      );
-
-      return;
-    }
-
-    // Pre-seleciona a opcao (e os dias, se for "custom") que a tarefa ja tinha,
-    // pra bastar apertar Enter na maioria dos casos -- sem isso o backend reseta
-    // a recorrencia pro padrao ("daily") sempre que o payload de edicao nao manda
-    // esses campos, apagando silenciosamente uma configuracao como "Inglês" so
-    // terca e quarta so por editar o titulo.
-    const recurrenceChoice = await promptRecurrenceChoice(task, points);
-    if (!recurrenceChoice) {
-      return;
-    }
-
-    const options = promptForOptions(task.options);
-    if (options === null) {
-      return;
-    }
-
-    // task.reasons e o campo atual (pool); task.reason e o legado, so ainda
-    // presente em tarefas nunca reeditadas desde essa mudanca (ver
-    // TaskTemplate.EffectiveReasons no backend) -- usado aqui so pra pre-
-    // preencher o primeiro prompt, a gravacao em si sempre vai por reasons.
-    const currentReasons =
-      task.reasons?.length > 0
-        ? task.reasons
-        : (task.reason ? [task.reason] : []);
-    const reasons = promptForReasons(currentReasons);
+    if (!result) return;
 
     try {
-      const updated = await updateTask(
-        id,
-        {
-          title: title.trim(),
-          description:
-            descriptionRaw?.trim() || null,
-          type,
-          period,
-          points,
-          options,
-          reasons,
-          ...recurrenceChoice
-        }
-      );
+      const updated = await updateTask(id, result);
 
-      tasks = tasks.map(
-        (item) =>
-          String(item.id) === String(id)
-            ? updated
-            : item
-      );
+      tasks = tasks.map((item) => (String(item.id) === String(id) ? updated : item));
 
-      showToast(
-        "Tarefa permanente atualizada."
-      );
+      showToast("Tarefa permanente atualizada.");
 
       draw();
     } catch (err) {
-      showToast(
-        err.message,
-        { error: true }
-      );
+      showToast(err.message, { error: true });
     }
   }
 

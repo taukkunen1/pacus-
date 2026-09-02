@@ -205,6 +205,93 @@ public class TaskRecurrenceTests
     }
 
     [Fact]
+    public async Task RecorrenciaInterval_DiaSimDiaNao_DeslizaPelosDiasDaSemanaAPartirDaAncora()
+    {
+        var (templates, dailyRoutine) = BuildSystem(out _);
+        var userId = ObjectId.GenerateNewId();
+
+        // Caso real pedido pelo usuario: "Lavar o cabelo", dia sim dia nao, comecando
+        // numa quarta (2026-09-02). Diferente de RecurrenceCustom com dias fixos --
+        // aqui o padrao desliza: qua, sex, dom, ter, qui, sab, seg, qua...
+        await templates.CreateAsync(userId, userId,
+            new CreateTaskRequest(
+                "Lavar o cabelo",
+                "Se sentir mais limpo e cheiroso",
+                "mandatory",
+                "evening",
+                1,
+                Recurrence: "interval",
+                AnchorDate: "2026-09-02",
+                IntervalDays: 2));
+
+        var beforeAnchor = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-01", "America/Sao_Paulo");
+        var anchorDay = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-02", "America/Sao_Paulo"); // qua (dia 0)
+        var dayAfter = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-03", "America/Sao_Paulo"); // qui (dia 1)
+        var twoAfter = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-04", "America/Sao_Paulo"); // sex (dia 2)
+        var threeAfter = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-05", "America/Sao_Paulo"); // sab (dia 3)
+        var fourAfter = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-06", "America/Sao_Paulo"); // dom (dia 4)
+
+        Assert.Empty(beforeAnchor.Tasks); // antes da ancora, nunca aparece
+        Assert.Equal("Lavar o cabelo", anchorDay.Tasks.Single().Title);
+        Assert.Empty(dayAfter.Tasks);
+        Assert.Equal("Lavar o cabelo", twoAfter.Tasks.Single().Title);
+        Assert.Empty(threeAfter.Tasks);
+        Assert.Equal("Lavar o cabelo", fourAfter.Tasks.Single().Title);
+    }
+
+    [Fact]
+    public async Task RecorrenciaInterval_SemIntervalDays_UsaPadraoDiaSimDiaNao()
+    {
+        var (templates, dailyRoutine) = BuildSystem(out _);
+        var userId = ObjectId.GenerateNewId();
+
+        await templates.CreateAsync(userId, userId,
+            new CreateTaskRequest(
+                "Lavar o cabelo", null, "mandatory", "evening", 1,
+                Recurrence: "interval", AnchorDate: "2026-09-02"));
+
+        var anchorDay = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-02", "America/Sao_Paulo");
+        var dayAfter = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-03", "America/Sao_Paulo");
+
+        Assert.Single(anchorDay.Tasks);
+        Assert.Empty(dayAfter.Tasks);
+    }
+
+    [Fact]
+    public async Task RecorrenciaInterval_SemAnchorDate_LancaExcecao()
+    {
+        var (templates, _) = BuildSystem(out _);
+        var userId = ObjectId.GenerateNewId();
+
+        await Assert.ThrowsAsync<ValidationException>(() => templates.CreateAsync(userId, userId,
+            new CreateTaskRequest("Lavar o cabelo", null, "mandatory", "evening", 1, Recurrence: "interval")));
+    }
+
+    [Fact]
+    public async Task RecorrenciaInterval_AnchorDateInvalida_LancaExcecao()
+    {
+        var (templates, _) = BuildSystem(out _);
+        var userId = ObjectId.GenerateNewId();
+
+        await Assert.ThrowsAsync<ValidationException>(() => templates.CreateAsync(userId, userId,
+            new CreateTaskRequest(
+                "Lavar o cabelo", null, "mandatory", "evening", 1,
+                Recurrence: "interval", AnchorDate: "02/09/2026")));
+    }
+
+    [Fact]
+    public async Task RecorrenciaInterval_IntervalDaysMenorQueUm_LancaExcecao()
+    {
+        var (templates, _) = BuildSystem(out _);
+        var userId = ObjectId.GenerateNewId();
+
+        await Assert.ThrowsAsync<ValidationException>(() => templates.CreateAsync(userId, userId,
+            new CreateTaskRequest(
+                "Lavar o cabelo", null, "mandatory", "evening", 1,
+                Recurrence: "interval", AnchorDate: "2026-09-02", IntervalDays: 0)));
+    }
+
+    [Fact]
     public async Task RecorrenciaDaily_ContinuaAparecendoTodoDia_ComportamentoOriginal()
     {
         var (templates, dailyRoutine) = BuildSystem(out _);

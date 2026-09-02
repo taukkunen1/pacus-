@@ -120,20 +120,38 @@
 }
 
 /* "Por que isso importa" -- parentalidade autonomo-suportiva (ver
-   docs/PROPOSITO.md e TaskTemplate.Reason). Visualmente distinto da
-   descricao (que e "como fazer"): cor mais quente, icone de lampada, sem
-   risco quando a tarefa e concluida (o motivo continua valendo). */
+   docs/PROPOSITO.md e TaskTemplate.Reason). Comecou como paragrafo sempre
+   visivel (italico, cor quente), mas competia visualmente com o titulo da
+   tarefa -- ocupava boa parte do card (pedido do dono do produto,
+   2026-09-02). Agora e um <details> nativo fechado por padrao: so o
+   gatilho "Por que?" aparece no card, e o texto completo (incluindo a
+   pergunta "Por que voce faz isso?") so ocupa espaco quando a crianca
+   toca pra abrir. Sem risco quando a tarefa e concluida (o motivo
+   continua valendo, nao tem estado "done" proprio). */
 .task-reason {
+  margin-top: 4px;
+}
+.task-reason__toggle {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 6px;
+  width: fit-content;
+  font-size: var(--step-xs, 0.8rem);
+  color: var(--color-sun);
+  cursor: pointer;
+  list-style: none;
+}
+.task-reason__toggle::-webkit-details-marker { display: none; }
+.task-reason__toggle::marker { content: ""; }
+.task-reason__toggle:hover { text-decoration: underline; }
+.task-reason__icon { flex-shrink: 0; }
+.task-reason__text {
   font-size: var(--step-xs, 0.8rem);
   color: var(--color-sun);
   margin-top: 4px;
   font-style: italic;
   white-space: pre-line;
 }
-.task-reason__icon { flex-shrink: 0; }
 
 /* Chips de escolha real da crianca entre missoes de uma tarefa (Teoria da
    Autodeterminacao -- ver docs/PROPOSITO.md e TaskTemplate.Options). */

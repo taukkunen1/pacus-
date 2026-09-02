@@ -130,6 +130,38 @@ Dois endpoints devolviam a lista inteira de uma vez, sem nenhum jeito de pedir s
 - **Testes**: `DailyRoutineConcurrencyTests.cs` (novo) — duas leituras independentes da mesma rotina, a primeira grava com sucesso (versão 0→1), a segunda (baseada na versão 0, que já não existe mais) lança `ConflictException`, e o que fica salvo é o que a primeira gravou, intacto. Pra isso funcionar de verdade, `FakeDailyRoutineRepository` passou a devolver/guardar cópias independentes (`Clone`) em vez da mesma referência em memória — do jeito que o Mongo de verdade já se comporta (cada leitura é um round-trip que desserializa um documento novo), mas que o fake antigo não simulava.
 - 58 testes unitários verdes (55 + 3 novos); build limpo sem warnings novos.
 
+## Bug crítico pós-deploy do achado #5 + recorrência "dia sim, dia não" + editor de tarefas do dia num painel só (2026-09-02)
+
+### 409 em rotinas antigas (regressão do achado #5 de concorrência otimista)
+
+Depois do deploy da concorrência otimista (`DailyRoutine.Version`, achado #5, seção acima), qualquer ação numa rotina criada **antes** desse campo existir passou a falhar sempre com `ConflictException` (409) — não era uma corrida rara, era 100% das vezes, porque a query filtro `Version == 0` não bate em documento do Mongo onde o campo simplesmente não existe (Mongo não trata "campo ausente" como igual a `0` numa comparação direta). `Version` desserializa como `0` em C#, mas o filtro do `ReplaceOneAsync` rodava direto no banco, sem passar pela desserialização.
+
+- **`DailyRoutineRepository.UpdateAsync`**: quando a versão esperada é `0`, o filtro agora aceita `Version == 0` OU o campo ausente (`Builders.Filter.Or(Eq(Version, 0), Exists(Version, false))`). Documentos legados sem `Version` voltam a gravar normalmente, sem script de migração nem tocar nos dados existentes.
+- **`DailyRoutinesController.GetToday()`**: ganhou uma repetição (retry) de uma tentativa em caso de 409, para absorver o caso raro de corrida real de verdade (dois requests concorrentes de fato) sem devolver erro pro usuário — o trade-off "sem retry automático" registrado no achado #5 continua valendo para os outros ~12 pontos de `DailyRoutineService` que chamam `UpdateAsync`, só `GetToday` ganhou a repetição.
+- Frontend (`api-client.js`): uma tentativa extra automática quando a API responde 409, antes de mostrar erro pro usuário.
+
+### Recorrência "dia sim, dia não" (`RecurrenceInterval`)
+
+Pedido pontual: uma tarefa permanente tipo "Lavar o cabelo" que não é nem diária nem por dia da semana fixo, e sim por intervalo de dias corridos.
+
+- **`TaskTemplate`**: novo valor de recorrência `RecurrenceInterval`, com dois campos novos, `AnchorDate` (data-âncora, formato `yyyy-MM-dd`) e `IntervalDays` (inteiro, dias entre ocorrências — `2` = dia sim, dia não).
+- **`DailyRoutineService.ResolveTemplateForDay`**: passou a receber a data operacional inteira (não só o dia da semana), porque `RecurrenceInterval` precisa contar dias corridos desde a âncora — diferente de `RecurrenceCustom`/`RecurrenceWeekdayRotation`, que se repetem sempre nos mesmos dias da semana, um intervalo em dias vai deslizando pela semana com o tempo. Novo helper `IsIntervalDay` calcula `(diasCorridosDesdeAAncora % IntervalDays) == 0`.
+- **`CreateTaskRequest`/`TaskTemplateService`**: validação e persistência dos dois campos novos quando `Recurrence == "interval"`.
+- **Testes**: `TaskRecurrenceTests.cs` cobrindo dia-sim-dia-não a partir de âncoras diferentes, incluindo a virada de semana.
+
+### Editor de tarefas do dia — um painel só, em vez da fila de prompts
+
+Reclamação do dono do produto: o botão de editar tarefa do dia (✎, tela "Hoje") abria uma sequência de `prompt`/`confirm` do navegador, um atrás do outro ("ok > ok > ok > ok"), e nesse meio de caminho não ficava claro que dava pra trocar o tipo da tarefa entre Obrigatória / Deve fazer / Desafio — a opção estava enterrada num desses prompts genéricos, sem destaque.
+
+- **`components/modal.js`**: nova função `promptTaskForm(...)`, um painel único com todos os campos de uma vez — título, descrição, pontos (com a mesma validação de sempre), o tipo da tarefa como um grupo de opções sempre visível (não mais escondido atrás de um prompt numerado), a lista de opções (quando a tarefa é de múltipla escolha, com botão de adicionar/remover, de 2 a 4 opções) e o motivo. Substitui os antigos `promptForType`, `promptForPoints`, `promptForDescription`, `promptForOptions` e `promptForReason` (todos removidos de `home.js`, junto com as constantes que só eles usavam).
+- **`css/components/modal.css`**: estilo novo pro painel (`.modal-box--form`, rola por dentro em telas baixas) e pro grupo de tipo (`.task-form-type-option`, visual de "pill" com destaque quando selecionado), checkbox e lista de opções.
+- **`screens/home.js`**: os fluxos de criar e editar tarefa do dia (`#add-task` e `[data-task-action=edit]`) agora chamam `promptTaskForm` uma vez só, em vez da cadeia de prompts sequenciais. `promptForReactionChoice` (reação do adulto ao dia, recurso sem relação com isto) não foi tocado.
+- Validado localmente (checagem de sintaxe com `node --check` nos arquivos tocados e um teste visual/funcional isolado do painel antes de subir) — sem suíte automatizada de frontend no projeto, então a validação aqui foi manual, como já registrado nas seções anteriores.
+
+### Faxina do repositório
+
+Apagado o arquivo solto `pacusretryfix.patch` (resíduo de um patch aplicado manualmente, sem uso depois de aplicado) e as 4 branches órfãs já mescladas e sem trabalho pendente (`fix/routine-conflict-retry`, `fix/routine-conflict-retry-1`, `taukkunen1-patch-1`, `taukkunen1-patch-2`). Restam só `main` e `feature/next-migration`.
+
 ## Revisão geral pós-auditoria + lentidão no primeiro acesso (2026-09-01)
 
 A pedido do dono do produto: "revise tudo, veja se tudo está testado e funcionando" + relato de que o site às vezes "parece carregando e demora tanto".

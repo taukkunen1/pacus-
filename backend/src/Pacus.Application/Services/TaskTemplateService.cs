@@ -28,7 +28,7 @@ public class TaskTemplateService : ITaskTemplateService
         var (type, period) = ParseTypeAndPeriod(request);
         var (recurrence, variants, customDays, anchorDate, intervalDays) = ParseRecurrenceAndVariants(request);
         var options = ParseOptions(request.Options);
-        var reason = ParseReason(request.Reason);
+        var reasons = ParseReasons(request.Reasons, request.Reason);
 
         var existing = await _taskTemplateRepository.GetActiveByUserAsync(familyId);
 
@@ -49,7 +49,7 @@ public class TaskTemplateService : ITaskTemplateService
             AnchorDate = anchorDate,
             IntervalDays = intervalDays,
             Options = options,
-            Reason = reason,
+            Reasons = reasons,
             CreatedBy = createdBy,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -74,7 +74,7 @@ public class TaskTemplateService : ITaskTemplateService
         var (type, period) = ParseTypeAndPeriod(request);
         var (recurrence, variants, customDays, anchorDate, intervalDays) = ParseRecurrenceAndVariants(request);
         var options = ParseOptions(request.Options);
-        var reason = ParseReason(request.Reason);
+        var reasons = ParseReasons(request.Reasons, request.Reason);
 
         template.Title = request.Title;
         template.Description = request.Description;
@@ -87,7 +87,12 @@ public class TaskTemplateService : ITaskTemplateService
         template.AnchorDate = anchorDate;
         template.IntervalDays = intervalDays;
         template.Options = options;
-        template.Reason = reason;
+        // Reasons e a fonte de verdade a partir de agora; zera o campo legado pra
+        // nao deixar as duas copias divergirem depois de uma edicao (ver
+        // TaskTemplate.EffectiveReasons -- so cai pro legado quando Reasons nunca
+        // foi regravado desde esta mudanca).
+        template.Reasons = reasons;
+        template.Reason = null;
         template.UpdatedAt = DateTime.UtcNow;
 
         await _taskTemplateRepository.UpdateAsync(template);
@@ -358,12 +363,47 @@ public class TaskTemplateService : ITaskTemplateService
         return options;
     }
 
-    // "Por que isso importa" (TaskTemplate.Reason) -- so trim + null-se-vazio, sem
-    // limite artificial de tamanho: diferente de Options, aqui e texto livre de
-    // verdade (uma frase, geralmente), sem estrutura pra validar.
-    public static string? ParseReason(string? rawReason)
+    // So trim + null-se-vazio, sem pool -- usado nos dois lugares que editam UM
+    // DailyTask especifico diretamente (CreateAdHocTaskAsync/UpdateTaskAsync em
+    // DailyRoutineService, via DailyTaskUpdateRequest.Reason), nao um TaskTemplate
+    // inteiro. Um unico dia nao tem "variedade" pra sortear -- so faz sentido a
+    // pessoa escrever um motivo especifico pra aquela tarefa daquele dia.
+    public static string? ParseSingleReason(string? rawReason)
     {
         var trimmed = rawReason?.Trim();
         return string.IsNullOrEmpty(trimmed) ? null : trimmed;
+    }
+
+    // "Por que isso importa" (TaskTemplate.Reasons) -- pool de frases que
+    // DailyRoutineService sorteia uma por dia (pedido do dono do produto,
+    // 2026-09-02: motivos variados em vez da mesma frase todo dia). Aceita
+    // rawReasons (campo atual) OU legacyReason (campo antigo, string unica --
+    // mantido pra clientes/testes que ainda mandam so "reason") -- rawReasons tem
+    // prioridade quando os dois vierem preenchidos. Sem limite de quantidade
+    // artificial tipo Options (nao sao "escolhas" que a crianca compara lado a
+    // lado, sao so variantes da mesma explicacao), mas um teto generoso de 8 evita
+    // que a lista vire ruido. Frases duplicadas (ignorando maiusculas/espacos) sao
+    // descartadas silenciosamente -- nao ha por que sortear entre duas copias da
+    // mesma frase.
+    public static List<string> ParseReasons(List<string>? rawReasons, string? legacyReason)
+    {
+        List<string> source;
+        if (rawReasons is not null && rawReasons.Count > 0)
+            source = rawReasons;
+        else if (!string.IsNullOrWhiteSpace(legacyReason))
+            source = new List<string> { legacyReason };
+        else
+            return new List<string>();
+
+        var reasons = source
+            .Select(r => r?.Trim() ?? string.Empty)
+            .Where(r => r.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (reasons.Count > 8)
+            throw new ValidationException("No maximo 8 motivos por tarefa.");
+
+        return reasons;
     }
 }

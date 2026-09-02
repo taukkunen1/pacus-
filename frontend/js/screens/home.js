@@ -31,8 +31,7 @@ import {
 import { showToast } from "../components/toast.js";
 import { pickEffortMessage } from "../utils/effort-messages.js";
 import { appState } from "../state/app-state.js";
-import { isValidPoints, POINTS_HELP_TEXT } from "../utils/validation.js";
-import { promptTextarea, showMessageModal } from "../components/modal.js";
+import { promptTaskForm, showMessageModal } from "../components/modal.js";
 import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
 import { withSlowLoadHint, SLOW_LOAD_MESSAGE } from "../utils/slow-load-hint.js";
 
@@ -48,128 +47,11 @@ const TYPES = [
   "challenge"
 ];
 
-const TYPE_PROMPT_LABELS = "1) Obrigatoria\n2) Deve fazer\n3) Desafio";
-const TYPE_PROMPT_MAP = { "1": "mandatory", "2": "expected", "3": "challenge" };
-const TYPE_PROMPT_DEFAULT = { mandatory: "1", expected: "2", challenge: "3" };
-
-// window.prompt so aceita texto — pede o numero do tipo e traduz pro valor
-// que a API espera. Retorna null se a pessoa cancelar (o chamador deve abortar).
-function promptForType(currentType) {
-  const suggested = TYPE_PROMPT_DEFAULT[currentType] ?? "1";
-  const answer = window.prompt(
-    `Tipo da tarefa:\n${TYPE_PROMPT_LABELS}`,
-    suggested
-  );
-
-  if (answer === null) return null;
-
-  return TYPE_PROMPT_MAP[answer.trim()] ?? currentType;
-}
-
-// Pede os Pacus Points e valida (-10 a 10, sem zero). Retorna null se invalido
-// ou cancelado — o chamador deve abortar nesse caso.
-function promptForPoints(defaultValue) {
-  const raw = window.prompt(POINTS_HELP_TEXT, String(defaultValue));
-  if (raw === null) return null;
-
-  const points = Number(raw);
-  if (!isValidPoints(points)) {
-    showToast(
-      `Valor invalido. ${POINTS_HELP_TEXT}.`,
-      { error: true }
-    );
-    return null;
-  }
-
-  return points;
-}
-
-// Pede a descricao (opcional) da tarefa, num modal com textarea (window.prompt
-// so aceita uma linha, o que nao serve pra descricoes com varios itens, um
-// por linha). Retorna undefined se a pessoa cancelar (o chamador deve abortar
-// nesse caso — undefined, e nao null, porque null e um valor valido aqui:
-// "sem descricao").
-async function promptForDescription(currentValue) {
-  const raw = await promptTextarea({
-    title: "Descrição da tarefa",
-    label: "Descrição (opcional) — um item por linha",
-    value: currentValue ?? "",
-    placeholder: "Ex.: 48 ÷ 6 = ___\n72 ÷ 8 = ___"
-  });
-
-  if (raw === null) return undefined;
-
-  return raw.trim() || null;
-}
-
-// Pergunta as opcoes de escolha (2-4) que a crianca vai poder selecionar
-// antes de concluir a tarefa (Teoria da Autodeterminacao -- docs/PROPOSITO.md).
-// Opcional: cancelar/deixar em branco na primeira pergunta = tarefa sem
-// opcoes (comportamento normal). Retorna null se a pessoa cancelar depois de
-// ja ter comecado a preencher (o chamador deve abortar a criacao/edicao
-// inteira nesse caso, igual aos outros prompts desta tela).
-function promptForOptions(currentOptions) {
-  const hasCurrent = Array.isArray(currentOptions) && currentOptions.length > 0;
-
-  const wantsOptions = window.confirm(
-    hasCurrent
-      ? "Esta tarefa tem opções pra escolher. Editar as opções?\n\nOK = Sim\nCancelar = Manter como está"
-      : "Adicionar opções pra criança escolher entre missões (ex.: torre de copos / ponte de papel)?\n\nOK = Sim\nCancelar = Não, tarefa comum"
-  );
-
-  if (!wantsOptions) {
-    return hasCurrent ? currentOptions : [];
-  }
-
-  const options = [];
-  for (let i = 1; i <= 4; i++) {
-    const suggestion = currentOptions?.[i - 1] ?? "";
-    const raw = window.prompt(
-      `Opção ${i}${i > 2 ? " (deixe em branco pra parar)" : ""}:`,
-      suggestion
-    );
-
-    if (raw === null) return null;
-
-    const trimmed = raw.trim();
-    if (!trimmed) {
-      if (i <= 2) {
-        showToast(
-          "Uma tarefa com opções precisa de pelo menos 2.",
-          { error: true }
-        );
-        return null;
-      }
-      break;
-    }
-
-    options.push(trimmed);
-  }
-
-  return options;
-}
-
-// Pergunta o "por que isso importa" da tarefa -- parentalidade autonomo-
-// suportiva (Joussemet, Landry & Koestner 2008; ver docs/PROPOSITO.md): dar a
-// razao por tras da regra, nao so a regra. Opcional, uma frase curta (window.
-// prompt de uma linha e suficiente aqui -- diferente da descricao, que pode
-// ter varios itens). Retorna null se cancelado (sem alterar o motivo atual).
-function promptForReason(currentValue) {
-  const raw = window.prompt(
-    "Por que essa tarefa importa? (opcional — o que a criança vê como motivo, não como fazer)",
-    currentValue ?? ""
-  );
-
-  if (raw === null) return currentValue ?? null;
-
-  return raw.trim() || null;
-}
-
 const REACTION_ORDER = ["heart", "clap", "star", "hug"];
 
 // Fluxo do adulto pra reagir ao dia (relatedness -- ver docs/PROPOSITO.md e
-// pacus/habitat.js): escolhe um icone (numero, mesmo padrao de promptForType) e recebe
-// a frase padrao daquele icone pra editar ou manter -- baixo atrito, mas ainda pessoal.
+// pacus/habitat.js): escolhe um icone (numero) e recebe a frase padrao daquele
+// icone pra editar ou manter -- baixo atrito, mas ainda pessoal.
 // Retorna null se cancelar em qualquer etapa (o chamador deve abortar).
 async function promptForReactionChoice(currentReaction) {
   const menuLines = REACTION_ORDER
@@ -683,56 +565,26 @@ export async function renderHome(
       ?.addEventListener(
         "click",
         async () => {
-          const title =
-            window.prompt(
-              "Nome da nova tarefa:"
-            );
+          // Painel unico (ver components/modal.js promptTaskForm) — nome,
+          // descricao, pontos, tipo e opcoes aparecem juntos numa tela so, em
+          // vez da fila antiga de prompts um atras do outro. So o adulto pode
+          // transformar a tarefa em permanente (mexe nas regras da familia) —
+          // o backend tambem bloqueia isso pra crianca, por isso o toggle so
+          // aparece no formulario quando isAdult.
+          const result = await promptTaskForm({
+            title: "Nova tarefa",
+            values: { type: "challenge", points: 1 },
+            showPermanentToggle: isAdult,
+            confirmLabel: "Adicionar"
+          });
 
-          if (!title?.trim()) {
+          if (!result) {
             return;
           }
 
-          const description = await promptForDescription(null);
-          if (description === undefined) {
-            return;
-          }
-
-          const points = promptForPoints(1);
-          if (points === null) {
-            return;
-          }
-
-          const type = promptForType("challenge");
-
-          if (!type) {
-            return;
-          }
-
-          const options = promptForOptions(null);
-          if (options === null) {
-            return;
-          }
-
-          const reason = promptForReason(null);
-
-          // So o adulto pode transformar a tarefa em permanente (mexe nas
-          // regras da familia) — o backend tambem bloqueia isso pra crianca.
-          const permanent =
-            isAdult &&
-            window.confirm(
-              "Esta tarefa deve se repetir nos próximos dias?\n\n" +
-                "OK = Sim, tarefa permanente\n" +
-                "Cancelar = Não, somente hoje"
-            );
-
-          const payload = {
-            title: title.trim(),
-            description,
-            type,
-            period: activePeriod,
-            points,
-            options,
-            reason
+          const { permanent, ...payload } = {
+            ...result,
+            period: activePeriod
           };
 
           try {
@@ -794,55 +646,30 @@ export async function renderHome(
               return;
             }
 
-            const title =
-              window.prompt(
-                "Nome da tarefa:",
-                task.title
-              );
+            // Mesmo painel unico da criacao (ver components/modal.js
+            // promptTaskForm), ja preenchido com os valores atuais da
+            // tarefa — inclui o tipo (obrigatoria/deve fazer/desafio) como
+            // grupo de botoes visivel, que antes ficava escondido dentro de
+            // mais um prompt generico na fila.
+            const result = await promptTaskForm({
+              title: "Editar tarefa",
+              values: task,
+              confirmLabel: "Salvar"
+            });
 
-            if (!title?.trim()) {
+            if (!result) {
               return;
             }
 
-            const description = await promptForDescription(
-              task.description
-            );
-            if (description === undefined) {
-              return;
-            }
-
-            const points = promptForPoints(task.points);
-            if (points === null) {
-              return;
-            }
-
-            const type = promptForType(task.type);
-
-            if (!type) {
-              return;
-            }
-
-            const options = promptForOptions(task.options);
-            if (options === null) {
-              return;
-            }
-
-            const reason = promptForReason(task.reason);
+            const { permanent, ...fields } = result;
 
             try {
               routine =
                 await updateDailyTask(
                   task.id,
                   {
-                    title:
-                      title.trim(),
-                    description,
-                    type,
-                    period:
-                      task.period,
-                    points,
-                    options,
-                    reason
+                    ...fields,
+                    period: task.period
                   }
                 );
 

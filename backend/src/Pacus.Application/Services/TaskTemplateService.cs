@@ -26,7 +26,7 @@ public class TaskTemplateService : ITaskTemplateService
         CreateTaskRequest request)
     {
         var (type, period) = ParseTypeAndPeriod(request);
-        var (recurrence, variants, customDays) = ParseRecurrenceAndVariants(request);
+        var (recurrence, variants, customDays, anchorDate, intervalDays) = ParseRecurrenceAndVariants(request);
         var options = ParseOptions(request.Options);
         var reason = ParseReason(request.Reason);
 
@@ -46,6 +46,8 @@ public class TaskTemplateService : ITaskTemplateService
             Recurrence = recurrence,
             Variants = variants,
             CustomDays = customDays,
+            AnchorDate = anchorDate,
+            IntervalDays = intervalDays,
             Options = options,
             Reason = reason,
             CreatedBy = createdBy,
@@ -70,7 +72,7 @@ public class TaskTemplateService : ITaskTemplateService
             throw new NotFoundException("Tarefa permanente nao encontrada.");
 
         var (type, period) = ParseTypeAndPeriod(request);
-        var (recurrence, variants, customDays) = ParseRecurrenceAndVariants(request);
+        var (recurrence, variants, customDays, anchorDate, intervalDays) = ParseRecurrenceAndVariants(request);
         var options = ParseOptions(request.Options);
         var reason = ParseReason(request.Reason);
 
@@ -82,6 +84,8 @@ public class TaskTemplateService : ITaskTemplateService
         template.Recurrence = recurrence;
         template.Variants = variants;
         template.CustomDays = customDays;
+        template.AnchorDate = anchorDate;
+        template.IntervalDays = intervalDays;
         template.Options = options;
         template.Reason = reason;
         template.UpdatedAt = DateTime.UtcNow;
@@ -181,9 +185,10 @@ public class TaskTemplateService : ITaskTemplateService
         TaskTemplate.RecurrenceWeekend,
         TaskTemplate.RecurrenceWeekdayRotation,
         TaskTemplate.RecurrenceCustom,
+        TaskTemplate.RecurrenceInterval,
     };
 
-    private static (string Recurrence, List<TaskTemplateVariant> Variants, List<DayOfWeek> CustomDays) ParseRecurrenceAndVariants(
+    private static (string Recurrence, List<TaskTemplateVariant> Variants, List<DayOfWeek> CustomDays, string? AnchorDate, int IntervalDays) ParseRecurrenceAndVariants(
         CreateTaskRequest request)
     {
         var recurrence = string.IsNullOrWhiteSpace(request.Recurrence)
@@ -193,14 +198,20 @@ public class TaskTemplateService : ITaskTemplateService
         if (!ValidRecurrences.Contains(recurrence))
         {
             throw new ValidationException(
-                $"Recorrencia invalida: {recurrence}. Use {TaskTemplate.RecurrenceDaily}, {TaskTemplate.RecurrenceWeekday}, {TaskTemplate.RecurrenceWeekend}, {TaskTemplate.RecurrenceCustom} ou {TaskTemplate.RecurrenceWeekdayRotation}.");
+                $"Recorrencia invalida: {recurrence}. Use {TaskTemplate.RecurrenceDaily}, {TaskTemplate.RecurrenceWeekday}, {TaskTemplate.RecurrenceWeekend}, {TaskTemplate.RecurrenceCustom}, {TaskTemplate.RecurrenceInterval} ou {TaskTemplate.RecurrenceWeekdayRotation}.");
         }
 
         if (recurrence.Equals(TaskTemplate.RecurrenceCustom, StringComparison.OrdinalIgnoreCase))
-            return (recurrence, new List<TaskTemplateVariant>(), ParseCustomDays(request.CustomDays));
+            return (recurrence, new List<TaskTemplateVariant>(), ParseCustomDays(request.CustomDays), null, 2);
+
+        if (recurrence.Equals(TaskTemplate.RecurrenceInterval, StringComparison.OrdinalIgnoreCase))
+        {
+            var (anchorDate, intervalDays) = ParseIntervalRecurrence(request.AnchorDate, request.IntervalDays);
+            return (recurrence, new List<TaskTemplateVariant>(), new List<DayOfWeek>(), anchorDate, intervalDays);
+        }
 
         if (!recurrence.Equals(TaskTemplate.RecurrenceWeekdayRotation, StringComparison.OrdinalIgnoreCase))
-            return (recurrence, new List<TaskTemplateVariant>(), new List<DayOfWeek>());
+            return (recurrence, new List<TaskTemplateVariant>(), new List<DayOfWeek>(), null, 2);
 
         if (request.Variants is null || request.Variants.Count == 0)
         {
@@ -254,7 +265,42 @@ public class TaskTemplateService : ITaskTemplateService
             });
         }
 
-        return (recurrence, variants, new List<DayOfWeek>());
+        return (recurrence, variants, new List<DayOfWeek>(), null, 2);
+    }
+
+    // RecurrenceInterval ("dia sim, dia nao" ou qualquer intervalo de N dias):
+    // precisa de uma data-ancora valida (formato "yyyy-MM-dd") e um intervalo >= 1.
+    // IntervalDays default 2 quando nao informado -- e o caso mais comum ("dia sim,
+    // dia nao"); 1 equivaleria a RecurrenceDaily, mas nao bloqueamos isso aqui (o
+    // dono da familia pode ter um motivo, e o resultado seria so redundante, nunca
+    // incorreto).
+    private static (string AnchorDate, int IntervalDays) ParseIntervalRecurrence(string? anchorDate, int? intervalDays)
+    {
+        if (string.IsNullOrWhiteSpace(anchorDate))
+        {
+            throw new ValidationException(
+                $"Recorrencia \"{TaskTemplate.RecurrenceInterval}\" precisa de uma data de inicio (AnchorDate, formato yyyy-MM-dd).");
+        }
+
+        if (!DateTime.TryParseExact(
+                anchorDate,
+                "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None,
+                out _))
+        {
+            throw new ValidationException(
+                $"Data de inicio invalida: {anchorDate}. Use o formato yyyy-MM-dd.");
+        }
+
+        var interval = intervalDays ?? 2;
+        if (interval < 1)
+        {
+            throw new ValidationException(
+                $"Recorrencia \"{TaskTemplate.RecurrenceInterval}\" precisa de um intervalo de pelo menos 1 dia (recebido: {interval}).");
+        }
+
+        return (anchorDate, interval);
     }
 
     // RecurrenceCustom aceita qualquer combinacao de dias (inclusive so um, como

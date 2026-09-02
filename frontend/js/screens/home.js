@@ -239,14 +239,40 @@ export async function renderHome(
     return reordered.map((t) => t.id);
   }
 
+  // Antes (2026-09-02): mostrava um cadeado -- "Termine as tarefas da manhã
+  // pra liberar Xh de jogo hoje" -- linguagem de "cumpra a obrigação pra
+  // desbloquear a recompensa", o oposto do que docs/PROPOSITO.md pede (nunca
+  // tratar tarefa como preço de admissão pro lazer). Pedido do dono do
+  // produto: trocar por "você já tem esse tempo disponível" + progresso das
+  // tarefas da manhã, sem framing de cadeado/bloqueio. Escopo do pedido é só
+  // as tarefas da manhã (mesmo criterio que já decide quando o timer destrava
+  // de verdade, ver SyncGameTimerAsync no backend) -- não conta o dia inteiro.
   function renderGameTimer() {
     if (!routine?.gameTimerEnabled) return "";
 
     if (!routine.gameTimerUnlockedAt) {
       const hours = Math.round((routine.gameTimerMinutes ?? 120) / 60);
+      const morningTasks = routine.tasks.filter(
+        (task) => !task.deletedAt && task.period === "morning"
+      );
+      const morningDone = morningTasks.filter(
+        (task) => task.status === "done"
+      ).length;
+
       return `
-        <div class="game-timer game-timer--locked">
-          🔒 Termine as tarefas da manhã pra liberar ${hours}h de jogo hoje.
+        <div class="game-timer game-timer--pending">
+          <div class="game-timer__pending-line">
+            Hoje você tem até ${hours}h de jogo disponíveis.
+          </div>
+          ${
+            morningTasks.length > 0
+              ? `
+                <div class="game-timer__pending-line game-timer__pending-line--progress">
+                  Você já cuidou de ${morningDone} de ${morningTasks.length} tarefas da manhã.
+                </div>
+              `
+              : ""
+          }
         </div>
       `;
     }

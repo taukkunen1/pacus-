@@ -1,0 +1,140 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 43, 41, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  z-index: 100;
+}
+
+.modal-box {
+  width: 100%;
+  max-width: 420px;
+  background: var(--surface-2);
+  border: 1.5px solid rgba(234, 246, 243, 0.15);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.modal-title { margin: 0; }
+
+.modal-textarea {
+  background: rgba(234, 246, 243, 0.08);
+  border: 1.5px solid rgba(234, 246, 243, 0.2);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  color: var(--text-on-dark);
+  font-size: var(--step-md);
+  font-family: inherit;
+  resize: vertical;
+  min-height: 96px;
+}
+.modal-textarea:focus { border-color: var(--color-coral); }
+.modal-textarea::placeholder { color: var(--text-on-dark-dim); }
+
+.modal-hint {
+  font-size: var(--step-xs);
+  color: var(--text-on-dark-dim);
+  margin: 0;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* Painel unico de criar/editar tarefa (ver components/modal.js promptTaskForm) --
+   mais alto que os outros modais porque junta todos os campos de uma vez (nome,
+   descricao, pontos, tipo, opcoes, motivo) em vez da fila antiga de prompts.
+   Rola por dentro em telas baixas pra nao cortar os botoes de acao. */
+.modal-box--form {
+  max-width: 480px;
+  max-height: min(90vh, 720px);
+  overflow-y: auto;
+}
+
+.task-form-type-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.task-form-type-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1.5px solid rgba(234, 246, 243, 0.2);
+  cursor: pointer;
+  font-size: var(--step-sm);
+}
+.task-form-type-option:has(input:checked) {
+  border-color: var(--color-coral);
+  background: rgba(234, 246, 243, 0.08);
+}
+.task-form-type-option input { accent-color: var(--color-coral); }
+
+.task-form-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--step-sm);
+  color: var(--text-on-dark);
+  cursor: pointer;
+}
+.task-form-checkbox input { accent-color: var(--color-coral); margin-top: 2px; }
+
+.task-form-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.task-form-option-row {
+  display: flex;
+  gap: var(--space-2);
+}
+.task-form-option-input {
+  flex: 1;
+  background: rgba(234, 246, 243, 0.08);
+  border: 1.5px solid rgba(234, 246, 243, 0.2);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-on-dark);
+  font-size: var(--step-sm);
+}
+.task-form-option-input:focus { border-color: var(--color-coral); }
+
+.task-form-option-remove {
+  padding: var(--space-2) var(--space-3);
+  flex-shrink: 0;
+}
+
+.task-form-option-add {
+  align-self: flex-start;
+  margin-top: var(--space-2);
+  font-size: var(--step-sm);
+  padding: var(--space-2) var(--space-4);
+}
+
+/* Modal so-leitura (ex.: revelar a reacao do adulto -- ver components/modal.js
+   showMessageModal e pacus/habitat.js). Botao centralizado, sem opcao de cancelar --
+   e so um "fechar", nao uma decisao. */
+.modal-box--reveal .modal-actions { justify-content: center; }
+.modal-reveal-body {
+  font-size: var(--step-lg);
+  line-height: 1.5;
+  color: var(--text-on-dark);
+  text-align: center;
+  white-space: pre-line;
+  margin: var(--space-2) 0;
+}

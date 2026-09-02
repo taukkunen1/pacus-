@@ -13,6 +13,8 @@ public record CreateStoreItemRequest(
 
 public record RequestRedemptionRequest(string StoreItemId);
 
+public record SetStoreItemActiveRequest(bool Active);
+
 public record StoreItemResponse(
     string Id,
     string UserId,

@@ -7,8 +7,13 @@ public interface IDailyRoutineRepository
 {
     Task<DailyRoutine?> GetByUserAndDateAsync(ObjectId userId, string date);
     Task<DailyRoutine> CreateAsync(DailyRoutine routine);
+
+    // Concorrencia otimista via DailyRoutine.Version (achado #5 da auditoria de API de
+    // 2026-09-01 -- ver docs/ESTADO_ATUAL.md): lanca ConflictException se a rotina foi
+    // alterada por outra requisicao entre a leitura e esta gravacao.
     Task UpdateAsync(DailyRoutine routine);
-    Task<List<DailyRoutine>> GetHistoryAsync(ObjectId userId, string? from, string? to);
+    // Paginado (achado #4 da auditoria de API de 2026-09-01 -- ver docs/ESTADO_ATUAL.md).
+    Task<(List<DailyRoutine> Items, long TotalCount)> GetHistoryAsync(ObjectId userId, string? from, string? to, int page, int pageSize);
 
     // Todas as rotinas (abertas e fechadas, sem filtro de data), para exportacao de dados (B2).
     Task<List<DailyRoutine>> GetAllByFamilyAsync(ObjectId familyId);

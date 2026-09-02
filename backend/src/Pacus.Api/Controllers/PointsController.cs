@@ -19,6 +19,7 @@ public class PointsController : ControllerBase
     private readonly IPointTransactionRepository _pointTransactionRepository;
     private readonly IAuditLogRepository _auditLogRepository;
     private readonly ISettingsRepository _settingsRepository;
+    private readonly IFamilyTimezoneService _familyTimezoneService;
     private readonly ICurrentUserService _currentUser;
 
     public PointsController(
@@ -26,12 +27,14 @@ public class PointsController : ControllerBase
         IPointTransactionRepository pointTransactionRepository,
         IAuditLogRepository auditLogRepository,
         ISettingsRepository settingsRepository,
+        IFamilyTimezoneService familyTimezoneService,
         ICurrentUserService currentUser)
     {
         _pointsService = pointsService;
         _pointTransactionRepository = pointTransactionRepository;
         _auditLogRepository = auditLogRepository;
         _settingsRepository = settingsRepository;
+        _familyTimezoneService = familyTimezoneService;
         _currentUser = currentUser;
     }
 
@@ -43,11 +46,22 @@ public class PointsController : ControllerBase
         return Ok(new { balance, brl = balance * rate });
     }
 
+    // Paginado (achado #4 da auditoria de API de 2026-09-01 -- ver docs/ESTADO_ATUAL.md):
+    // o extrato cresce uma transacao a cada tarefa concluida, ajuste ou resgate, pra
+    // sempre. E a resposta usa PointTransactionResponse.ToResponse() em vez da entidade
+    // de dominio crua (mesmo espirito do achado #3).
     [HttpGet("transactions")]
-    public async Task<IActionResult> GetTransactions()
+    public async Task<IActionResult> GetTransactions(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = PaginationHelper.DefaultPageSize)
     {
-        var transactions = await _pointTransactionRepository.GetHistoryAsync(_currentUser.FamilyId);
-        return Ok(transactions);
+        PaginationHelper.Validate(page, pageSize);
+
+        var (items, totalCount) = await _pointTransactionRepository.GetHistoryAsync(
+            _currentUser.FamilyId, page, pageSize);
+
+        return Ok(new PagedResult<PointTransactionResponse>(
+            items.Select(t => t.ToResponse()).ToList(), page, pageSize, totalCount));
     }
 
     // Define o saldo para um valor absoluto — pensado para migrar um saldo que a familia
@@ -63,7 +77,7 @@ public class PointsController : ControllerBase
 
         if (delta != 0)
         {
-            const string timezone = "America/Sao_Paulo";
+            var timezone = await _familyTimezoneService.GetTimezoneAsync(_currentUser.FamilyId);
             var date = TimezoneHelper.GetOperationalDate(timezone);
 
             await _pointsService.RecordAsync(
@@ -105,9 +119,27 @@ public class PointsController : ControllerBase
     // no saldo em R$ mostrado pro usuario. Corrigido: le a taxa configurada da familia,
     // com o mesmo fallback (Settings.DefaultPointToBrlRate) usado quando ainda nao existe
     // um documento de Settings salvo.
+    //
+    // Segunda parte do problema: famílias cujo Settings ja existia no Mongo antes dessa
+    // mudanca (ex.: por terem ligado o tempo de jogo em algum momento) ficaram com
+    // PointToBrlRate = 0.05 gravado no documento -- valor que nunca foi escolhido por
+    // ninguem (nao existe endpoint pra configurar essa taxa), so o default antigo da
+    // propriedade C# congelado no banco. Por isso curamos aqui: se o valor salvo for
+    // exatamente a taxa antiga, tratamos como "nao migrado", aplicamos e persistimos o
+    // default atual -- assim o proximo GetBalance ja vem certo sem precisar de migracao
+    // manual no banco de producao.
     private async Task<double> GetPointToBrlRateAsync()
     {
         var settings = await _settingsRepository.GetByUserIdAsync(_currentUser.FamilyId);
-        return settings?.PointToBrlRate ?? Settings.DefaultPointToBrlRate;
+        if (settings is null) return Settings.DefaultPointToBrlRate;
+
+        if (settings.PointToBrlRate == Settings.LegacyDefaultPointToBrlRate)
+        {
+            settings.PointToBrlRate = Settings.DefaultPointToBrlRate;
+            settings.UpdatedAt = DateTime.UtcNow;
+            await _settingsRepository.UpsertAsync(settings);
+        }
+
+        return settings.PointToBrlRate;
     }
 }

@@ -13,5 +13,8 @@ public record BootstrapResponse(
     string ChildUserId,
     string FamilyId,
     string PacusId,
-    string Message
+    string Message,
+    // Codigo de recuperacao de senha do adulto -- so vem preenchido aqui, uma unica vez.
+    // Depois disso so o hash fica salvo no banco.
+    string RecoveryCode
 );

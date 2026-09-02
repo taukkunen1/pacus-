@@ -18,6 +18,10 @@ public interface IDailyRoutineService
     // Pode ser chamado a qualquer momento, mesmo depois de ja concluida — sem restricao de janela de tempo.
     Task<DailyRoutine> ToggleTaskAsync(ObjectId userId, string taskId, bool completed, ObjectId actorId, string actorRole);
 
+    // Escolhe (ou limpa, se selectedOption for null) qual das Options da tarefa a
+    // crianca vai seguir. Nao trava conclusao -- so registra a escolha, se houver.
+    Task<DailyRoutine> SelectTaskOptionAsync(ObjectId userId, string taskId, string? selectedOption, ObjectId actorId, string actorRole);
+
     // Cria uma tarefa nova so para o dia atual — autonomia da crianca (ou do adulto) sobre a
     // rotina de hoje. Por baixo, tambem cria um TaskTemplate inativo com os mesmos dados:
     // isso garante que a tarefa SEMPRE tem um caminho pronto para ser replicada em outro dia
@@ -47,4 +51,8 @@ public interface IDailyRoutineService
     // ja aplica [RequireRole(Adult)], mas o service tambem confere por
     // seguranca (nunca confiar so no frontend/controller).
     Task<DailyRoutine> AdjustGameTimerAsync(ObjectId userId, int deltaMinutes, ObjectId actorId, string actorRole);
+
+    // Vinculo (relatedness -- ver docs/PROPOSITO.md e DailyReaction). Restrito a adulto;
+    // um por dia (reagir de novo substitui a reacao anterior, nao acumula).
+    Task<DailyRoutine> SetReactionAsync(ObjectId userId, string icon, string? message, ObjectId actorId, string actorRole);
 }

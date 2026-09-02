@@ -6,7 +6,8 @@ import {
   getPacus,
   pauseGameTimer,
   resumeGameTimer,
-  adjustGameTimer
+  adjustGameTimer,
+  setDailyReaction
 } from "../api/pacus-api.js";
 
 import {
@@ -14,10 +15,12 @@ import {
   createTask,
   updateDailyTask,
   deleteDailyTask,
-  reorderDailyTasks
+  reorderDailyTasks,
+  selectTaskOption
 } from "../api/tasks-api.js";
 
-import { renderTank } from "../pacus/habitat.js";
+import { getPendingRedemptions } from "../api/store-api.js";
+import { renderTank, REACTION_ICONS } from "../pacus/habitat.js";
 import { renderTaskSection } from "../components/task-list.js";
 import { formatOperationalDate } from "../utils/date.js";
 import {
@@ -26,8 +29,11 @@ import {
   typeLabel
 } from "../utils/format.js";
 import { showToast } from "../components/toast.js";
+import { pickEffortMessage } from "../utils/effort-messages.js";
 import { appState } from "../state/app-state.js";
-import { isValidPoints, POINTS_HELP_TEXT } from "../utils/validation.js";
+import { promptTaskForm, showMessageModal } from "../components/modal.js";
+import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
+import { withSlowLoadHint, SLOW_LOAD_MESSAGE } from "../utils/slow-load-hint.js";
 
 const PERIODS = [
   "morning",
@@ -41,54 +47,43 @@ const TYPES = [
   "challenge"
 ];
 
-const TYPE_PROMPT_LABELS = "1) Obrigatoria\n2) Deve fazer\n3) Desafio";
-const TYPE_PROMPT_MAP = { "1": "mandatory", "2": "expected", "3": "challenge" };
-const TYPE_PROMPT_DEFAULT = { mandatory: "1", expected: "2", challenge: "3" };
+const REACTION_ORDER = ["heart", "clap", "star", "hug"];
 
-// window.prompt so aceita texto — pede o numero do tipo e traduz pro valor
-// que a API espera. Retorna null se a pessoa cancelar (o chamador deve abortar).
-function promptForType(currentType) {
-  const suggested = TYPE_PROMPT_DEFAULT[currentType] ?? "1";
-  const answer = window.prompt(
-    `Tipo da tarefa:\n${TYPE_PROMPT_LABELS}`,
-    suggested
+// Fluxo do adulto pra reagir ao dia (relatedness -- ver docs/PROPOSITO.md e
+// pacus/habitat.js): escolhe um icone (numero) e recebe a frase padrao daquele
+// icone pra editar ou manter -- baixo atrito, mas ainda pessoal.
+// Retorna null se cancelar em qualquer etapa (o chamador deve abortar).
+async function promptForReactionChoice(currentReaction) {
+  const menuLines = REACTION_ORDER
+    .map((key, i) => `${i + 1}) ${REACTION_ICONS[key].emoji} ${REACTION_ICONS[key].label}`)
+    .join("\n");
+
+  const currentIndex = currentReaction
+    ? REACTION_ORDER.indexOf(currentReaction.icon)
+    : -1;
+
+  const choice = window.prompt(
+    `Como foi o dia da criança hoje?\n${menuLines}`,
+    String(currentIndex >= 0 ? currentIndex + 1 : 1)
   );
 
-  if (answer === null) return null;
+  if (choice === null) return null;
 
-  return TYPE_PROMPT_MAP[answer.trim()] ?? currentType;
-}
+  const icon = REACTION_ORDER[Number(choice.trim()) - 1] ?? REACTION_ORDER[0];
 
-// Pede os Pacus Points e valida (-10 a 10, sem zero). Retorna null se invalido
-// ou cancelado — o chamador deve abortar nesse caso.
-function promptForPoints(defaultValue) {
-  const raw = window.prompt(POINTS_HELP_TEXT, String(defaultValue));
-  if (raw === null) return null;
+  const suggestion =
+    currentReaction?.icon === icon
+      ? currentReaction.message ?? REACTION_ICONS[icon].defaultMessage
+      : REACTION_ICONS[icon].defaultMessage;
 
-  const points = Number(raw);
-  if (!isValidPoints(points)) {
-    showToast(
-      `Valor invalido. ${POINTS_HELP_TEXT}.`,
-      { error: true }
-    );
-    return null;
-  }
-
-  return points;
-}
-
-// Pede a descricao (opcional) da tarefa. Retorna undefined se a pessoa
-// cancelar o prompt (o chamador deve abortar nesse caso — undefined, e nao
-// null, porque null e um valor valido aqui: "sem descricao").
-function promptForDescription(currentValue) {
-  const raw = window.prompt(
-    "Descrição da tarefa (opcional):",
-    currentValue ?? ""
+  const message = window.prompt(
+    "Quer personalizar a mensagem? (opcional — deixe como está, edite, ou apague tudo pra deixar só o ícone)",
+    suggestion
   );
 
-  if (raw === null) return undefined;
+  if (message === null) return null;
 
-  return raw.trim() || null;
+  return { icon, message: message.trim() || null };
 }
 
 function formatGameTimerRemaining(remainingMs) {
@@ -143,10 +138,16 @@ export async function renderHome(
 
   try {
     [routine, balance] =
-      await Promise.all([
-        getTodayRoutine(),
-        getPointsBalance()
-      ]);
+      await withSlowLoadHint(
+        Promise.all([
+          getTodayRoutine(),
+          getPointsBalance()
+        ]),
+        () => {
+          const loadingEl = content.querySelector("p.task-empty");
+          if (loadingEl) loadingEl.textContent = SLOW_LOAD_MESSAGE;
+        }
+      );
   } catch (err) {
     content.innerHTML = `
       <p class="error-text">
@@ -165,6 +166,17 @@ export async function renderHome(
     console.warn("PACUS nao encontrado. A tela de hoje continuara sem o estagio do PACUS.", err);
   }
 
+  // Numerozinho na aba "Loja" avisando o adulto de resgate(s) aguardando aprovacao --
+  // so uma contagem leve, sem mudar nada na tela de hoje em si.
+  let pendingRedemptionsCount = 0;
+  if (isAdult) {
+    try {
+      const pending = await getPendingRedemptions();
+      pendingRedemptionsCount = pending?.length ?? 0;
+    } catch (err) {
+      console.warn("Nao foi possivel carregar resgates pendentes.", err);
+    }
+  }
 
   function totalTasks() {
     return routine.tasks.filter(
@@ -374,7 +386,7 @@ export async function renderHome(
         </div>
       </div>
 
-      ${renderTank(pacus)}
+      ${renderTank(pacus, undefined, { reaction: routine.reaction, isAdult })}
 
       ${renderGameTimer()}
 
@@ -447,46 +459,10 @@ export async function renderHome(
         </div>
       </div>
 
-      <nav
-        class="bottom-nav"
-        aria-label="Navegação principal"
-      >
-        <button
-          data-nav="today"
-          class="is-active"
-          type="button"
-        >
-          Hoje
-        </button>
-
-        <button
-          data-nav="history"
-          type="button"
-        >
-          Histórico
-        </button>
-
-        <button
-          data-nav="points"
-          type="button"
-        >
-          Pontos
-        </button>
-
-        <button
-          data-nav="pacus"
-          type="button"
-        >
-          PACUS
-        </button>
-
-        <button
-          data-nav="store"
-          type="button"
-        >
-          Loja
-        </button>
-      </nav>
+      ${renderBottomNav("today", {
+        today: !isAdult ? Math.max(0, totalTasks() - doneTasks()) : 0,
+        store: isAdult ? pendingRedemptionsCount : 0
+      })}
     `;
 
     attachHandlers();
@@ -542,20 +518,46 @@ export async function renderHome(
         );
       });
 
-    content
-      .querySelectorAll("[data-nav]")
-      .forEach((button) => {
-        button.addEventListener(
-          "click",
-          () => {
-            location.hash =
-              button.dataset.nav;
+    attachBottomNav(content, navigate);
 
-            navigate(
-              button.dataset.nav
-            );
+    content
+      .querySelectorAll('[data-action="view-reaction"]')
+      .forEach((el) => {
+        const reveal = () => {
+          const reaction = routine.reaction;
+          if (!reaction) return;
+
+          const icon = REACTION_ICONS[reaction.icon];
+          showMessageModal({
+            title: `${icon?.emoji ?? "💬"} Mensagem de hoje`,
+            body: reaction.message || icon?.defaultMessage || "Alguém pensou em você hoje!"
+          });
+        };
+
+        el.addEventListener("click", reveal);
+        // role="button" (ver pacus/habitat.js) nao dispara "click" sozinho no teclado
+        // como um <button> de verdade -- sem isso, Tab+Enter nao revelava a mensagem.
+        el.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            reveal();
           }
-        );
+        });
+      });
+
+    content
+      .querySelector('[data-action="set-reaction"]')
+      ?.addEventListener("click", async () => {
+        const choice = await promptForReactionChoice(routine.reaction);
+        if (!choice) return;
+
+        try {
+          routine = await setDailyReaction(choice.icon, choice.message);
+          showToast("Reação registrada — o Pacus vai carregar isso com ele hoje.");
+          draw();
+        } catch (err) {
+          showToast(err.message, { error: true });
+        }
       });
 
     content
@@ -563,47 +565,26 @@ export async function renderHome(
       ?.addEventListener(
         "click",
         async () => {
-          const title =
-            window.prompt(
-              "Nome da nova tarefa:"
-            );
+          // Painel unico (ver components/modal.js promptTaskForm) — nome,
+          // descricao, pontos, tipo e opcoes aparecem juntos numa tela so, em
+          // vez da fila antiga de prompts um atras do outro. So o adulto pode
+          // transformar a tarefa em permanente (mexe nas regras da familia) —
+          // o backend tambem bloqueia isso pra crianca, por isso o toggle so
+          // aparece no formulario quando isAdult.
+          const result = await promptTaskForm({
+            title: "Nova tarefa",
+            values: { type: "challenge", points: 1 },
+            showPermanentToggle: isAdult,
+            confirmLabel: "Adicionar"
+          });
 
-          if (!title?.trim()) {
+          if (!result) {
             return;
           }
 
-          const description = promptForDescription(null);
-          if (description === undefined) {
-            return;
-          }
-
-          const points = promptForPoints(1);
-          if (points === null) {
-            return;
-          }
-
-          const type = promptForType("challenge");
-
-          if (!type) {
-            return;
-          }
-
-          // So o adulto pode transformar a tarefa em permanente (mexe nas
-          // regras da familia) — o backend tambem bloqueia isso pra crianca.
-          const permanent =
-            isAdult &&
-            window.confirm(
-              "Esta tarefa deve se repetir nos próximos dias?\n\n" +
-                "OK = Sim, tarefa permanente\n" +
-                "Cancelar = Não, somente hoje"
-            );
-
-          const payload = {
-            title: title.trim(),
-            description,
-            type,
-            period: activePeriod,
-            points
+          const { permanent, ...payload } = {
+            ...result,
+            period: activePeriod
           };
 
           try {
@@ -665,46 +646,30 @@ export async function renderHome(
               return;
             }
 
-            const title =
-              window.prompt(
-                "Nome da tarefa:",
-                task.title
-              );
+            // Mesmo painel unico da criacao (ver components/modal.js
+            // promptTaskForm), ja preenchido com os valores atuais da
+            // tarefa — inclui o tipo (obrigatoria/deve fazer/desafio) como
+            // grupo de botoes visivel, que antes ficava escondido dentro de
+            // mais um prompt generico na fila.
+            const result = await promptTaskForm({
+              title: "Editar tarefa",
+              values: task,
+              confirmLabel: "Salvar"
+            });
 
-            if (!title?.trim()) {
+            if (!result) {
               return;
             }
 
-            const description = promptForDescription(
-              task.description
-            );
-            if (description === undefined) {
-              return;
-            }
-
-            const points = promptForPoints(task.points);
-            if (points === null) {
-              return;
-            }
-
-            const type = promptForType(task.type);
-
-            if (!type) {
-              return;
-            }
+            const { permanent, ...fields } = result;
 
             try {
               routine =
                 await updateDailyTask(
                   task.id,
                   {
-                    title:
-                      title.trim(),
-                    description,
-                    type,
-                    period:
-                      task.period,
-                    points
+                    ...fields,
+                    period: task.period
                   }
                 );
 
@@ -841,6 +806,44 @@ export async function renderHome(
       });
 
     content
+      .querySelectorAll(
+        "[data-task-action=select-option]"
+      )
+      .forEach((button) => {
+        button.addEventListener(
+          "click",
+          async () => {
+            const card =
+              button.closest(".task-card");
+
+            const taskId = card?.dataset.taskId;
+            if (!taskId) return;
+
+            const task = routine.tasks.find(
+              (item) => String(item.id) === String(taskId)
+            );
+            if (!task) return;
+
+            const chosen = button.dataset.optionValue;
+            // Clicar de novo na mesma opcao ja escolhida desmarca -- da pra
+            // criança mudar de ideia sem precisar de outra opcao "neutra".
+            const nextValue =
+              task.selectedOption === chosen ? null : chosen;
+
+            try {
+              routine = await selectTaskOption(taskId, nextValue);
+              draw();
+            } catch (err) {
+              showToast(
+                err.message,
+                { error: true }
+              );
+            }
+          }
+        );
+      });
+
+    content
       .querySelectorAll(".task-check")
       .forEach((button) => {
         button.addEventListener(
@@ -893,6 +896,24 @@ export async function renderHome(
 
               balance =
                 await getPointsBalance();
+
+              // Reforço de ESFORÇO (nao de resultado/traço), so ao concluir -- ver
+              // utils/effort-messages.js e docs/PROPOSITO.md. Reabrir a tarefa nao
+              // mostra frase nenhuma, so o toggle silencioso de sempre.
+              if (willComplete) {
+                const justCompleted = routine.tasks.find(
+                  (item) => String(item.id) === String(taskId)
+                );
+
+                if (justCompleted) {
+                  const message = pickEffortMessage(
+                    justCompleted,
+                    routine.tasks
+                  );
+
+                  showToast(`${message} +${justCompleted.points} PP`);
+                }
+              }
 
               draw();
             } catch (err) {

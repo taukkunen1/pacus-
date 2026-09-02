@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Bson;
 using Pacus.Api.Auth;
+using Pacus.Api.Middleware;
 using Pacus.Application.Interfaces;
 using Pacus.Application.Services;
 using Pacus.Infrastructure.Auth;
@@ -133,6 +134,14 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddHttpContextAccessor();
 
+// Tratamento de excecao global (achado #1 da auditoria de API de 2026-09-01) --
+// ver Middleware/AppExceptionHandler.cs pro mapeamento de cada tipo de excecao pro
+// status HTTP certo. AddProblemDetails() e exigido pelo AddExceptionHandler mesmo
+// quando a resposta final e o JSON customizado (o handler retorna true e assume o
+// controle da resposta, ver TryHandleAsync).
+builder.Services.AddExceptionHandler<AppExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 // Repositories
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IPacusRepository, PacusRepository>();
@@ -161,6 +170,7 @@ builder.Services.AddScoped<IStoreService, StoreService>();
 builder.Services.AddScoped<ITaskTemplateService, TaskTemplateService>();
 builder.Services.AddScoped<IDataExportService, DataExportService>();
 builder.Services.AddScoped<IAccountDeletionService, AccountDeletionService>();
+builder.Services.AddScoped<IFamilyTimezoneService, FamilyTimezoneService>();
 
 builder.Services
     .AddControllers()
@@ -240,6 +250,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// Primeiro na pipeline de proposito -- pra capturar excecao de qualquer middleware
+// depois dele, nao so das actions dos controllers.
+app.UseExceptionHandler();
 
 app.UseHttpsRedirection();
 

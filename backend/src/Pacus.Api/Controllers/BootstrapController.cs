@@ -18,24 +18,16 @@ public class BootstrapController : ControllerBase
         _bootstrapService = bootstrapService;
     }
 
+    // Sem try/catch aqui de proposito: ConflictException ("ja existe um usuario
+    // adulto com este email") vira 409 sozinha, via
+    // Pacus.Api.Middleware.AppExceptionHandler (achado #1 da auditoria de API de
+    // 2026-09-01 -- ver docs/ESTADO_ATUAL.md).
     [AllowAnonymous]
     [HttpPost]
     public async Task<IActionResult> CreateInitialFamily(
         [FromBody] BootstrapRequest request)
     {
-        try
-        {
-            var result =
-                await _bootstrapService.CreateInitialFamilyAsync(request);
-
-            return Created("", result);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new
-            {
-                error = ex.Message
-            });
-        }
+        var result = await _bootstrapService.CreateInitialFamilyAsync(request);
+        return Created("", result);
     }
 }

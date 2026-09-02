@@ -2,6 +2,7 @@ using MongoDB.Bson;
 using Pacus.Application.DTOs;
 using Pacus.Application.Services;
 using Pacus.UnitTests.Fakes;
+using Pacus.Application.Exceptions;
 
 namespace Pacus.UnitTests;
 
@@ -57,7 +58,7 @@ public class TaskManagementTests
         await dailyRoutine.CreateAdHocTaskAsync(userId,
             new CreateTaskRequest("Ler livro", null, "expected", "evening", 3), userId, "child");
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<ValidationException>(
             () => dailyRoutine.ReorderTasksAsync(userId, new List<string> { "so-um-id" }, userId, "child"));
     }
 
@@ -124,7 +125,7 @@ public class TaskManagementTests
         var userId = ObjectId.GenerateNewId();
         await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-24", "America/Sao_Paulo");
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => dailyRoutine.CreateAdHocTaskAsync(
+        await Assert.ThrowsAsync<ValidationException>(() => dailyRoutine.CreateAdHocTaskAsync(
             userId, new CreateTaskRequest("Tarefa", null, "challenge", "evening", 11), userId, "child"));
     }
 
@@ -135,7 +136,7 @@ public class TaskManagementTests
         var userId = ObjectId.GenerateNewId();
         await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-24", "America/Sao_Paulo");
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => dailyRoutine.CreateAdHocTaskAsync(
+        await Assert.ThrowsAsync<ValidationException>(() => dailyRoutine.CreateAdHocTaskAsync(
             userId, new CreateTaskRequest("Tarefa", null, "challenge", "evening", 0), userId, "child"));
     }
 

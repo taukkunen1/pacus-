@@ -20,7 +20,21 @@ function normalizeStage(stage) {
   return STAGE_ORDER.includes(value) ? value : "egg";
 }
 
-export function renderTank(pacus, stageOverride) {
+// Vinculo (relatedness -- terceira necessidade da Teoria da Autodeterminacao, ver
+// docs/PROPOSITO.md): a reacao pessoal do adulto sobre o dia "mora" no PACUS, nao numa
+// tela separada -- reforca o vinculo emocional que a crianca ja tem com o bichinho, em
+// vez de virar mais uma notificacao. REACTION_ICONS e a unica fonte de verdade do emoji
+// (o backend so guarda a chave semantica, ver DailyRoutineService.AllowedReactionIcons)
+// e da frase padrao sugerida ao adulto (ver screens/home.js promptForReaction).
+export const REACTION_ICONS = {
+  heart: { emoji: "❤️", label: "Coração", defaultMessage: "Estou orgulhoso de você hoje." },
+  clap: { emoji: "👏", label: "Palminhas", defaultMessage: "Você se esforçou bastante hoje, parabéns!" },
+  star: { emoji: "🌟", label: "Estrela", defaultMessage: "Isso foi demais, muito bem!" },
+  hug: { emoji: "🤗", label: "Abraço", defaultMessage: "Te amo, foi um bom dia." },
+};
+
+export function renderTank(pacus, stageOverride, options = {}) {
+  const { reaction = null, isAdult = false } = options;
   const normalizedStage = normalizeStage(stageOverride ?? pacus?.stage);
   const colorStyle = getPacusColorStyle(pacus, normalizedStage);
   const isEggPhase = normalizedStage === "egg" || normalizedStage === "cracking" || normalizedStage === "hatching";
@@ -73,8 +87,29 @@ export function renderTank(pacus, stageOverride) {
       </div>
     `;
 
-  return `
-    <div class="pacus-tank pacus-tank--${normalizedStage}" style="${colorStyle}" aria-hidden="true">
+  // So aparece quando ha reacao de hoje -- um "toque no Pacus pra ver" discreto, nao
+  // um badge fixo o tempo todo. Sem data-action proprio de proposito: o clique borbulha
+  // pro .pacus-tank (que carrega o data-action="view-reaction"), pra tocar em qualquer
+  // parte do tanque revelar a mensagem, nao so este iconezinho -- e so um lembrete visual
+  // de que ha algo esperando. screens/home.js e quem decide o que fazer com o clique.
+  const reactionHint = reaction
+    ? `
+        <span
+          class="tank-reaction-hint"
+          aria-label="Há uma mensagem de hoje — toque para ver"
+          title="Toque no Pacus pra ver a mensagem de hoje"
+        >
+          ${REACTION_ICONS[reaction.icon]?.emoji ?? "💬"}
+        </span>
+      `
+    : "";
+
+  const tankInteractiveAttrs = reaction
+    ? `data-action="view-reaction" role="button" tabindex="0" aria-label="Toque para ver a mensagem de hoje"`
+    : `aria-hidden="true"`;
+
+  const tank = `
+    <div class="pacus-tank pacus-tank--${normalizedStage} ${reaction ? "pacus-tank--has-reaction" : ""}" style="${colorStyle}" ${tankInteractiveAttrs}>
       <div class="tank-bubble"></div>
       <div class="tank-bubble"></div>
       <div class="tank-bubble"></div>
@@ -102,6 +137,21 @@ export function renderTank(pacus, stageOverride) {
       <div class="tank-rock tank-rock--2"></div>
       <div class="tank-floor"></div>
       <span class="tank-caption">${STAGE_CAPTIONS[normalizedStage]}</span>
+
+      ${reactionHint}
     </div>
   `;
+
+  // So o adulto ve o botao de reagir -- vinculo (relatedness) e uma acao do adulto pra
+  // crianca, nao o contrario (ver docs/PROPOSITO.md e a decisao do dono do produto de
+  // comecar so numa direcao).
+  const adultAction = isAdult
+    ? `
+        <button type="button" class="tank-reaction-cta" data-action="set-reaction">
+          ${reaction ? "✏️ Editar reação de hoje" : "💬 Reagir ao dia de hoje"}
+        </button>
+      `
+    : "";
+
+  return `${tank}${adultAction}`;
 }

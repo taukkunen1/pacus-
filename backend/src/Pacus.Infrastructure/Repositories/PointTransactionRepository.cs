@@ -26,11 +26,24 @@ public class PointTransactionRepository : IPointTransactionRepository
         return transactions.Sum(t => t.Points);
     }
 
-    public Task<List<PointTransaction>> GetHistoryAsync(ObjectId userId, int limit = 100) =>
-        _context.PointTransactions.Find(t => t.FamilyId == userId)
+    // Paginado (achado #4 da auditoria de API de 2026-09-01 -- ver docs/ESTADO_ATUAL.md):
+    // antes tinha um limit=100 fixo sem jeito de ver o resto do extrato. TotalCount vem de
+    // uma segunda query (CountDocumentsAsync) -- o Mongo nao devolve isso de graca junto
+    // com Skip/Limit.
+    public async Task<(List<PointTransaction> Items, long TotalCount)> GetHistoryAsync(
+        ObjectId userId, int page, int pageSize)
+    {
+        var filter = Builders<PointTransaction>.Filter.Eq(t => t.FamilyId, userId);
+
+        var totalCount = await _context.PointTransactions.CountDocumentsAsync(filter);
+        var items = await _context.PointTransactions.Find(filter)
             .SortByDescending(t => t.CreatedAt)
-            .Limit(limit)
+            .Skip((page - 1) * pageSize)
+            .Limit(pageSize)
             .ToListAsync();
+
+        return (items, totalCount);
+    }
 
     public Task<List<PointTransaction>> GetAllByFamilyAsync(ObjectId familyId) =>
         _context.PointTransactions.Find(t => t.FamilyId == familyId)

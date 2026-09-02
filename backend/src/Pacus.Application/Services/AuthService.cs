@@ -53,6 +53,44 @@ public class AuthService : IAuthService
         return BuildResponse(user, ChildTokenLifetime);
     }
 
+    public async Task<string> ResetAdultPasswordAsync(string email, string recoveryCode, string newPassword)
+    {
+        var user = await _userRepository.GetByEmailAsync(email.Trim().ToLowerInvariant());
+
+        // Mensagem generica, mesmo padrao do login -- nao revela se o email existe ou
+        // se so o codigo esta errado.
+        if (user is null || user.Role != UserRole.Adult || user.RecoveryCodeHash is null
+            || !_passwordHasher.Verify(user.RecoveryCodeHash, recoveryCode.Trim().ToUpperInvariant()))
+        {
+            throw new UnauthorizedAccessException("Email ou codigo de recuperacao invalidos.");
+        }
+
+        user.PasswordHash = _passwordHasher.Hash(newPassword);
+
+        // Uso unico: gera e grava um codigo novo, o antigo nunca mais funciona --
+        // mesmo raciocinio dos codigos de backup de 2FA.
+        var newRecoveryCode = GenerateRecoveryCode();
+        user.RecoveryCodeHash = _passwordHasher.Hash(newRecoveryCode);
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _userRepository.UpdateAsync(user);
+
+        return newRecoveryCode;
+    }
+
+    // 10 caracteres em base32-like (sem 0/O/1/I, que se confundem visualmente) -- pensado
+    // pra ser anotado/guardado por uma pessoa, tipo "K7QX-9F3M-2Z". Usado tambem pelo
+    // BootstrapService ao criar a familia.
+    public static string GenerateRecoveryCode()
+    {
+        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        Span<char> buffer = stackalloc char[10];
+        for (var i = 0; i < buffer.Length; i++)
+            buffer[i] = alphabet[Random.Shared.Next(alphabet.Length)];
+
+        return new string(buffer);
+    }
+
     private AuthResponse BuildResponse(Domain.Entities.User user, TimeSpan lifetime)
     {
         var (token, expiresAt) = _tokenService.GenerateToken(user, lifetime);

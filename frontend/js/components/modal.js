@@ -137,6 +137,12 @@ const TYPE_OPTIONS = [
   { value: "challenge", label: "Desafio" }
 ];
 
+const PERIOD_OPTIONS = [
+  { value: "morning", label: "Manhã" },
+  { value: "afternoon", label: "Tarde" },
+  { value: "evening", label: "Noite" }
+];
+
 // Painel unico de criar/editar tarefa -- substitui a sequencia antiga de
 // varios window.prompt/confirm em fila (nome > descricao > pontos > tipo >
 // opcoes > motivo), que obrigava a pessoa a ir clicando OK varias vezes sem
@@ -206,6 +212,25 @@ export function promptTaskForm({
                   name="task-form-type"
                   value="${opt.value}"
                   ${(values.type ?? "mandatory") === opt.value ? "checked" : ""}
+                />
+                <span>${escapeHtml(opt.label)}</span>
+              </label>
+            `
+            ).join("")}
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Período</label>
+          <div class="task-form-type-group" role="radiogroup" aria-label="Período da tarefa">
+            ${PERIOD_OPTIONS.map(
+              (opt) => `
+              <label class="task-form-type-option">
+                <input
+                  type="radio"
+                  name="task-form-period"
+                  value="${opt.value}"
+                  ${(values.period ?? "morning") === opt.value ? "checked" : ""}
                 />
                 <span>${escapeHtml(opt.label)}</span>
               </label>
@@ -367,6 +392,10 @@ export function promptTaskForm({
         overlay.querySelector('input[name="task-form-type"]:checked')
           ?.value ?? "mandatory";
 
+      const period =
+        overlay.querySelector('input[name="task-form-period"]:checked')
+          ?.value ?? "morning";
+
       let options = [];
       if (hasOptionsCheckbox.checked) {
         options = optionInputs
@@ -392,6 +421,7 @@ export function promptTaskForm({
         description,
         points,
         type,
+        period,
         options,
         reason,
         permanent

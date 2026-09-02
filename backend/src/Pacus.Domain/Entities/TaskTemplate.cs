@@ -53,6 +53,14 @@ public class TaskTemplate
     // so sabado. RecurrenceWeekday/RecurrenceWeekend sao atalhos pros dois casos
     // mais comuns; este cobre qualquer outra combinacao.
     public const string RecurrenceCustom = "custom";
+    // "Dia sim, dia nao" (ou qualquer intervalo de N dias) ancorado numa data
+    // especifica -- diferente de RecurrenceCustom, que e sempre os MESMOS dias da
+    // semana toda semana. Um intervalo de 2 dias desliza pelos dias da semana com
+    // o tempo (ex.: ancorado numa quarta, cai em quarta/sexta/domingo/terca/
+    // quinta/sabado/segunda/quarta/... -- nunca duas semanas seguidas iguais).
+    // Ver AnchorDate/IntervalDays abaixo e ResolveTemplateForDay em
+    // DailyRoutineService.
+    public const string RecurrenceInterval = "interval";
 
     public string Recurrence { get; set; } = RecurrenceDaily;
 
@@ -61,6 +69,14 @@ public class TaskTemplate
 
     // So usado quando Recurrence == RecurrenceCustom.
     public List<DayOfWeek> CustomDays { get; set; } = new();
+
+    // So usados quando Recurrence == RecurrenceInterval. AnchorDate e a primeira
+    // data em que a tarefa aparece (formato "yyyy-MM-dd", mesmo formato de
+    // DailyRoutine.Date); IntervalDays e de quantos em quantos dias ela repete
+    // a partir dali (2 = dia sim dia nao). Datas antes de AnchorDate nunca
+    // incluem a tarefa, mesmo que a diferenca de dias "batesse" matematicamente.
+    public string? AnchorDate { get; set; }
+    public int IntervalDays { get; set; } = 2;
 
     public ObjectId CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; }

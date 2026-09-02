@@ -98,7 +98,7 @@ public class DailyRoutineService : IDailyRoutineService
                 Points = resolved.Points,
                 Status = TaskItemStatus.Pending,
                 Options = new List<string>(template.Options),
-                Reason = template.Reason,
+                Reason = PickReason(template.EffectiveReasons),
                 CompletedAt = null,
                 CreatedBy = userId.ToString(),
                 Origin = "template",
@@ -144,7 +144,7 @@ public class DailyRoutineService : IDailyRoutineService
                 Points = pair.Resolved!.Points,
                 Status = TaskItemStatus.Pending,
                 Options = new List<string>(pair.Template.Options),
-                Reason = pair.Template.Reason,
+                Reason = PickReason(pair.Template.EffectiveReasons),
                 CompletedAt = null,
                 CreatedBy = userId.ToString(),
                 Origin = "template",
@@ -276,7 +276,7 @@ public class DailyRoutineService : IDailyRoutineService
         if (string.IsNullOrWhiteSpace(request.Title))
             throw new ValidationException("O titulo da tarefa e obrigatorio.");
         var options = TaskTemplateService.ParseOptions(request.Options);
-        var reason = TaskTemplateService.ParseReason(request.Reason);
+        var reason = TaskTemplateService.ParseSingleReason(request.Reason);
         await EnsureChildPermissionAsync(userId, actorRole, p => p.CanCreateTasks);
 
         var actorRoleEnum = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
@@ -296,7 +296,7 @@ public class DailyRoutineService : IDailyRoutineService
             Active = false,
             Recurrence = "daily",
             Options = options,
-            Reason = reason,
+            Reasons = reason is null ? new List<string>() : new List<string> { reason },
             CreatedBy = actorId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -464,7 +464,7 @@ public class DailyRoutineService : IDailyRoutineService
             throw new ValidationException($"Periodo invalido: {request.Period}");
         ValidatePoints(request.Points);
         var options = TaskTemplateService.ParseOptions(request.Options);
-        var reason = TaskTemplateService.ParseReason(request.Reason);
+        var reason = TaskTemplateService.ParseSingleReason(request.Reason);
         await EnsureChildPermissionAsync(userId, actorRole, p => p.CanEditTasks);
 
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
@@ -672,6 +672,18 @@ public class DailyRoutineService : IDailyRoutineService
     // por TimezoneHelper.GetOperationalDate antes de chegar em qualquer chamador).
     private static DayOfWeek ParseDayOfWeek(string date) =>
         DateTime.ParseExact(date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture).DayOfWeek;
+
+    // Sorteia uma frase do pool de motivos do template pra este DailyTask (pedido do
+    // dono do produto, 2026-09-02: "frases aleatorias e motivos sempre pertinentes,
+    // nao precisa ser a mesma frase todos os dias"). So roda no momento em que o
+    // DailyTask e gerado (aqui e em CreateRoutineForDateAsync) -- depois disso o
+    // DailyTask e imutavel como qualquer outro campo copiado do template, entao a
+    // frase sorteada fica fixa para aquele dia especifico (nao muda se a pessoa
+    // recarregar a tela), mas o proximo dia gerado sorteia de novo. Random.Shared
+    // (thread-safe, .NET 6+) em vez de `new Random()` porque varias rotinas de
+    // familias diferentes podem ser geradas concorrentemente.
+    private static string? PickReason(List<string> reasons) =>
+        reasons.Count == 0 ? null : reasons[Random.Shared.Next(reasons.Count)];
 
     // Decide se/como um TaskTemplate aparece num dia especifico, de acordo com
     // Recurrence. Retorna null quando a recorrencia nao inclui esse dia (o chamador

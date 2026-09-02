@@ -1,4 +1,4 @@
-﻿using MongoDB.Bson;
+using MongoDB.Bson;
 using Pacus.Application.DTOs;
 using Pacus.Application.Interfaces;
 using Pacus.Application.Utils;
@@ -81,11 +81,9 @@ public class DailyRoutineService : IDailyRoutineService
             .DefaultIfEmpty(0)
             .Max() + 1;
 
-        var dayOfWeek = ParseDayOfWeek(routine.Date);
-
         foreach (var template in missingTemplates)
         {
-            var resolved = ResolveTemplateForDay(template, dayOfWeek);
+            var resolved = ResolveTemplateForDay(template, routine.Date);
             if (resolved is null) continue; // recorrencia nao inclui este dia (ex.: fim de semana)
 
             routine.Tasks.Add(new DailyTask
@@ -130,10 +128,9 @@ public class DailyRoutineService : IDailyRoutineService
         if (existing is not null) return existing;
 
         var templates = await _taskTemplateRepository.GetActiveByUserAsync(userId);
-        var dayOfWeek = ParseDayOfWeek(date);
 
         var tasks = templates
-            .Select(t => (Template: t, Resolved: ResolveTemplateForDay(t, dayOfWeek)))
+            .Select(t => (Template: t, Resolved: ResolveTemplateForDay(t, date)))
             .Where(pair => pair.Resolved is not null) // recorrencia nao inclui este dia
             .Select(pair => new DailyTask
             {
@@ -677,14 +674,18 @@ public class DailyRoutineService : IDailyRoutineService
         DateTime.ParseExact(date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture).DayOfWeek;
 
     // Decide se/como um TaskTemplate aparece num dia especifico, de acordo com
-    // Recurrence. Retorna null quando a recorrencia nao inclui esse dia da semana
-    // (o chamador deve pular esse template pra essa data). Titulo/descricao/pontos
-    // no retorno ja vem resolvidos (iguais ao template, exceto em
-    // RecurrenceWeekdayRotation, onde titulo/descricao vem da variante do dia, e
-    // os pontos tambem vem da variante quando ela define um valor proprio --
-    // ex.: uma missao que exige supervisao de adulto pode valer mais que outra).
-    private static ResolvedTemplateContent? ResolveTemplateForDay(TaskTemplate template, DayOfWeek dayOfWeek)
+    // Recurrence. Retorna null quando a recorrencia nao inclui esse dia (o chamador
+    // deve pular esse template pra essa data). Titulo/descricao/pontos no retorno ja
+    // vem resolvidos (iguais ao template, exceto em RecurrenceWeekdayRotation, onde
+    // titulo/descricao vem da variante do dia, e os pontos tambem vem da variante
+    // quando ela define um valor proprio -- ex.: uma missao que exige supervisao de
+    // adulto pode valer mais que outra). Recebe a data operacional inteira (nao so o
+    // dia da semana) porque RecurrenceInterval precisa contar dias corridos desde uma
+    // data-ancora -- um "dia sim, dia nao" desliza pelos dias da semana com o tempo,
+    // diferente de RecurrenceCustom, que e sempre os mesmos dias toda semana.
+    private static ResolvedTemplateContent? ResolveTemplateForDay(TaskTemplate template, string date)
     {
+        var dayOfWeek = ParseDayOfWeek(date);
         var isWeekend = dayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
 
         if (template.Recurrence.Equals(TaskTemplate.RecurrenceWeekday, StringComparison.OrdinalIgnoreCase))
@@ -714,9 +715,45 @@ public class DailyRoutineService : IDailyRoutineService
                 : null;
         }
 
+        if (template.Recurrence.Equals(TaskTemplate.RecurrenceInterval, StringComparison.OrdinalIgnoreCase))
+        {
+            return IsIntervalDay(template, date)
+                ? new ResolvedTemplateContent(template.Title, template.Description, template.Points)
+                : null;
+        }
+
         // RecurrenceDaily (ou qualquer valor desconhecido/legado): comportamento
         // original, todo dia, com o conteudo do proprio template.
         return new ResolvedTemplateContent(template.Title, template.Description, template.Points);
+    }
+
+    // "Dia sim, dia nao" (IntervalDays == 2) ou qualquer intervalo de N dias, contado
+    // em dias corridos desde AnchorDate (nao dias uteis, nao "toda outra semana" --
+    // simplesmente (data - ancora) % N == 0). Datas antes da ancora nunca incluem a
+    // tarefa. Template mal configurado (sem AnchorDate, por algum dado legado ou
+    // corrompido) tambem nunca inclui, em vez de lancar excecao no meio da geracao da
+    // rotina inteira -- mais seguro falhar "silencioso" pra uma tarefa do que quebrar
+    // o carregamento do dia todo.
+    private static bool IsIntervalDay(TaskTemplate template, string date)
+    {
+        if (string.IsNullOrWhiteSpace(template.AnchorDate))
+            return false;
+
+        if (!DateTime.TryParseExact(
+                template.AnchorDate,
+                "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None,
+                out var anchor))
+        {
+            return false;
+        }
+
+        var today = DateTime.ParseExact(date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var daysSinceAnchor = (today - anchor).Days;
+        var interval = template.IntervalDays < 1 ? 2 : template.IntervalDays;
+
+        return daysSinceAnchor >= 0 && daysSinceAnchor % interval == 0;
     }
 
     private sealed record ResolvedTemplateContent(string Title, string? Description, int Points);

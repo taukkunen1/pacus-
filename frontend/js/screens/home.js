@@ -600,7 +600,7 @@ export async function renderHome(
           // aparece no formulario quando isAdult.
           const result = await promptTaskForm({
             title: "Nova tarefa",
-            values: { type: "challenge", points: 1 },
+            values: { type: "challenge", points: 1, period: activePeriod },
             showPermanentToggle: isAdult,
             confirmLabel: "Adicionar"
           });
@@ -609,10 +609,7 @@ export async function renderHome(
             return;
           }
 
-          const { permanent, ...payload } = {
-            ...result,
-            period: activePeriod
-          };
+          const { permanent, ...payload } = result;
 
           try {
             if (permanent) {
@@ -675,9 +672,9 @@ export async function renderHome(
 
             // Mesmo painel unico da criacao (ver components/modal.js
             // promptTaskForm), ja preenchido com os valores atuais da
-            // tarefa — inclui o tipo (obrigatoria/deve fazer/desafio) como
-            // grupo de botoes visivel, que antes ficava escondido dentro de
-            // mais um prompt generico na fila.
+            // tarefa — inclui o tipo (obrigatoria/deve fazer/desafio) e o
+            // periodo (manha/tarde/noite) como grupos de botoes visiveis,
+            // que antes ficavam escondidos (o periodo nem aparecia).
             const result = await promptTaskForm({
               title: "Editar tarefa",
               values: task,
@@ -694,10 +691,7 @@ export async function renderHome(
               routine =
                 await updateDailyTask(
                   task.id,
-                  {
-                    ...fields,
-                    period: task.period
-                  }
+                  fields
                 );
 
               balance =

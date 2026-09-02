@@ -132,10 +132,15 @@ function taskCard(task, canManage) {
         ${
           task.reason
             ? `
-              <p class="task-reason">
-                <span class="task-reason__icon" aria-hidden="true">💡</span>
-                ${escapeHtml(task.reason)}
-              </p>
+              <details class="task-reason">
+                <summary class="task-reason__toggle">
+                  <span class="task-reason__icon" aria-hidden="true">💡</span>
+                  Por que?
+                </summary>
+                <p class="task-reason__text">
+                  <strong>Por que você faz isso?</strong> ${escapeHtml(task.reason)}
+                </p>
+              </details>
             `
             : ""
         }

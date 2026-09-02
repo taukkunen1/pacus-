@@ -15,6 +15,11 @@ public record CreateTaskRequest(
     // So usado quando Recurrence == "custom" -- nomes de DayOfWeek (ex.: "tuesday",
     // "wednesday"), qualquer combinacao incluindo fim de semana.
     List<string>? CustomDays = null,
+    // So usados quando Recurrence == "interval" -- ver TaskTemplate.AnchorDate/
+    // IntervalDays. AnchorDate no formato "yyyy-MM-dd"; IntervalDays default 2
+    // ("dia sim, dia nao") quando nao informado.
+    string? AnchorDate = null,
+    int? IntervalDays = null,
     // Op-in de escolha (Teoria da Autodeterminacao, ver docs/PROPOSITO.md): 2-4 opcoes
     // curtas que a crianca escolhe entre si antes de concluir. Null/vazio = sem opcoes.
     List<string>? Options = null,

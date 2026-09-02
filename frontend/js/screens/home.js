@@ -453,7 +453,8 @@ export async function renderHome(
               ),
               {
                 canManage: true,
-                type
+                type,
+                period: activePeriod
               }
             )
         ).join("")}

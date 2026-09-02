@@ -13,10 +13,9 @@ import { getPoints } from "../api/points-api.js";
 import { showToast } from "../components/toast.js";
 import { appState } from "../state/app-state.js";
 import { formatBrl } from "../utils/format.js";
-import { promptTextarea } from "../components/modal.js";
+import { promptStoreItemForm } from "../components/modal.js";
 import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
 
-const CATEGORIES = ["screen_time", "toy", "activity", "other"];
 const CATEGORY_LABELS = {
   screen_time: "Tempo de tela",
   toy: "Brinquedo",
@@ -289,78 +288,17 @@ export async function renderStore(root, navigate = () => {}) {
     });
   }
 
-  // Usado tanto por "+ Novo item" quanto por "Editar" -- se `existing` for passado, os
-  // prompts vem pre-preenchidos com os valores atuais do item. Devolve null se o adulto
-  // cancelar em qualquer etapa (mesmo padrão dos outros fluxos baseados em window.prompt).
+  // Usado tanto por "+ Novo item" quanto por "Editar" -- painel unico
+  // (components/modal.js promptStoreItemForm), mesmo padrao do editor de
+  // tarefas: todos os campos visiveis de uma vez, com Categoria como grupo de
+  // botoes em vez de pedir pra digitar "screen_time"/"toy"/... por extenso.
+  // Devolve null se o adulto cancelar.
   async function promptItemFields(existing = null) {
-    const title = window.prompt("Nome do item:", existing?.title ?? "");
-    if (!title?.trim()) return null;
-
-    const descriptionRaw = await promptTextarea({
-      title: "Descrição do item",
-      label: "Descrição (opcional) — um item por linha",
-      value: existing?.description ?? "",
-      placeholder: "Ex.: válido só aos fins de semana"
+    return promptStoreItemForm({
+      title: existing ? "Editar item" : "Novo item",
+      values: existing ?? {},
+      confirmLabel: existing ? "Salvar" : "Adicionar"
     });
-
-    const cost = Number(window.prompt("Custo em Pacus Points:", String(existing?.cost ?? 100)));
-    if (!Number.isInteger(cost) || cost <= 0) {
-      showToast("Custo inválido. Use um número inteiro maior que zero.", { error: true });
-      return null;
-    }
-
-    const category = window
-      .prompt(`Categoria: ${CATEGORIES.join(", ")}`, existing?.category ?? "other")
-      ?.trim()
-      .toLowerCase();
-
-    if (!CATEGORIES.includes(category)) {
-      showToast(`Categoria inválida. Use uma de: ${CATEGORIES.join(", ")}.`, { error: true });
-      return null;
-    }
-
-    const icon = window.prompt("Emoji do item (opcional):", existing?.icon ?? "") || null;
-
-    const stockRaw = window.prompt(
-      "Estoque (deixe em branco para ilimitado):",
-      existing?.stock !== null && existing?.stock !== undefined ? String(existing.stock) : ""
-    );
-    const stock = stockRaw?.trim() ? Number(stockRaw) : null;
-    if (stock !== null && (!Number.isInteger(stock) || stock <= 0)) {
-      showToast("Estoque inválido. Deixe em branco para ilimitado ou use um número inteiro maior que zero.", { error: true });
-      return null;
-    }
-
-    const dailyLimitRaw = window.prompt(
-      "Limite de resgates por dia (deixe em branco para sem limite):",
-      existing?.dailyLimit ? String(existing.dailyLimit) : ""
-    );
-    const dailyLimit = dailyLimitRaw?.trim() ? Number(dailyLimitRaw) : null;
-    if (dailyLimit !== null && (!Number.isInteger(dailyLimit) || dailyLimit <= 0)) {
-      showToast("Limite diário inválido. Deixe em branco para sem limite ou use um número inteiro maior que zero.", { error: true });
-      return null;
-    }
-
-    const screenTimeRaw = window.prompt(
-      "Minutos de tempo de tela concedidos ao aprovar (deixe em branco se não for tempo de tela):",
-      existing?.screenTimeMinutes ? String(existing.screenTimeMinutes) : (category === "screen_time" ? "60" : "")
-    );
-    const screenTimeMinutes = screenTimeRaw?.trim() ? Number(screenTimeRaw) : null;
-    if (screenTimeMinutes !== null && (!Number.isInteger(screenTimeMinutes) || screenTimeMinutes <= 0)) {
-      showToast("Minutos de tela inválidos. Deixe em branco ou use um número inteiro maior que zero.", { error: true });
-      return null;
-    }
-
-    return {
-      title: title.trim(),
-      description: descriptionRaw?.trim() || null,
-      cost,
-      category,
-      icon,
-      stock,
-      dailyLimit,
-      screenTimeMinutes
-    };
   }
 
   try {

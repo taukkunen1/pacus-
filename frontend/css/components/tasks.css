@@ -45,6 +45,29 @@
 .task-section--expected .task-section__dot { background: var(--color-lagoon-light); }
 .task-section--challenge .task-section__dot { background: var(--color-coral); }
 
+.task-section__celebration {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.task-section__celebration-icon {
+  font-size: var(--step-lg);
+  flex-shrink: 0;
+  line-height: 1;
+}
+.task-section__celebration-title {
+  font-family: var(--font-display);
+  font-size: var(--step-sm);
+  font-weight: 600;
+  color: var(--color-sun);
+}
+.task-section__celebration-subtitle {
+  font-size: var(--step-xs, 0.8rem);
+  color: var(--text-on-dark-dim);
+  margin-top: 2px;
+}
+
 .task-list { display: flex; flex-direction: column; gap: var(--space-2); }
 
 .task-card {

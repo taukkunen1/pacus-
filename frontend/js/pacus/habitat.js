@@ -25,12 +25,12 @@ function normalizeStage(stage) {
 // tela separada -- reforca o vinculo emocional que a crianca ja tem com o bichinho, em
 // vez de virar mais uma notificacao. REACTION_ICONS e a unica fonte de verdade do emoji
 // (o backend so guarda a chave semantica, ver DailyRoutineService.AllowedReactionIcons)
-// e da frase padrao sugerida ao adulto (ver screens/home.js promptForReaction).
+// e da frase padrao sugerida ao adulto (ver components/modal.js promptReactionForm).
 export const REACTION_ICONS = {
-  heart: { emoji: "❤️", label: "Coração", defaultMessage: "Estou orgulhoso de você hoje." },
-  clap: { emoji: "👏", label: "Palminhas", defaultMessage: "Você se esforçou bastante hoje, parabéns!" },
-  star: { emoji: "🌟", label: "Estrela", defaultMessage: "Isso foi demais, muito bem!" },
-  hug: { emoji: "🤗", label: "Abraço", defaultMessage: "Te amo, foi um bom dia." },
+  heart: { emoji: "❤️", label: "Coração", defaultMessage: "Você me deixou orgulhoso hoje." },
+  clap: { emoji: "👏", label: "Palminhas", defaultMessage: "Você se esforçou bastante — parabéns!" },
+  star: { emoji: "🌟", label: "Estrela", defaultMessage: "Uau, isso foi demais!" },
+  hug: { emoji: "🤗", label: "Abraço", defaultMessage: "Eu te amo. Foi um bom dia." },
 };
 
 export function renderTank(pacus, stageOverride, options = {}) {
@@ -148,7 +148,7 @@ export function renderTank(pacus, stageOverride, options = {}) {
   const adultAction = isAdult
     ? `
         <button type="button" class="tank-reaction-cta" data-action="set-reaction">
-          ${reaction ? "✏️ Editar reação de hoje" : "💬 Reagir ao dia de hoje"}
+          ${reaction ? "✏️ Editar mensagem de hoje" : "💬 Deixar uma mensagem pra hoje"}
         </button>
       `
     : "";

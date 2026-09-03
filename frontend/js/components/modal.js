@@ -1,4 +1,5 @@
 import { isValidPoints, POINTS_HELP_TEXT } from "../utils/validation.js";
+import { REACTION_ICONS } from "../pacus/habitat.js";
 
 // Modal simples com textarea -- usado onde window.prompt() nao serve porque o
 // campo precisa aceitar varias linhas (window.prompt e uma unica linha; Enter
@@ -1194,6 +1195,129 @@ export function promptPermanentTaskForm({
         options: hasOptionsCheckbox.checked ? optionsEditor.getValues() : [],
         reasons: reasonsEditor.getValues()
       });
+    }
+
+    overlay
+      .querySelector('[data-modal-action="ok"]')
+      .addEventListener("click", submit);
+
+    overlay
+      .querySelector('[data-modal-action="cancel"]')
+      .addEventListener("click", () => finish(null));
+
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) finish(null);
+    });
+
+    overlay.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") finish(null);
+    });
+  });
+}
+
+// Painel unico de reagir ao dia -- antes eram dois window.prompt encadeados
+// (um menu numerado pra escolher o icone digitando 1-4, depois um segundo
+// prompt de texto livre pra mensagem, sugerindo a mensagem padrao do icone
+// escolhido). Agora e uma unica tela com os icones como grupo de botoes
+// visiveis (mesmo padrao de .task-form-type-group usado em Tipo/Periodo/
+// Categoria nos outros formularios) e um campo de mensagem que atualiza
+// sozinho a sugestao ao trocar de icone -- mantendo a mensagem atual se o
+// icone escolhido for o mesmo que a reacao ja tinha. Resolve com
+// `{ icon, message }` se confirmar, ou `null` se cancelar.
+export function promptReactionForm({ current = null } = {}) {
+  return new Promise((resolve) => {
+    closeActiveModal();
+
+    const iconKeys = Object.keys(REACTION_ICONS);
+    const initialIcon =
+      current?.icon && REACTION_ICONS[current.icon] ? current.icon : iconKeys[0];
+    const initialMessage =
+      current?.icon === initialIcon && current?.message
+        ? current.message
+        : REACTION_ICONS[initialIcon].defaultMessage;
+
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal-box modal-box--form" role="dialog" aria-modal="true" aria-label="Reagir ao dia">
+        <h3 class="modal-title">Reagir ao dia</h3>
+
+        <div class="field">
+          <label>Como foi o dia?</label>
+          <div class="task-form-type-group" role="radiogroup" aria-label="Reação do dia">
+            ${iconKeys
+              .map(
+                (key) => `
+              <label class="task-form-type-option">
+                <input
+                  type="radio"
+                  name="reaction-form-icon"
+                  value="${key}"
+                  ${key === initialIcon ? "checked" : ""}
+                />
+                <span>${REACTION_ICONS[key].emoji} ${escapeHtml(REACTION_ICONS[key].label)}</span>
+              </label>
+            `
+              )
+              .join("")}
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="reaction-form-message">Mensagem pra criança (opcional)</label>
+          <textarea
+            id="reaction-form-message"
+            class="modal-textarea"
+            rows="3"
+            placeholder="Ex.: Você me deixou orgulhoso hoje."
+          >${escapeHtml(initialMessage)}</textarea>
+          <p class="modal-hint">Deixe em branco pra usar a mensagem padrão do ícone escolhido.</p>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-modal-action="cancel">Cancelar</button>
+          <button type="button" class="btn btn-primary" data-modal-action="ok">Salvar</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    activeModal = overlay;
+
+    const messageField = overlay.querySelector("#reaction-form-message");
+    let lastAutoMessage = initialMessage;
+
+    // Ao trocar de icone, so atualiza o campo de mensagem se ele ainda tiver
+    // o texto sugerido automaticamente (ou estiver vazio) -- assim, se a
+    // pessoa ja tiver digitado algo proprio, a troca de icone nao apaga o que
+    // ela escreveu.
+    overlay.querySelectorAll('input[name="reaction-form-icon"]').forEach((input) => {
+      input.addEventListener("change", () => {
+        const key = input.value;
+        const suggestion =
+          current?.icon === key && current?.message
+            ? current.message
+            : REACTION_ICONS[key].defaultMessage;
+
+        if (!messageField.value.trim() || messageField.value === lastAutoMessage) {
+          messageField.value = suggestion;
+          lastAutoMessage = suggestion;
+        }
+      });
+    });
+
+    function finish(result) {
+      overlay.remove();
+      if (activeModal === overlay) activeModal = null;
+      resolve(result);
+    }
+
+    function submit() {
+      const icon =
+        overlay.querySelector('input[name="reaction-form-icon"]:checked')?.value ??
+        initialIcon;
+      const message = messageField.value.trim() || REACTION_ICONS[icon].defaultMessage;
+      finish({ icon, message });
     }
 
     overlay

@@ -31,7 +31,7 @@ import {
 import { showToast } from "../components/toast.js";
 import { pickEffortMessage } from "../utils/effort-messages.js";
 import { appState } from "../state/app-state.js";
-import { promptTaskForm, showMessageModal } from "../components/modal.js";
+import { promptTaskForm, showMessageModal, promptReactionForm } from "../components/modal.js";
 import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
 import { withSlowLoadHint, SLOW_LOAD_MESSAGE } from "../utils/slow-load-hint.js";
 
@@ -46,45 +46,6 @@ const TYPES = [
   "expected",
   "challenge"
 ];
-
-const REACTION_ORDER = ["heart", "clap", "star", "hug"];
-
-// Fluxo do adulto pra reagir ao dia (relatedness -- ver docs/PROPOSITO.md e
-// pacus/habitat.js): escolhe um icone (numero) e recebe a frase padrao daquele
-// icone pra editar ou manter -- baixo atrito, mas ainda pessoal.
-// Retorna null se cancelar em qualquer etapa (o chamador deve abortar).
-async function promptForReactionChoice(currentReaction) {
-  const menuLines = REACTION_ORDER
-    .map((key, i) => `${i + 1}) ${REACTION_ICONS[key].emoji} ${REACTION_ICONS[key].label}`)
-    .join("\n");
-
-  const currentIndex = currentReaction
-    ? REACTION_ORDER.indexOf(currentReaction.icon)
-    : -1;
-
-  const choice = window.prompt(
-    `Como foi o dia da criança hoje?\n${menuLines}`,
-    String(currentIndex >= 0 ? currentIndex + 1 : 1)
-  );
-
-  if (choice === null) return null;
-
-  const icon = REACTION_ORDER[Number(choice.trim()) - 1] ?? REACTION_ORDER[0];
-
-  const suggestion =
-    currentReaction?.icon === icon
-      ? currentReaction.message ?? REACTION_ICONS[icon].defaultMessage
-      : REACTION_ICONS[icon].defaultMessage;
-
-  const message = window.prompt(
-    "Quer personalizar a mensagem? (opcional — deixe como está, edite, ou apague tudo pra deixar só o ícone)",
-    suggestion
-  );
-
-  if (message === null) return null;
-
-  return { icon, message: message.trim() || null };
-}
 
 function formatGameTimerRemaining(remainingMs) {
   const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
@@ -575,12 +536,16 @@ export async function renderHome(
     content
       .querySelector('[data-action="set-reaction"]')
       ?.addEventListener("click", async () => {
-        const choice = await promptForReactionChoice(routine.reaction);
+        // Painel unico (ver components/modal.js promptReactionForm), mesmo padrao
+        // dos outros editores do site: icones como grupo de botoes visiveis (nada
+        // de menu numerado em window.prompt) + campo de mensagem opcional, tudo
+        // numa tela so. Antes disso eram dois window.prompt encadeados.
+        const choice = await promptReactionForm({ current: routine.reaction });
         if (!choice) return;
 
         try {
           routine = await setDailyReaction(choice.icon, choice.message);
-          showToast("Reação registrada — o Pacus vai carregar isso com ele hoje.");
+          showToast("Mensagem salva — o Pacus vai guardar isso com carinho hoje.");
           draw();
         } catch (err) {
           showToast(err.message, { error: true });

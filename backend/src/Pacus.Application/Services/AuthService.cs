@@ -91,6 +91,21 @@ public class AuthService : IAuthService
         return new string(buffer);
     }
 
+    // Codigo curto (6 caracteres do mesmo alfabeto do recovery code, formato
+    // "XXX-YYY") pensado pra crianca digitar num teclado de tablet sem erro --
+    // bem mais curto que o recovery code (que e do adulto, digitado uma vez so
+    // num fluxo de "esqueci a senha"). Unicidade e checada e garantida por quem
+    // chama isto (ver BootstrapService.GenerateUniqueFamilyCodeAsync), nao aqui.
+    public static string GenerateFamilyCode()
+    {
+        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        Span<char> buffer = stackalloc char[6];
+        for (var i = 0; i < buffer.Length; i++)
+            buffer[i] = alphabet[Random.Shared.Next(alphabet.Length)];
+
+        return $"{buffer[0]}{buffer[1]}{buffer[2]}-{buffer[3]}{buffer[4]}{buffer[5]}";
+    }
+
     private AuthResponse BuildResponse(Domain.Entities.User user, TimeSpan lifetime)
     {
         var (token, expiresAt) = _tokenService.GenerateToken(user, lifetime);

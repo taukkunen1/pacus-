@@ -7,3 +7,5 @@ public record ChildProfileDto(string Id, string Name);
 public record UpdateChildPinRequest(string NewPin);
 
 public record UpdateTimezoneRequest(string Timezone);
+
+public record FamilyCodeDto(string FamilyCode);

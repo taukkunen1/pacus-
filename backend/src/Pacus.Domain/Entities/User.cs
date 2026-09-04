@@ -19,6 +19,14 @@ public class User
     public string? RecoveryCodeHash { get; set; }
 
     public string Timezone { get; set; } = "America/Sao_Paulo";
+
+    // Codigo curto da familia (formato "XXX-YYY", gerado uma vez no bootstrap e
+    // copiado pro adulto + crianca, mesmo padrao denormalizado do Timezone acima).
+    // Usado pela crianca pra encontrar a familia dela ao logar num aparelho novo,
+    // sem precisar colar um ObjectId do Mongo -- ver AuthService.GenerateFamilyCode
+    // e FamilyController.GetChildrenByFamilyCode.
+    public string FamilyCode { get; set; } = string.Empty;
+
     public ObjectId FamilyId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

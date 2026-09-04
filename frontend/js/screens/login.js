@@ -4,72 +4,24 @@ import { createFamily } from "../api/bootstrap-api.js";
 import { withSlowLoadHint, SLOW_LOAD_MESSAGE } from "../utils/slow-load-hint.js";
 
 const CHILD_PROFILE_KEY = "pacus.child.profileId"; // so um id, nao e credencial — ok em localStorage
-const CHILDREN_CACHE_KEY = "pacus.family.children"; // so nome + id de cada crianca — mesmo motivo
-const FAMILY_CODE_KEY = "pacus.family.code"; // codigo curto da familia (ver User.FamilyCode) — nao e credencial
 
-function getCachedChildren() {
-  try {
-    const raw = localStorage.getItem(CHILDREN_CACHE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
+// Codigo curto da familia (ex.: "K7Q-X9F", ver User.FamilyCode no backend) --
+// e o que a crianca digita pra achar a familia num aparelho novo, no lugar de
+// colar um ObjectId cru. So e pedido uma vez por aparelho: depois de digitado
+// (ou apos um adulto logar aqui, ver cacheFamilyChildren), fica salvo aqui e a
+// tela pula direto pra lista de nomes.
+const FAMILY_CODE_KEY = "pacus.family.code";
 
-function cacheChildren(children) {
-  try {
-    localStorage.setItem(CHILDREN_CACHE_KEY, JSON.stringify(children));
-  } catch {
-    // Melhor esforco — se falhar, so nao fica em cache pra proxima vez.
-  }
-}
-
-function getSavedFamilyCode() {
-  try {
-    return localStorage.getItem(FAMILY_CODE_KEY) || "";
-  } catch {
-    return "";
-  }
-}
-
-function saveFamilyCode(code) {
-  try {
-    localStorage.setItem(FAMILY_CODE_KEY, code);
-  } catch {
-    // Melhor esforco.
-  }
-}
-
-// Fecha o problema do "ovo e a galinha": depois que um adulto loga uma vez
-// neste aparelho, tanto a lista de criancas quanto o codigo da familia ficam
-// salvos — a crianca nao precisa que ninguem digite o codigo pra ela na
-// primeira vez, e ele continua disponivel (auto-preenchido) se algum dia o
-// cache de nomes for limpo.
+// Chamado apos um login de adulto neste aparelho -- alem de popular a lista de
+// nomes (como ja fazia), agora tambem guarda o codigo da familia, entao se uma
+// crianca for logar depois no mesmo aparelho ela nem precisa digitar o codigo.
 async function cacheFamilyChildren() {
   try {
-    const children = await getFamilyChildren();
-    cacheChildren(children);
+    const [children, codeResult] = await Promise.all([getFamilyChildren(), getFamilyCode()]);
+    if (codeResult?.familyCode) localStorage.setItem(FAMILY_CODE_KEY, codeResult.familyCode);
   } catch {
-    // Melhor esforco — se falhar, a tela de crianca cai no fallback de codigo.
+    // Melhor esforco — se falhar, a tela de crianca cai no fluxo de digitar o codigo.
   }
-
-  try {
-    const { familyCode } = await getFamilyCode();
-    if (familyCode) saveFamilyCode(familyCode);
-  } catch {
-    // Melhor esforco.
-  }
-}
-
-// Uppercase, so letras/numeros, no maximo 6 caracteres, com traco depois dos
-// 3 primeiros -- mesmo formato "XXX-YYY" gerado por AuthService.GenerateFamilyCode.
-function formatFamilyCodeInput(value) {
-  const cleaned = String(value ?? "")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 6);
-  return cleaned.length > 3 ? `${cleaned.slice(0, 3)}-${cleaned.slice(3)}` : cleaned;
 }
 
 export function renderLogin(root, onSuccess) {
@@ -110,7 +62,7 @@ export function renderLogin(root, onSuccess) {
         <p class="error-text hidden" id="adult-error"></p>
         <button type="submit" class="btn btn-primary btn-block">Entrar</button>
         <button type="button" class="btn btn-ghost btn-block" id="forgot-password-btn">Esqueci minha senha</button>
-        <button type="button" class="btn btn-ghost btn-block" id="create-family-from-adult-btn">Criar uma família</button>
+        <button type="button" class="btn btn-ghost btn-block" id="register-btn">Criar uma família</button>
       </form>
     `;
 
@@ -147,7 +99,7 @@ export function renderLogin(root, onSuccess) {
     });
 
     slot.querySelector("#forgot-password-btn").addEventListener("click", renderForgotPasswordForm);
-    slot.querySelector("#create-family-from-adult-btn").addEventListener("click", renderCreateFamilyForm);
+    slot.querySelector("#register-btn").addEventListener("click", renderRegisterForm);
   }
 
   // "Esqueci minha senha" -- sem provedor de e-mail configurado, usa o codigo de
@@ -219,20 +171,172 @@ export function renderLogin(root, onSuccess) {
     });
   }
 
-  function renderChildForm() {
-    const cachedChildren = getCachedChildren();
-    if (cachedChildren.length > 0) {
-      renderProfilePicker(cachedChildren);
-      return;
-    }
+  // Cadastro inicial da familia (1 adulto + 1 crianca) -- so escopo do bootstrap
+  // ja existente no backend; adicionar uma segunda crianca depois ficou fora
+  // deste recurso por decisao explicita.
+  function renderRegisterForm() {
+    slot.innerHTML = `
+      <form class="login-form" id="register-form">
+        <div class="field">
+          <label for="reg-adult-name">Seu nome</label>
+          <input id="reg-adult-name" type="text" autocomplete="name" required />
+        </div>
+        <div class="field">
+          <label for="reg-adult-email">Email</label>
+          <input id="reg-adult-email" type="email" autocomplete="username" required />
+        </div>
+        <div class="field">
+          <label for="reg-adult-password">Senha (mínimo 8 caracteres)</label>
+          <input id="reg-adult-password" type="password" autocomplete="new-password" minlength="8" required />
+        </div>
+        <div class="field">
+          <label for="reg-child-name">Nome da criança</label>
+          <input id="reg-child-name" type="text" required />
+        </div>
+        <div class="field">
+          <label for="reg-child-pin">PIN da criança (4 dígitos)</label>
+          <input id="reg-child-pin" type="text" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required />
+        </div>
+        <p class="error-text hidden" id="register-error"></p>
+        <button type="submit" class="btn btn-primary btn-block">Criar família</button>
+        <button type="button" class="btn btn-ghost btn-block" id="back-to-login-from-register-btn">Voltar</button>
+      </form>
+    `;
 
-    const savedCode = getSavedFamilyCode();
-    renderFamilyCodeEntry({ prefill: savedCode, autoLookup: Boolean(savedCode) });
+    slot.querySelector("#back-to-login-from-register-btn").addEventListener("click", renderAdultForm);
+
+    slot.querySelector("#register-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (submitting) return;
+
+      const adultName = slot.querySelector("#reg-adult-name").value.trim();
+      const adultEmail = slot.querySelector("#reg-adult-email").value.trim();
+      const adultPassword = slot.querySelector("#reg-adult-password").value;
+      const childName = slot.querySelector("#reg-child-name").value.trim();
+      const childPin = slot.querySelector("#reg-child-pin").value.trim();
+      const errorEl = slot.querySelector("#register-error");
+      const submitBtn = slot.querySelector('#register-form button[type="submit"]');
+      const originalLabel = submitBtn.textContent;
+      errorEl.classList.add("hidden");
+
+      submitting = true;
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Criando...";
+      try {
+        const result = await withSlowLoadHint(
+          createFamily(adultName, adultEmail, adultPassword, childName, childPin),
+          () => { submitBtn.textContent = "Ainda conectando..."; errorEl.textContent = SLOW_LOAD_MESSAGE; errorEl.classList.remove("hidden", "error-text"); errorEl.classList.add("hint-text"); }
+        );
+        renderRegisterSuccess(result, adultEmail);
+      } catch (err) {
+        errorEl.classList.remove("hint-text");
+        errorEl.classList.add("error-text");
+        errorEl.textContent = err.message;
+        errorEl.classList.remove("hidden");
+        submitting = false;
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalLabel;
+      }
+    });
   }
 
-  // Fluxo principal: a crianca so toca no proprio nome. A lista vem do cache
-  // populado no ultimo login de um adulto neste aparelho, ou de uma busca por
-  // codigo da familia (ver cacheFamilyChildren / renderFamilyCodeEntry).
+  function renderRegisterSuccess(result, adultEmail) {
+    submitting = false;
+
+    // Ja aproveita o cache deste aparelho -- quem acabou de criar a familia
+    // provavelmente vai logar (ou deixar a crianca logar) em seguida aqui mesmo.
+    try {
+      localStorage.setItem(FAMILY_CODE_KEY, result.familyCode);
+    } catch {
+      // localStorage indisponivel (modo privado, etc.) — sem problema, so nao cacheia.
+    }
+
+    slot.innerHTML = `
+      <div class="login-form">
+        <p class="profile-picker-hint">Família criada! Guarde estas informações em lugar seguro:</p>
+        <div class="field">
+          <label>Código da família — a criança usa para logar em novos aparelhos</label>
+          <p class="register-code">${escapeHtml(result.familyCode)}</p>
+        </div>
+        <div class="field">
+          <label>Código de recuperação — para "esqueci minha senha"</label>
+          <p class="register-code">${escapeHtml(result.recoveryCode)}</p>
+        </div>
+        <button type="button" class="btn btn-primary btn-block" id="go-to-login-btn">Ir para o login</button>
+      </div>
+    `;
+
+    slot.querySelector("#go-to-login-btn").addEventListener("click", () => {
+      renderAdultForm();
+      const emailInput = slot.querySelector("#email");
+      if (emailInput) emailInput.value = adultEmail;
+    });
+  }
+
+  // Ponto de entrada da aba "Crianca": se este aparelho ja tem o codigo da
+  // familia guardado (de um cadastro ou login de adulto anteriores, ou de uma
+  // digitacao anterior), pula direto pra lista de nomes; senao pede o codigo.
+  async function renderChildForm() {
+    const cachedCode = localStorage.getItem(FAMILY_CODE_KEY) || "";
+    if (cachedCode) {
+      await loadChildrenForCode(cachedCode);
+    } else {
+      renderFamilyCodeEntry();
+    }
+  }
+
+  async function loadChildrenForCode(code) {
+    slot.innerHTML = `<div class="login-form"><p class="profile-picker-hint">Carregando...</p></div>`;
+    try {
+      const children = await getChildrenByFamilyCode(code);
+      localStorage.setItem(FAMILY_CODE_KEY, code);
+        renderProfilePicker(children);
+    } catch (err) {
+      renderFamilyCodeEntry(err.message);
+    }
+  }
+
+  function renderFamilyCodeEntry(initialError) {
+    slot.innerHTML = `
+      <div class="login-form">
+        <p class="profile-picker-hint">Digite o código da família (peça para o responsável).</p>
+        <div class="field">
+          <label for="family-code">Código da família</label>
+          <input id="family-code" type="text" autocomplete="off" placeholder="XXX-XXX" maxlength="7" />
+        </div>
+        <p class="error-text ${initialError ? "" : "hidden"}" id="family-code-error">${escapeHtml(initialError || "")}</p>
+        <button type="button" class="btn btn-primary btn-block" id="family-code-continue-btn">Continuar</button>
+      </div>
+    `;
+
+    const input = slot.querySelector("#family-code");
+    const errorEl = slot.querySelector("#family-code-error");
+
+    // Auto-formata "XXXYYY" -> "XXX-YYY" enquanto digita (ou cola sem o traco) --
+    // o codigo gerado pelo backend ja vem nesse formato (ver AuthService.GenerateFamilyCode).
+    input.addEventListener("input", () => {
+      let raw = input.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+      input.value = raw.length > 3 ? `${raw.slice(0, 3)}-${raw.slice(3)}` : raw;
+    });
+
+    async function submitCode() {
+      const code = input.value.trim();
+      if (!code) {
+        errorEl.textContent = "Digite o código da família.";
+        errorEl.classList.remove("hidden");
+        return;
+      }
+      errorEl.classList.add("hidden");
+      await loadChildrenForCode(code);
+    }
+
+    slot.querySelector("#family-code-continue-btn").addEventListener("click", submitCode);
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { event.preventDefault(); submitCode(); }
+    });
+  }
+
+  // Fluxo principal: a crianca so toca no proprio nome.
   function renderProfilePicker(children) {
     slot.innerHTML = `
       <div class="login-form">
@@ -245,7 +349,7 @@ export function renderLogin(root, onSuccess) {
             )
             .join("")}
         </div>
-        <button type="button" class="btn btn-ghost btn-block" id="use-code-instead-btn">Nao encontrou seu nome?</button>
+        <button type="button" class="btn btn-ghost btn-block" id="change-family-code-btn">Não é este aparelho / trocar código</button>
       </div>
     `;
 
@@ -255,225 +359,10 @@ export function renderLogin(root, onSuccess) {
       renderPinEntry({ id: btn.dataset.id, name: btn.dataset.name }, { showBackToPicker: true });
     });
 
-    slot.querySelector("#use-code-instead-btn").addEventListener("click", () => {
-      renderFamilyCodeEntry({ prefill: getSavedFamilyCode() });
+    slot.querySelector("#change-family-code-btn").addEventListener("click", () => {
+      renderFamilyCodeEntry();
     });
   }
-
-  // Fallback (e ponto de entrada quando nenhum adulto ainda logou neste
-  // aparelho): a crianca digita o codigo curto da familia (ver
-  // User.FamilyCode) em vez de colar um ObjectId do Mongo -- o adulto encontra
-  // esse codigo na tela PACUS, em "Configuracoes da familia". Auto-formata
-  // "XXX-YYY" conforme digita, e tenta a busca sozinho quando ja existe um
-  // codigo salvo neste aparelho (autoLookup), pra crianca so precisar tocar
-  // o proprio nome direto, sem redigitar nada.
-  function renderFamilyCodeEntry({ prefill = "", autoLookup = false } = {}) {
-    slot.innerHTML = `
-      <div class="login-form">
-        <p class="profile-picker-hint">Peca o código da família para um adulto (tela PACUS → Configurações da família).</p>
-        <div class="field">
-          <label for="family-code">Código da família</label>
-          <input
-            id="family-code"
-            type="text"
-            value="${formatFamilyCodeInput(prefill)}"
-            placeholder="XXX-YYY"
-            autocomplete="off"
-            maxlength="7"
-          />
-        </div>
-        <p class="error-text hidden" id="family-code-error"></p>
-        <button type="button" class="btn btn-primary btn-block" id="family-code-continue-btn">Continuar</button>
-        <button type="button" class="btn btn-ghost btn-block" id="create-family-btn">Criar uma família</button>
-      </div>
-    `;
-
-    const codeInput = slot.querySelector("#family-code");
-    const errorEl = slot.querySelector("#family-code-error");
-    const continueBtn = slot.querySelector("#family-code-continue-btn");
-
-    codeInput.addEventListener("input", () => {
-      codeInput.value = formatFamilyCodeInput(codeInput.value);
-    });
-
-    codeInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        lookup();
-      }
-    });
-
-    async function lookup() {
-      const code = codeInput.value.trim();
-
-      if (code.length < 7) {
-        errorEl.textContent = "Digite o código completo (6 caracteres).";
-        errorEl.classList.remove("hidden");
-        return;
-      }
-
-      if (submitting) return;
-
-      errorEl.classList.add("hidden");
-      submitting = true;
-      const originalLabel = continueBtn.textContent;
-      continueBtn.disabled = true;
-      continueBtn.textContent = "Procurando...";
-
-      try {
-        const children = await withSlowLoadHint(
-          getChildrenByFamilyCode(code),
-          () => { continueBtn.textContent = "Ainda conectando..."; }
-        );
-
-        if (!children.length) {
-          errorEl.textContent = "Nenhuma criança encontrada com esse código. Confira com um adulto da família.";
-          errorEl.classList.remove("hidden");
-          return;
-        }
-
-        saveFamilyCode(code);
-        cacheChildren(children);
-        renderProfilePicker(children);
-      } catch (err) {
-        errorEl.textContent = err.message;
-        errorEl.classList.remove("hidden");
-      } finally {
-        submitting = false;
-        continueBtn.disabled = false;
-        continueBtn.textContent = originalLabel;
-      }
-    }
-
-    continueBtn.addEventListener("click", lookup);
-    slot.querySelector("#create-family-btn").addEventListener("click", renderCreateFamilyForm);
-
-    // Codigo ja salvo neste aparelho (de um login de adulto anterior, ou de uma
-    // busca por codigo anterior) -- tenta sozinho antes de pedir pra crianca
-    // tocar em "Continuar".
-    if (autoLookup && prefill) {
-      lookup();
-    }
-  }
-
-  // Cadastro de uma familia nova (1 adulto + 1 crianca) -- ate agora so existia
-  // via chamada direta na API, sem tela nenhuma. Acessivel tanto da aba
-  // Crianca (quando ninguem ainda tem um codigo) quanto da aba Adulto.
-  function renderCreateFamilyForm() {
-    slot.innerHTML = `
-      <form class="login-form" id="create-family-form">
-        <p class="profile-picker-hint">Crie a conta do responsável e o perfil da primeira criança.</p>
-
-        <div class="field">
-          <label for="new-adult-name">Seu nome</label>
-          <input id="new-adult-name" type="text" required />
-        </div>
-
-        <div class="field">
-          <label for="new-adult-email">Seu email</label>
-          <input id="new-adult-email" type="email" autocomplete="username" required />
-        </div>
-
-        <div class="field">
-          <label for="new-adult-password">Sua senha (mínimo 8 caracteres)</label>
-          <input id="new-adult-password" type="password" autocomplete="new-password" minlength="8" required />
-        </div>
-
-        <div class="field">
-          <label for="new-child-name">Nome da criança</label>
-          <input id="new-child-name" type="text" required />
-        </div>
-
-        <div class="field">
-          <label for="new-child-pin">PIN da criança (4 dígitos)</label>
-          <input
-            id="new-child-pin"
-            type="text"
-            inputmode="numeric"
-            pattern="[0-9]{4}"
-            maxlength="4"
-            autocomplete="off"
-            required
-          />
-        </div>
-
-        <p class="error-text hidden" id="create-family-error"></p>
-        <button type="submit" class="btn btn-primary btn-block">Criar família</button>
-        <button type="button" class="btn btn-ghost btn-block" id="back-from-create-btn">Voltar</button>
-      </form>
-    `;
-
-    slot.querySelector("#back-from-create-btn").addEventListener("click", () => {
-      renderFamilyCodeEntry({ prefill: getSavedFamilyCode() });
-    });
-
-    slot.querySelector("#create-family-form").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      if (submitting) return;
-
-      const adultName = slot.querySelector("#new-adult-name").value.trim();
-      const adultEmail = slot.querySelector("#new-adult-email").value.trim();
-      const adultPassword = slot.querySelector("#new-adult-password").value;
-      const childName = slot.querySelector("#new-child-name").value.trim();
-      const childPin = slot.querySelector("#new-child-pin").value.trim();
-      const errorEl = slot.querySelector("#create-family-error");
-      errorEl.classList.add("hidden");
-
-      const submitBtn = slot.querySelector('#create-family-form button[type="submit"]');
-      const originalLabel = submitBtn.textContent;
-
-      submitting = true;
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Criando...";
-
-      try {
-        const result = await withSlowLoadHint(
-          createFamily({ adultName, adultEmail, adultPassword, childName, childPin }),
-          () => { submitBtn.textContent = "Ainda conectando..."; }
-        );
-
-        saveFamilyCode(result.familyCode);
-        renderFamilyCreatedScreen(result);
-      } catch (err) {
-        errorEl.textContent = err.message;
-        errorEl.classList.remove("hidden");
-      } finally {
-        submitting = false;
-        submitBtn.disabled = false;
-        submitBtn.textContent = originalLabel;
-      }
-    });
-  }
-
-  // Tela final do cadastro -- mostra os dois codigos (familia + recuperacao de
-  // senha) uma unica vez, igual ao "esqueci minha senha". So aqui eles aparecem
-  // em texto puro; depois disso so o hash fica salvo no banco.
-  function renderFamilyCreatedScreen(result) {
-    slot.innerHTML = `
-      <div class="login-form">
-        <p class="profile-picker-hint">Família criada! Guarde os dois códigos abaixo em lugar seguro antes de continuar.</p>
-
-        <div class="field">
-          <label for="created-family-code">Código da família (para a criança logar)</label>
-          <input id="created-family-code" type="text" value="${escapeHtml(result.familyCode)}" readonly />
-        </div>
-
-        <div class="field">
-          <label for="created-recovery-code">Código de recuperação de senha (para você, se esquecer a senha)</label>
-          <input id="created-recovery-code" type="text" value="${escapeHtml(result.recoveryCode)}" readonly />
-        </div>
-
-        <button type="button" class="btn btn-primary btn-block" id="go-to-login-btn">Ir para o login</button>
-      </div>
-    `;
-
-    slot.querySelector("#go-to-login-btn").addEventListener("click", () => {
-      mode = "adult";
-      roleButtons.forEach((b) => b.classList.toggle("is-active", b.dataset.role === "adult"));
-      renderAdultForm();
-    });
-  }
-
 
   function renderPinEntry(child, { showBackToPicker }) {
     slot.innerHTML = `
@@ -573,6 +462,6 @@ export function renderLogin(root, onSuccess) {
 
 function escapeHtml(value = "") {
   const div = document.createElement("div");
-  div.textContent = String(value);
+  div.textContent = value;
   return div.innerHTML;
 }

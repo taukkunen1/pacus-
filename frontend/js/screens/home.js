@@ -35,24 +35,9 @@ import {
 import { showToast } from "../components/toast.js";
 import { pickEffortMessage } from "../utils/effort-messages.js";
 import { appState } from "../state/app-state.js";
-import { promptTaskForm, showMessageModal, promptReactionForm, promptPermanentTaskForm } from "../components/modal.js";
+import { promptTaskForm, promptPermanentTaskForm, showMessageModal, promptReactionForm } from "../components/modal.js";
 import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
 import { withSlowLoadHint, SLOW_LOAD_MESSAGE } from "../utils/slow-load-hint.js";
-
-// Abreviacao em portugues -> nome em ingles do enum DayOfWeek do backend
-// (Enum.TryParse so aceita "Monday", "Tuesday" etc). Cobre a semana inteira --
-// usado so pelo selo de recorrencia customizada na lista de tarefas
-// permanentes (ver recurrenceBadge abaixo); a escolha dos dias em si agora e
-// feita com checkboxes no painel de components/modal.js promptPermanentTaskForm.
-const DAY_ABBR = [
-  { abbr: "seg", key: "Monday" },
-  { abbr: "ter", key: "Tuesday" },
-  { abbr: "qua", key: "Wednesday" },
-  { abbr: "qui", key: "Thursday" },
-  { abbr: "sex", key: "Friday" },
-  { abbr: "sab", key: "Saturday" },
-  { abbr: "dom", key: "Sunday" }
-];
 
 const PERIODS = [
   "morning",
@@ -64,6 +49,23 @@ const TYPES = [
   "mandatory",
   "expected",
   "challenge"
+];
+
+// Abreviacao em portugues -> nome em ingles do enum DayOfWeek do backend
+// (Enum.TryParse so aceita "Monday", "Tuesday" etc). Cobre a semana inteira --
+// usado so pelo selo de recorrencia customizada na lista de tarefas
+// permanentes (ver recurrenceBadge abaixo); a escolha dos dias em si e feita
+// com checkboxes no painel de components/modal.js promptPermanentTaskForm.
+// Movido de screens/pacus.js pra ca junto com o resto da gestao de tarefas
+// permanentes (ver comentario na secao "ROTINA" dentro de draw()).
+const DAY_ABBR = [
+  { abbr: "seg", key: "Monday" },
+  { abbr: "ter", key: "Tuesday" },
+  { abbr: "qua", key: "Wednesday" },
+  { abbr: "qui", key: "Thursday" },
+  { abbr: "sex", key: "Friday" },
+  { abbr: "sab", key: "Saturday" },
+  { abbr: "dom", key: "Sunday" }
 ];
 
 function formatGameTimerRemaining(remainingMs) {
@@ -147,10 +149,12 @@ export async function renderHome(
   }
 
   // Numerozinho na aba "Loja" avisando o adulto de resgate(s) aguardando aprovacao --
-  // so uma contagem leve, sem mudar nada na tela de hoje em si. Aproveitamos o
-  // mesmo carregamento (bloco isAdult) pra buscar tambem as tarefas
-  // permanentes, que agora sao geridas aqui em vez da tela do PACUS -- sem
-  // round-trip extra so pra elas.
+  // so uma contagem leve, sem mudar nada na tela de hoje em si. Aproveita a mesma
+  // chamada (Promise.all) pra buscar as tarefas permanentes tambem, ja que as duas
+  // so servem pro adulto -- ver secao "ROTINA" em draw() e docs/ESTADO_ATUAL.md
+  // (gestao de tarefas permanentes migrou de screens/pacus.js pra ca: la a lista
+  // aparecia pra qualquer papel, sem checar isAdult, o que deixava uma crianca
+  // logada editar/desativar tarefa permanente pela aba PACUS).
   let pendingRedemptionsCount = 0;
   let permanentTasks = [];
   if (isAdult) {
@@ -160,7 +164,7 @@ export async function renderHome(
         getTasks()
       ]);
       pendingRedemptionsCount = pending?.length ?? 0;
-      permanentTasks = tasks ?? [];
+      permanentTasks = tasks;
     } catch (err) {
       console.warn("Nao foi possivel carregar resgates pendentes ou tarefas permanentes.", err);
     }
@@ -507,25 +511,12 @@ export async function renderHome(
     startGameTimerCountdown();
   }
 
-  // Selo curto na lista de tarefas permanentes mostrando em quais dias a
-  // tarefa aparece, quando nao e todo dia (o caso mais comum nao precisa de
-  // selo nenhum).
-  function recurrenceBadge(task) {
-    if (task.recurrence === "weekday") return `<span>📅 dias úteis</span>`;
-    if (task.recurrence === "weekend") return `<span>📅 fim de semana</span>`;
-    if (task.recurrence === "weekday_rotation") return `<span>🔁 1 atividade/dia útil</span>`;
-
-    if (task.recurrence === "custom" && (task.customDays ?? []).length) {
-      const labels = task.customDays
-        .map((day) => DAY_ABBR.find((d) => d.key.toLowerCase() === String(day).toLowerCase())?.abbr)
-        .filter(Boolean)
-        .join(", ");
-      return `<span>📅 ${escapeHtml(labels)}</span>`;
-    }
-
-    return "";
-  }
-
+  // Movido de screens/pacus.js (aba PACUS) pra ca: a lista la nao checava
+  // isAdult nenhuma vez, entao uma crianca logada via os mesmos botoes de
+  // editar/desativar tarefa permanente que o adulto via. Aqui a secao inteira
+  // (template acima) so renderiza quando isAdult, e os event listeners
+  // (attachHandlers) so sao ligados quando os botoes existem no DOM -- ou
+  // seja, ja saem protegidos de graca.
   function renderPermanentTasks() {
     if (!permanentTasks.length) {
       return `
@@ -577,7 +568,7 @@ export async function renderHome(
               <button
                 class="btn btn-ghost"
                 data-permanent-task-action="edit"
-                data-permanent-task-id="${escapeHtml(String(task.id))}"
+                data-task-id="${escapeHtml(String(task.id))}"
               >
                 Editar
               </button>
@@ -588,7 +579,7 @@ export async function renderHome(
                     <button
                       class="btn btn-ghost"
                       data-permanent-task-action="delete"
-                      data-permanent-task-id="${escapeHtml(String(task.id))}"
+                      data-task-id="${escapeHtml(String(task.id))}"
                     >
                       Desativar
                     </button>
@@ -597,7 +588,7 @@ export async function renderHome(
                     <button
                       class="btn btn-primary"
                       data-permanent-task-action="activate"
-                      data-permanent-task-id="${escapeHtml(String(task.id))}"
+                      data-task-id="${escapeHtml(String(task.id))}"
                     >
                       Ativar
                     </button>
@@ -610,6 +601,29 @@ export async function renderHome(
       .join("");
   }
 
+  // Selo curto na lista de tarefas permanentes mostrando em quais dias a
+  // tarefa aparece, quando nao e todo dia (o caso mais comum nao precisa de
+  // selo nenhum).
+  function recurrenceBadge(task) {
+    if (task.recurrence === "weekday") return `<span>📅 dias úteis</span>`;
+    if (task.recurrence === "weekend") return `<span>📅 fim de semana</span>`;
+    if (task.recurrence === "weekday_rotation") return `<span>🔁 1 atividade/dia útil</span>`;
+
+    if (task.recurrence === "custom" && (task.customDays ?? []).length) {
+      const labels = task.customDays
+        .map((day) => DAY_ABBR.find((d) => d.key.toLowerCase() === String(day).toLowerCase())?.abbr)
+        .filter(Boolean)
+        .join(", ");
+      return `<span>📅 ${escapeHtml(labels)}</span>`;
+    }
+
+    return "";
+  }
+
+  // Painel unico (components/modal.js promptPermanentTaskForm), mesmo padrao
+  // do editor de tarefas do dia: Tipo e Periodo como grupos de botoes,
+  // recorrencia com os blocos de dias/variantes revelados so quando fazem
+  // sentido, Opcoes e Motivos como listas editaveis.
   async function createPermanentTask() {
     const result = await promptPermanentTaskForm({
       title: "Nova tarefa permanente",
@@ -621,8 +635,11 @@ export async function renderHome(
 
     try {
       const created = await createTask(result);
+
       permanentTasks = [created, ...permanentTasks];
+
       showToast("Tarefa permanente criada.");
+
       draw();
     } catch (err) {
       showToast(err.message, { error: true });
@@ -643,8 +660,11 @@ export async function renderHome(
 
     try {
       const updated = await updateTask(id, result);
+
       permanentTasks = permanentTasks.map((item) => (String(item.id) === String(id) ? updated : item));
+
       showToast("Tarefa permanente atualizada.");
+
       draw();
     } catch (err) {
       showToast(err.message, { error: true });
@@ -659,8 +679,11 @@ export async function renderHome(
 
     try {
       await deleteTask(id);
+
       permanentTasks = permanentTasks.filter((item) => String(item.id) !== String(id));
+
       showToast("Tarefa permanente desativada.");
+
       draw();
     } catch (err) {
       showToast(err.message, { error: true });
@@ -670,8 +693,11 @@ export async function renderHome(
   async function reactivatePermanentTask(id) {
     try {
       await activateTask(id);
+
       permanentTasks = await getTasks();
+
       showToast("Tarefa permanente ativada.");
+
       draw();
     } catch (err) {
       showToast(err.message, { error: true });
@@ -737,7 +763,7 @@ export async function renderHome(
       .querySelectorAll('[data-permanent-task-action="edit"]')
       .forEach((button) => {
         button.addEventListener("click", () =>
-          editPermanentTask(button.dataset.permanentTaskId)
+          editPermanentTask(button.dataset.taskId)
         );
       });
 
@@ -745,7 +771,7 @@ export async function renderHome(
       .querySelectorAll('[data-permanent-task-action="delete"]')
       .forEach((button) => {
         button.addEventListener("click", () =>
-          deletePermanentTask(button.dataset.permanentTaskId)
+          deletePermanentTask(button.dataset.taskId)
         );
       });
 
@@ -753,7 +779,7 @@ export async function renderHome(
       .querySelectorAll('[data-permanent-task-action="activate"]')
       .forEach((button) => {
         button.addEventListener("click", () =>
-          reactivatePermanentTask(button.dataset.permanentTaskId)
+          reactivatePermanentTask(button.dataset.taskId)
         );
       });
 
@@ -888,16 +914,16 @@ export async function renderHome(
             // promptTaskForm), ja preenchido com os valores atuais da
             // tarefa — inclui o tipo (obrigatoria/deve fazer/desafio) e o
             // periodo (manha/tarde/noite) como grupos de botoes visiveis,
-            // que antes ficavam escondidos (o periodo nem aparecia).
-            // Mesmo toggle "repetir nos proximos dias" da criacao (ver
-            // #add-task acima) -- so o adulto ve a opcao, o backend tambem
-            // bloqueia pra crianca. Editar e marcar permanente cria uma
-            // tarefa permanente nova com os dados atuais, alem de salvar a
-            // edicao na tarefa de hoje normalmente.
+            // que antes ficavam escondidos (o periodo nem aparecia). O
+            // toggle "tornar permanente" (mesma regra do formulario de
+            // criacao: so adulto) so faz sentido aqui quando a tarefa ainda
+            // e avulsa de hoje -- uma tarefa que ja veio de um template
+            // (task.taskTemplateId preenchido) ja e permanente, entao o
+            // toggle fica escondido pra nao sugerir uma acao redundante.
             const result = await promptTaskForm({
               title: "Editar tarefa",
               values: task,
-              showPermanentToggle: isAdult,
+              showPermanentToggle: isAdult && !task.taskTemplateId,
               confirmLabel: "Salvar"
             });
 
@@ -908,16 +934,27 @@ export async function renderHome(
             const { permanent, ...fields } = result;
 
             try {
-              routine =
-                await updateDailyTask(
-                  task.id,
-                  fields
-                );
-
               if (permanent) {
-                const created = await createTask(fields);
-                permanentTasks = [created, ...permanentTasks];
-                showToast("Tarefa permanente criada.");
+                // Promove a tarefa avulsa de hoje a tarefa permanente: cria
+                // o template com os dados editados e remove a copia avulsa,
+                // porque GET /daily-routines/today ja injeta automaticamente
+                // a ocorrencia de hoje de qualquer template ativo -- manter
+                // as duas deixaria a tarefa duplicada na lista de hoje.
+                // Observacao: se a tarefa avulsa ja estava concluida hoje,
+                // a ocorrencia gerada pelo template novo comeca pendente de
+                // novo (o progresso de hoje nao e copiado).
+                await createTask(fields);
+                await deleteDailyTask(task.id);
+
+                routine = await getTodayRoutine();
+
+                showToast("Tarefa promovida a permanente.");
+              } else {
+                routine =
+                  await updateDailyTask(
+                    task.id,
+                    fields
+                  );
               }
 
               balance =
@@ -1207,3 +1244,4 @@ function escapeHtml(value = "") {
 
   return div.innerHTML;
 }
+

@@ -24,8 +24,13 @@ function hashSeed(seed) {
   return Math.abs(hash);
 }
 
-// O hue de nascimento: fixo para o mesmo PACUS (mesmo id) para sempre.
+// O hue de nascimento: fixo para o mesmo PACUS (mesmo id) para sempre, a
+// menos que o adulto tenha corrigido manualmente pelo painel de Configurações
+// (ver Pacus.ColorHue no backend) -- nesse caso o valor salvo manda.
 export function getBirthHue(pacus) {
+  if (typeof pacus?.colorHue === "number" && Number.isFinite(pacus.colorHue)) {
+    return ((pacus.colorHue % 360) + 360) % 360;
+  }
   const seed = pacus?.id ?? pacus?.name ?? "pacus";
   return hashSeed(seed) % 360;
 }

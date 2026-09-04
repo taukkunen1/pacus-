@@ -1338,6 +1338,291 @@ export function promptReactionForm({ current = null } = {}) {
   });
 }
 
+const PACUS_STAGE_OPTIONS = [
+  { value: "egg", label: "Ovo" },
+  { value: "cracking", label: "Rachando" },
+  { value: "hatching", label: "Eclodindo" },
+  { value: "baby", label: "Filhote" },
+  { value: "young", label: "Jovem" },
+  { value: "adult", label: "Adulto" }
+];
+
+// Painel unico (mesmo espirito do promptTaskForm) pro adulto corrigir
+// manualmente o estado do PACUS -- estagio, tamanho, dias vividos e cor.
+// Existia so via API (ver Pacus.Api.Controllers.PacusController.UpdateState),
+// pensado originalmente pra migrar uma familia que ja tinha progresso antes
+// deste app, mas nunca teve uma tela de verdade. `values` espera
+// { stage, size, totalClosedDays, colorHue, hasManualColor }; colorHue e o
+// hue efetivo atual (manual ou derivado) pra pre-popular o seletor mesmo
+// quando ainda nao ha cor manual salva. Resolve com
+// { stage, size, totalClosedDays, colorHue } -- colorHue vem null quando a
+// pessoa deixa em "cor automática" (o chamador decide como sinalizar "limpar"
+// pro backend, ver ColorHue: -1 em UpdatePacusStateRequest).
+export function promptPacusStateForm({
+  title = "Editar PACUS",
+  values = {},
+  confirmLabel = "Salvar"
+} = {}) {
+  return new Promise((resolve) => {
+    closeActiveModal();
+
+    const initialHue = Number.isFinite(values.colorHue) ? Math.round(values.colorHue) : 0;
+    const initialManualColor = Boolean(values.hasManualColor);
+
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal-box modal-box--form" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}">
+        <h3 class="modal-title">${escapeHtml(title)}</h3>
+        <p class="modal-hint">Corrige o estado atual do PACUS diretamente — pensado pra migrar o progresso de uma família que já tinha um bichinho antes deste app, ou pra ajustar algo que ficou errado.</p>
+
+        <div class="field">
+          <label>Estágio</label>
+          <div class="task-form-type-group" role="radiogroup" aria-label="Estágio do PACUS">
+            ${PACUS_STAGE_OPTIONS.map(
+              (opt) => `
+              <label class="task-form-type-option">
+                <input
+                  type="radio"
+                  name="pacus-state-form-stage"
+                  value="${opt.value}"
+                  ${(values.stage ?? "egg") === opt.value ? "checked" : ""}
+                />
+                <span>${escapeHtml(opt.label)}</span>
+              </label>
+            `
+            ).join("")}
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="pacus-state-form-size">Tamanho</label>
+          <input
+            id="pacus-state-form-size"
+            type="number"
+            step="0.1"
+            min="0"
+            value="${escapeHtml(String(values.size ?? 1))}"
+          />
+        </div>
+
+        <div class="field">
+          <label for="pacus-state-form-days">Dias vividos</label>
+          <input
+            id="pacus-state-form-days"
+            type="number"
+            step="1"
+            min="0"
+            value="${escapeHtml(String(values.totalClosedDays ?? 0))}"
+          />
+        </div>
+
+        <div class="field">
+          <label class="task-form-checkbox">
+            <input type="checkbox" id="pacus-state-form-manual-color" ${initialManualColor ? "checked" : ""} />
+            <span>Escolher a cor manualmente (em vez da cor automática baseada no PACUS)</span>
+          </label>
+          <div id="pacus-state-form-color-block" class="${initialManualColor ? "" : "hidden"}" style="display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2);">
+            <input
+              id="pacus-state-form-color"
+              type="range"
+              min="0"
+              max="359"
+              step="1"
+              value="${initialHue}"
+              style="flex: 1;"
+            />
+            <span id="pacus-state-form-color-swatch" style="display:inline-block; width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; background: hsl(${initialHue} 80% 55%);"></span>
+          </div>
+        </div>
+
+        <p class="error-text hidden" id="pacus-state-form-error"></p>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-modal-action="cancel">Cancelar</button>
+          <button type="button" class="btn btn-primary" data-modal-action="ok">${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    activeModal = overlay;
+
+    const sizeInput = overlay.querySelector("#pacus-state-form-size");
+    const daysInput = overlay.querySelector("#pacus-state-form-days");
+    const manualColorCheckbox = overlay.querySelector("#pacus-state-form-manual-color");
+    const colorBlock = overlay.querySelector("#pacus-state-form-color-block");
+    const colorInput = overlay.querySelector("#pacus-state-form-color");
+    const colorSwatch = overlay.querySelector("#pacus-state-form-color-swatch");
+    const errorText = overlay.querySelector("#pacus-state-form-error");
+
+    manualColorCheckbox.addEventListener("change", () => {
+      colorBlock.classList.toggle("hidden", !manualColorCheckbox.checked);
+    });
+
+    colorInput.addEventListener("input", () => {
+      colorSwatch.style.background = `hsl(${colorInput.value} 80% 55%)`;
+    });
+
+    function showError(message) {
+      errorText.textContent = message;
+      errorText.classList.remove("hidden");
+    }
+
+    function finish(result) {
+      overlay.remove();
+      if (activeModal === overlay) activeModal = null;
+      resolve(result);
+    }
+
+    function submit() {
+      const stage =
+        overlay.querySelector('input[name="pacus-state-form-stage"]:checked')
+          ?.value ?? "egg";
+
+      const size = Number(sizeInput.value);
+      if (!Number.isFinite(size) || size < 0) {
+        showError("Tamanho inválido.");
+        sizeInput.focus();
+        return;
+      }
+
+      const totalClosedDays = Number(daysInput.value);
+      if (!Number.isInteger(totalClosedDays) || totalClosedDays < 0) {
+        showError("Dias vividos inválido — use um número inteiro (0 ou mais).");
+        daysInput.focus();
+        return;
+      }
+
+      const colorHue = manualColorCheckbox.checked ? Number(colorInput.value) : null;
+
+      finish({ stage, size, totalClosedDays, colorHue });
+    }
+
+    overlay
+      .querySelector('[data-modal-action="ok"]')
+      .addEventListener("click", submit);
+
+    overlay
+      .querySelector('[data-modal-action="cancel"]')
+      .addEventListener("click", () => finish(null));
+
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) finish(null);
+    });
+
+    overlay.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") finish(null);
+    });
+  });
+}
+
+// Painel unico pra agendar uma transicao futura de estagio (mesmo espirito do
+// promptTaskForm) -- antes disso era uma fila de dois promptInput encadeados
+// (estagio digitado por extenso, depois a data), sem nenhuma pista visual de
+// quais estagios sao aceitos. Resolve com { stage, date } (date no formato
+// AAAA-MM-DD) ou `null` se cancelar.
+export function promptGrowthStageForm({
+  title = "Novo estágio de crescimento",
+  values = {},
+  confirmLabel = "Adicionar"
+} = {}) {
+  return new Promise((resolve) => {
+    closeActiveModal();
+
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal-box modal-box--form" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}">
+        <h3 class="modal-title">${escapeHtml(title)}</h3>
+
+        <div class="field">
+          <label>Estágio</label>
+          <div class="task-form-type-group" role="radiogroup" aria-label="Estágio">
+            ${PACUS_STAGE_OPTIONS.map(
+              (opt) => `
+              <label class="task-form-type-option">
+                <input
+                  type="radio"
+                  name="growth-stage-form-stage"
+                  value="${opt.value}"
+                  ${(values.stage ?? "adult") === opt.value ? "checked" : ""}
+                />
+                <span>${escapeHtml(opt.label)}</span>
+              </label>
+            `
+            ).join("")}
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="growth-stage-form-date">A partir de qual data?</label>
+          <input
+            id="growth-stage-form-date"
+            type="date"
+            value="${escapeHtml(values.date ?? "")}"
+          />
+        </div>
+
+        <p class="error-text hidden" id="growth-stage-form-error"></p>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-modal-action="cancel">Cancelar</button>
+          <button type="button" class="btn btn-primary" data-modal-action="ok">${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    activeModal = overlay;
+
+    const dateInput = overlay.querySelector("#growth-stage-form-date");
+    const errorText = overlay.querySelector("#growth-stage-form-error");
+
+    function showError(message) {
+      errorText.textContent = message;
+      errorText.classList.remove("hidden");
+    }
+
+    function finish(result) {
+      overlay.remove();
+      if (activeModal === overlay) activeModal = null;
+      resolve(result);
+    }
+
+    function submit() {
+      const stage =
+        overlay.querySelector('input[name="growth-stage-form-stage"]:checked')
+          ?.value ?? "adult";
+
+      const date = dateInput.value.trim();
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        showError("Escolha uma data válida.");
+        dateInput.focus();
+        return;
+      }
+
+      finish({ stage, date });
+    }
+
+    overlay
+      .querySelector('[data-modal-action="ok"]')
+      .addEventListener("click", submit);
+
+    overlay
+      .querySelector('[data-modal-action="cancel"]')
+      .addEventListener("click", () => finish(null));
+
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) finish(null);
+    });
+
+    overlay.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") finish(null);
+    });
+  });
+}
+
 function closeActiveModal() {
   if (activeModal) {
     activeModal.remove();

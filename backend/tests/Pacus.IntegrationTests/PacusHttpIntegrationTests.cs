@@ -39,6 +39,69 @@ public class PacusHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
         Assert.Equal(10, body.GetProperty("totalClosedDays").GetInt32());
     }
 
+    // Correcao manual de cor (ver User -- na verdade Pacus.ColorHue): antes so
+    // existia a cor derivada automaticamente do id, sem jeito de sobrescrever.
+    [Fact]
+    public async Task UpdateState_WithColorHue_SetsManualColor()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var response = await client.PutAsJsonAsync(
+            "/api/v1/pacus/me/state",
+            new { colorHue = 180 });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(180, body.GetProperty("colorHue").GetInt32());
+    }
+
+    // -1 e o sinal de "limpar", nao um hue de verdade (ver comentario em
+    // UpdatePacusStateRequest.ColorHue) -- volta pra cor derivada automatica.
+    [Fact]
+    public async Task UpdateState_WithColorHueMinusOne_ClearsManualColor()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        await client.PutAsJsonAsync("/api/v1/pacus/me/state", new { colorHue = 180 });
+
+        var response = await client.PutAsJsonAsync(
+            "/api/v1/pacus/me/state",
+            new { colorHue = -1 });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("colorHue").ValueKind);
+    }
+
+    [Theory]
+    [InlineData(360)]
+    [InlineData(-2)]
+    [InlineData(1000)]
+    public async Task UpdateState_WithColorHueOutOfRange_ReturnsBadRequest(int invalidHue)
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var response = await client.PutAsJsonAsync(
+            "/api/v1/pacus/me/state",
+            new { colorHue = invalidHue });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     // Troca de papel (checklist de seguranca, item A3): crianca tentando
     // corrigir manualmente o estagio/tamanho do PACUS, acao restrita ao
     // adulto (usada pra migrar progresso de uma versao anterior do app).

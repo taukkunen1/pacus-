@@ -1,7 +1,8 @@
 import { apiClient } from "../api/api-client.js";
 import { renderTank } from "../pacus/habitat.js";
+import { getBirthHue } from "../pacus/color.js";
 import { showToast } from "../components/toast.js";
-import { promptInput } from "../components/modal.js";
+import { promptInput, promptPacusStateForm, promptGrowthStageForm } from "../components/modal.js";
 import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
 import { appState } from "../state/app-state.js";
 import {
@@ -173,6 +174,18 @@ export async function renderPacus(root, navigate) {
 
           <div class="task-card">
             <div class="task-card__content">
+              <strong class="task-title">Editar PACUS</strong>
+              <span class="task-description">
+                Estágio: ${stageLabel(pacus?.stage ?? "egg")} · Tamanho: ${Number(pacus?.size ?? 0).toFixed(1)} · Dias vividos: ${pacus?.totalClosedDays ?? 0} · Cor: ${pacus?.colorHue != null ? "manual" : "automática"}
+              </span>
+            </div>
+            <div class="task-actions">
+              <button class="btn btn-ghost" id="edit-pacus-state">Editar</button>
+            </div>
+          </div>
+
+          <div class="task-card">
+            <div class="task-card__content">
               <strong class="task-title">Calendário de crescimento do PACUS</strong>
               <span class="task-description">
                 ${
@@ -205,9 +218,49 @@ export async function renderPacus(root, navigate) {
     content.querySelector("#change-timezone")?.addEventListener("click", changeTimezone);
     content.querySelector("#change-child-pin")?.addEventListener("click", changeChildPin);
     content.querySelector("#generate-recovery-code")?.addEventListener("click", handleGenerateRecoveryCode);
+    content.querySelector("#edit-pacus-state")?.addEventListener("click", editPacusState);
     content.querySelector("#add-growth-stage")?.addEventListener("click", addGrowthStage);
     content.querySelector("#clear-growth-stages")?.addEventListener("click", clearGrowthStages);
   }
+
+  async function editPacusState() {
+    const hasManualColor = pacus?.colorHue != null;
+    const effectiveHue = hasManualColor ? pacus.colorHue : getBirthHue(pacus);
+
+    const result = await promptPacusStateForm({
+      values: {
+        stage: pacus?.stage ?? "egg",
+        size: pacus?.size ?? 1,
+        totalClosedDays: pacus?.totalClosedDays ?? 0,
+        colorHue: effectiveHue,
+        hasManualColor
+      },
+      confirmLabel: "Salvar"
+    });
+
+    if (!result) return;
+
+    try {
+      pacus = await apiClient("/pacus/me/state", {
+        method: "PUT",
+        body: JSON.stringify({
+          stage: result.stage,
+          size: result.size,
+          totalClosedDays: result.totalClosedDays,
+          // null = "cor automática" pro formulário, mas o backend usa null
+          // pra "nao mexer neste campo" -- -1 e o sinal de "limpar" (ver
+          // UpdatePacusStateRequest.ColorHue no backend).
+          colorHue: result.colorHue === null ? -1 : result.colorHue
+        })
+      });
+
+      showToast("PACUS atualizado.");
+      draw();
+    } catch (err) {
+      showToast(err.message, { error: true });
+    }
+  }
+
 
   async function changeTimezone() {
     const timezone = await promptInput({
@@ -292,42 +345,18 @@ export async function renderPacus(root, navigate) {
   }
 
   async function addGrowthStage() {
-    const stageNames = ["egg", "cracking", "hatching", "baby", "young", "adult"];
-    const stageLabels = {
-      egg: "Ovo",
-      cracking: "Rachando",
-      hatching: "Eclodindo",
-      baby: "Filhote",
-      young: "Jovem",
-      adult: "Adulto"
-    };
-    const stage = (
-      await promptInput({
-        title: "Novo estágio de crescimento",
-        label: "Estágio",
-        value: "adult",
-        hint: `Opções: ${stageNames.map((s) => stageLabels[s]).join(", ")}.`
-      })
-    )
-      ?.trim()
-      .toLowerCase();
-
-    if (!stageNames.includes(stage)) {
-      showToast(`Estágio inválido. Use um de: ${stageNames.map((s) => stageLabels[s]).join(", ")}.`, { error: true });
-      return;
-    }
-
-    const date = await promptInput({
+    const result = await promptGrowthStageForm({
       title: "Novo estágio de crescimento",
-      label: "A partir de qual data?",
-      type: "date"
+      values: { stage: "adult" },
+      confirmLabel: "Adicionar"
     });
-    if (!date?.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(date.trim())) {
-      showToast("Data inválida. Use o formato AAAA-MM-DD.", { error: true });
-      return;
-    }
 
-    const updated = [...growthStages.filter((s) => s.date !== date.trim()), { stage, date: date.trim() }];
+    if (!result) return;
+
+    const updated = [
+      ...growthStages.filter((s) => s.date !== result.date),
+      { stage: result.stage, date: result.date }
+    ];
 
     try {
       growthStages = await apiClient("/settings/growth-stages", {

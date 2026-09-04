@@ -1,6 +1,6 @@
 # PACUS — Mapa de Dados
 
-Documento de referência para conformidade com a LGPD (Lei 13.709/2018), gerado a partir do código-fonte real do backend em `feature/next-migration` (checklist de segurança e LGPD, item B1). Cobre as 12 collections do MongoDB usadas pela aplicação — as 11 previstas originalmente no checklist mais `audit_logs`, criada no item A5.
+Documento de referência para conformidade com a LGPD (Lei 13.709/2018), gerado a partir do código-fonte real do backend inicialmente em `feature/next-migration` (checklist de segurança e LGPD, item B1) e posteriormente integrado em `main`. Cobre as 12 collections do MongoDB usadas pela aplicação — as 11 previstas originalmente no checklist mais `audit_logs`, criada no item A5.
 
 Este documento é a base para os itens seguintes do checklist: B2 (exportação de dados), B3 (exclusão de conta), D1 (registro de operações de tratamento) e D2 (RIPD).
 

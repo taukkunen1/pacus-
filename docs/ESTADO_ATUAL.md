@@ -1,6 +1,6 @@
 # PACUS — Estado atual do projeto
 
-Verificado direto no código-fonte de `feature/next-migration` em 2026-09-01. Cada afirmação abaixo foi conferida lendo o arquivo citado, não apenas assumida a partir do README ou de commits antigos.
+Verificado diretamente no código-fonte. A auditoria original foi feita em `feature/next-migration` em 2026-09-01; em 2026-09-04 essa branch está integralmente contida em `main`, que é a branch atual do projeto. Cada afirmação abaixo foi conferida lendo o arquivo citado, não apenas assumida a partir do README ou de commits antigos.
 
 ## Regras centrais do README — o que está implementado de verdade
 
@@ -26,16 +26,18 @@ Ambas as pendências acima ("Ação sugerida" original) já foram corrigidas nes
 - **Testes** — suíte de integração em xUnit no backend (`*.HttpIntegrationTests.cs`), cobrindo isolamento por família, permissões por papel (adulto/criança) e os fluxos de LGPD (exportação, exclusão de conta).
 - **CI** (`.github/workflows/ci.yml`) — dois jobs: `backend` (`dotnet build` + `dotnet test`) e `frontend` (`node --check` em todo `.js` de `frontend/js`, só sintaxe).
 
-## Branches (E1 resolvido em 2026-09-01)
+## Branches (estado verificado em 2026-09-04)
 
-`main` e `feature/next-migration` estavam com históricos desconexos: `main` tinha só 2 commits (o segundo era um `pacus.zip` de 22MB subido pela interface web do GitHub, sem código real), enquanto todo o app vivia só em `feature/next-migration`. Consolidado a pedido explícito do dono do projeto: force-push de `main` para o commit de `feature/next-migration` — as duas branches agora apontam para o mesmo commit, `main` tem o app inteiro, e `ci.yml` (que só dispara em push para `main`) volta a validar de verdade a cada push, sem precisar do truque de trigger temporário. Os 2 commits antigos de `main` (o zip) não foram perdidos — ficaram preservados na tag `main-legacy-zip-backup`. Detalhes no item **E1** do checklist (`docs/SECURITY_LGPD_CHECKLIST.md`).
+Em 2026-09-01, `main` e `feature/next-migration` tinham históricos desconexos: `main` tinha apenas dois commits, incluindo um `pacus.zip` de 22 MB sem código-fonte útil, enquanto o app vivia em `feature/next-migration`. O histórico antigo foi preservado na tag `main-legacy-zip-backup`, e `main` foi então alinhada à feature.
+
+Desde então, o desenvolvimento foi integrado em `main`. No estado atual, `feature/next-migration` aponta para `c23cc10` e é ancestral de `main` (`4c368b7`); ela não possui commits que não estejam em `main`. Portanto, `main` é a fonte de verdade para desenvolvimento, CI e deploy. A branch `feature/next-migration` permanece apenas como referência histórica e pode ser arquivada ou removida numa manutenção futura, se não houver necessidade de mantê-la.
 
 ## Segurança e LGPD (`docs/SECURITY_LGPD_CHECKLIST.md`)
 
-15 itens concluídos, 8 pendentes (todos marcados `[DEPOIS]`, ou seja, dependem de uma decisão de produto/infra sua, não de código):
+15 itens concluídos, 7 pendentes (todos marcados `[DEPOIS]`, ou seja, dependem de uma decisão de produto/infra sua, não de código):
 
 - **Concluído:** rate limiting, testes de isolamento por família, correção de um bug real de checagem de posse em `TasksController.Delete`, renomeação `UserId → FamilyId`, log de auditoria, mapa de dados das 12 collections, exportação de dados (LGPD, portabilidade), exclusão de conta (hard delete + anonimização de `audit_logs` com TTL de 12 meses), rascunhos de Política de Privacidade/Termos de Uso, RIPD e Plano de Resposta a Incidentes.
-- **Pendente (decisão sua):** confirmar hardening de infra no Render/Atlas (A6), checar histórico do Git por segredo vazado (A7), **rotacionar o PAT do GitHub por um fine-grained token limitado a este repositório** (A8), publicar Política/Termos e implementar tela de consentimento (B5/B6), decisão sobre fluxo de cadastro infantil (C3), canal de contato de privacidade (D4), consolidação `main`/`feature` (E1).
+- **Pendente (decisão sua):** confirmar hardening de infra no Render/Atlas (A6), checar histórico do Git por segredo vazado (A7), **rotacionar o PAT do GitHub por um fine-grained token limitado a este repositório** (A8), publicar Política/Termos e implementar tela de consentimento (B5/B6), decisão sobre fluxo de cadastro infantil (C3) e canal de contato de privacidade (D4).
 
 O item **A8** é particularmente relevante agora: o checklist já pedia a troca do token clássico por um fine-grained scoped a este repo — vale fazer isso com o token que você colou nesta conversa.
 
@@ -77,7 +79,7 @@ A pedido do dono do produto, depois de um levantamento do que faltava no app:
 - **Badges in-app**: `renderBottomNav` aceita um mapa `{ navKey: count }`; `screens/home.js` calcula tarefas pendentes de hoje (criança) e resgates aguardando aprovação (adulto) e mostra um numerozinho na aba correspondente. Escopo desta rodada: só a tela "Hoje" (a mais visitada) — as outras telas não calculam badges ainda.
 - **Limpeza**: removidos `components/task-editor.js`, `components/task-card.js`, `state/task-state.js` (confirmado sem nenhum import em lugar nenhum). README atualizado: hospedagem da API deixou de estar "em aberto" — já roda no Render.
 - **Fora do escopo por decisão do dono do produto**: notificações push/e-mail reais (ficaram só como badge in-app, sem Firebase/provedor de e-mail) e reset de senha por e-mail de verdade (ficou o recovery code, sem provedor de e-mail configurado).
-- Suíte completa (36 unitários + integração via Testcontainers) verde no CI real antes de remover o trigger temporário do `ci.yml`. Ainda em `feature/next-migration` — sem merge/deploy pra `main` (instrução permanente do dono do produto).
+- Suíte completa (36 unitários + integração via Testcontainers) verde no CI real. Esse trabalho foi posteriormente integrado em `main`.
 
 ## Melhorias baseadas em ciência do comportamento (2026-09-01, pós-`docs/PROPOSITO.md`)
 
@@ -160,13 +162,13 @@ Reclamação do dono do produto: o botão de editar tarefa do dia (✎, tela "Ho
 
 ### Faxina do repositório
 
-Apagado o arquivo solto `pacusretryfix.patch` (resíduo de um patch aplicado manualmente, sem uso depois de aplicado) e as 4 branches órfãs já mescladas e sem trabalho pendente (`fix/routine-conflict-retry`, `fix/routine-conflict-retry-1`, `taukkunen1-patch-1`, `taukkunen1-patch-2`). Restam só `main` e `feature/next-migration`.
+Apagado o arquivo solto `pacusretryfix.patch` (resíduo de um patch aplicado manualmente, sem uso depois de aplicado) e as 4 branches órfãs já mescladas e sem trabalho pendente (`fix/routine-conflict-retry`, `fix/routine-conflict-retry-1`, `taukkunen1-patch-1`, `taukkunen1-patch-2`). Esta observação descreve a limpeza feita naquele momento; o repositório pode ter novas branches de feature depois dela.
 
 ## Revisão geral pós-auditoria + lentidão no primeiro acesso (2026-09-01)
 
 A pedido do dono do produto: "revise tudo, veja se tudo está testado e funcionando" + relato de que o site às vezes "parece carregando e demora tanto".
 
-**Revisão geral:** build da solução inteira limpo (0 erros), 58 testes unitários verdes localmente, e os 5 achados da auditoria de API (exceções tipadas, DTOs de resposta, paginação, concorrência otimista) cada um validado individualmente no CI real (unitário + integração via Testcontainers/MongoDB) antes de ser considerado fechado — histórico de runs do GitHub Actions em `feature/next-migration` confirmado verde nos últimos 15 runs (os 2 únicos vermelhos são de antes desta sessão, já corrigidos na época). Nada pendente sem teste.
+**Revisão geral:** build da solução inteira limpo (0 erros), 58 testes unitários verdes localmente, e os 5 achados da auditoria de API (exceções tipadas, DTOs de resposta, paginação, concorrência otimista) cada um validado individualmente no CI real (unitário + integração via Testcontainers/MongoDB) antes de ser considerado fechado. A referência aos runs de `feature/next-migration` é histórica; a validação contínua atual ocorre em `main`.
 
 **Diagnóstico da lentidão:** não é bug de código — é comportamento normal de infraestrutura em plano gratuito. O frontend (`frontend/`) é hospedado como site estático no GitHub Pages (`.github/workflows/pages.yml`, deploy só em push pra `main`) — isso carrega instantâneo, sempre. Quem hiberna é a **API no Render** (`pacus.onrender.com`): medido diretamente nesta sessão, uma chamada a `/api/v1/health` depois de um tempo sem uso levou **5.6s**, contra **0.3s** nas chamadas seguintes (já "acordada"). Isso é o padrão conhecido do plano gratuito do Render — o serviço dorme depois de um período sem tráfego e o primeiro request seguinte paga o custo de acordar o container (em planos gratuitos isso costuma passar de 30s quando o sono é mais longo que o medido aqui). Não há nada de anormal no `Dockerfile` ou no `Program.cs` (nenhuma chamada bloqueante extra no boot) causando lentidão adicional além do "acordar" em si.
 
@@ -178,4 +180,4 @@ A pedido do dono do produto: "revise tudo, veja se tudo está testado e funciona
 - **CSS**: `.hint-text` (novo, `frontend/css/global.css`) — mesmo elemento de `.error-text`, cor neutra (`--text-on-dark-dim`) em vez de vermelho, pra não parecer erro quando é só demora.
 - **Fora do escopo desta correção**: não mexi no plano do Render (não tenho acesso ao dashboard) nem adicionei nenhum "ping" pra manter o serviço sempre acordado — isso só empurra o problema, não resolve, e pode não valer a pena vs. simplesmente upgradar o plano se a demora incomodar de verdade. **Se quiser eliminar o cold start de vez, o caminho é olhar o plano do serviço no Render (Settings → Instance Type) e considerar um plano pago "always-on".**
 - Sem testes automatizados de frontend no projeto (só checagem de sintaxe via `node --check`, que já roda no CI em `frontend` job) — validado manualmente lendo o fluxo e rodando a checagem de sintaxe local nos arquivos tocados.
-- Ainda em `feature/next-migration`, sem merge/deploy pra `main` (instrução permanente do dono do produto) — ou seja, essa melhoria de feedback visual só vai pro ar quando `main` for atualizada.
+- Esta melhoria foi posteriormente integrada em `main`; esta nota de "sem merge/deploy" é apenas o estado histórico da implementação.

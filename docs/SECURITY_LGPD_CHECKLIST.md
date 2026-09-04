@@ -1,6 +1,6 @@
 # PACUS — Checklist de Segurança e LGPD
 
-Gerado a partir da auditoria de 2026-08-28/29. Regra: seguimos esta lista, um item por vez, na ordem abaixo. Cada item marcado `[x]` foi concluído e commitado em `feature/next-migration`.
+Gerado a partir da auditoria de 2026-08-28/29. Regra: seguimos esta lista, um item por vez, na ordem abaixo. Os itens marcados `[x]` foram concluídos inicialmente em `feature/next-migration` e, quando aplicável, posteriormente integrados em `main`.
 
 Convenção:
 - **[AQUI]** — dá pra fazer nesta sessão (código, testes, documento que eu redijo).
@@ -43,7 +43,7 @@ Convenção:
 
 ## Fase E — CI/infra (achado durante a validação)
 
-- [x] **E1. Consolidar `main` e `feature/next-migration`.** Resolvido: force-push de `main` para o commit da `feature/next-migration` (opção recomendada — o `pacus.zip` de 22MB não tinha valor a preservar). Os 2 commits antigos de `main` não foram perdidos de verdade: ficaram preservados na tag `main-legacy-zip-backup`, criada e enviada ao GitHub antes do force-push. `main` agora tem o app inteiro (mesmo commit de `feature/next-migration`) e o CI oficial (`ci.yml`, gatilho só em `main`) rodou e passou verde de verdade nesse push, sem precisar de trigger temporário.
+- [x] **E1. Consolidar `main` e `feature/next-migration`.** Resolvido em 2026-09-01: `main` foi alinhada ao código de `feature/next-migration`, com o histórico antigo preservado na tag `main-legacy-zip-backup`. Estado verificado em 2026-09-04: `feature/next-migration` (`c23cc10`) é ancestral de `main` (`4c368b7`) e não tem commits pendentes; `main` é a branch de referência e o alvo do CI oficial.
 
 ---
 

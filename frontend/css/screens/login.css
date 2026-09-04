@@ -112,4 +112,26 @@
   text-align: center;
   transition: background var(--duration-fast) var(--ease-water), transform var(--duration-fast) var(--ease-water);
 }
+
+/* Codigo da familia / recuperacao mostrados uma vez no cadastro (screens/login.js
+   renderRegisterSuccess) e reexibido na tela de Configuracoes -- destaque visual
+   pra ficar facil de copiar/anotar, sem parecer um campo de formulario normal. */
+.register-code {
+  font-family: var(--font-display);
+  font-size: var(--step-lg);
+  letter-spacing: 0.08em;
+  text-align: center;
+  color: var(--color-coral);
+  background: rgba(234, 246, 243, 0.08);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin: 0;
+  user-select: all;
+}
+.register-code--inline {
+  display: inline-block;
+  font-size: var(--step-sm);
+  padding: 2px var(--space-2);
+  margin-left: var(--space-1);
+}
 .profile-picker__item:active { transform: scale(0.97); background: rgba(234, 246, 243, 0.16); }

@@ -89,7 +89,7 @@ Para exercer qualquer um desses direitos, entre em contato pelo e-mail informado
 
 O perfil da criança no PACUS é criado e administrado pelo adulto responsável — a criança não se cadastra de forma autônoma, não informa e-mail, e não tem acesso às configurações da família. O ato do adulto criar o perfil da criança e configurar seu acesso constitui a base legal para o tratamento dos dados dela (LGPD, art. 14, §1º).
 
-🔲 *Nota interna (não faz parte do texto final): ainda não temos uma tela de consentimento específica e destacada para isso — é o item C3 do nosso checklist interno, marcado como decisão de produto pendente.*
+No cadastro, o adulto confirma esse consentimento de forma explícita e destacada, por meio de um checkbox específico (distinto do aceite geral dos Termos de Uso), antes que o perfil da criança seja criado.
 
 ## 9. Segurança
 

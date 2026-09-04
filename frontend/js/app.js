@@ -5,17 +5,29 @@ import { renderHistory } from "./screens/history.js";
 import { renderPoints } from "./screens/points.js";
 import { renderPacus } from "./screens/pacus.js";
 import { renderStore } from "./screens/store.js";
+import { renderSettings } from "./screens/settings.js";
 import { setUser } from "./state/app-state.js";
+import { watchForDayBoundary } from "./utils/day-boundary-watch.js";
 
 const ROLE_CLAIM = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
 
 const root = document.getElementById("app");
 
+// So recarrega sozinho quando a tela atual e a "Hoje" -- nas outras abas nao
+// tem nada que fique desatualizado pela virada do dia, e forcar uma
+// navegacao de volta pra "Hoje" atrapalharia quem esta vendo outra tela.
+let currentScreen = "today";
+
 function navigate(screen = "today") {
+  currentScreen = screen;
+
   if (screen === "history") return renderHistory(root, navigate);
   if (screen === "points") return renderPoints(root, navigate);
   if (screen === "pacus") return renderPacus(root, navigate);
   if (screen === "store") return renderStore(root, navigate);
+  // renderSettings se auto-protege (redireciona pra "today" se nao for
+  // adulto) -- ver screens/settings.js -- entao nao precisa de checagem aqui.
+  if (screen === "settings") return renderSettings(root, navigate);
   return renderHome(root, navigate);
 }
 
@@ -61,4 +73,14 @@ window.addEventListener("hashchange", () => {
   if (getToken()) navigate(location.hash.replace("#", "") || "today");
 });
 window.addEventListener("pacus:unauthorized", () => { clearToken(); goToLogin(); });
+
+// Corrige o bug de "a tarefa de hoje nao resetou": o back-end ja fecha o dia
+// certinho a cada requisicao (DayClosingService), mas a tela "Hoje" so
+// buscava a rotina uma vez, na montagem -- se o app ficasse aberto
+// atravessando a meia-noite, continuava mostrando o dia anterior ate alguem
+// mexer em alguma coisa. Isso aqui recarrega a tela sozinha nesse caso.
+watchForDayBoundary(() => {
+  if (getToken() && currentScreen === "today") navigate("today");
+});
+
 boot();

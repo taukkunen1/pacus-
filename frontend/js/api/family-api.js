@@ -2,6 +2,17 @@ import { apiClient } from "./api-client.js";
 
 export const getFamilyChildren = () => apiClient("/family/children");
 
+// Anonimo (sem token) -- e o primeiro passo do login da crianca num aparelho
+// novo, antes de existir qualquer sessao (ver screens/login.js FAMILY_CODE_KEY).
+// O codigo e o mesmo mostrado ao adulto no cadastro (ver api/bootstrap-api.js)
+// e na tela de Configuracoes.
+export const getChildrenByFamilyCode = (familyCode) =>
+  apiClient(`/family/by-code/${encodeURIComponent(familyCode)}/children`);
+
+// So o adulto consegue reconsultar o codigo da propria familia (ex.: tela de
+// Configuracoes, ou pra repassar pra criança de novo se ela esquecer).
+export const getFamilyCode = () => apiClient("/family/code");
+
 export const updateChildPin = (childId, newPin) =>
   apiClient(`/family/children/${childId}/pin`, {
     method: "PUT",
@@ -18,14 +29,3 @@ export const updateFamilyTimezone = (timezone) =>
 
 export const generateRecoveryCode = () =>
   apiClient("/family/recovery-code", { method: "POST" });
-
-// Usado pela tela de login da crianca pra encontrar a familia por um codigo
-// curto (ver User.FamilyCode) em vez de colar um id do Mongo. Anonimo no
-// backend -- nao exige token.
-export const getChildrenByFamilyCode = (code) =>
-  apiClient(`/family/by-code/${encodeURIComponent(code)}/children`);
-
-// Pro adulto reconsultar o codigo da propria familia (ex.: pra mostrar de novo
-// na tela de Configurações, se o código mostrado uma vez no cadastro já não
-// estiver mais à mão).
-export const getFamilyCode = () => apiClient("/family/code");

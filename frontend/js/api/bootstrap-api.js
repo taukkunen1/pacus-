@@ -1,10 +1,12 @@
 import { apiClient } from "./api-client.js";
 
-// Cria a familia inicial (1 adulto + 1 crianca) -- ver Pacus.Application.Services.BootstrapService.
-// Devolve, entre outras coisas, o codigo de recuperacao do adulto e o codigo curto
-// da familia (ver User.FamilyCode), cada um em texto puro so nesta resposta.
-export const createFamily = (payload) =>
+// Cadastro inicial da familia (1 adulto + 1 crianca) -- endpoint anonimo, e o
+// proprio ponto de entrada que cria a conta (ver BootstrapService no backend).
+// Devolve, so nesta resposta, o codigo de recuperacao de senha do adulto e o
+// codigo da familia que a crianca vai usar pra logar -- a tela de cadastro
+// (screens/login.js) deve orientar o usuario a guardar os dois.
+export const createFamily = (adultName, adultEmail, adultPassword, childName, childPin) =>
   apiClient("/bootstrap", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ adultName, adultEmail, adultPassword, childName, childPin }),
   });

@@ -9,7 +9,8 @@ import {
   updateChildPin,
   getFamilyTimezone,
   updateFamilyTimezone,
-  generateRecoveryCode
+  generateRecoveryCode,
+  getFamilyCode
 } from "../api/family-api.js";
 
 export async function renderPacus(root, navigate) {
@@ -28,6 +29,7 @@ export async function renderPacus(root, navigate) {
   let pacus = null;
   let growthStages = [];
   let familyTimezone = "";
+  let familyCode = "";
 
   try {
     pacus = await apiClient("/pacus/me");
@@ -40,9 +42,10 @@ export async function renderPacus(root, navigate) {
 
   if (isAdult) {
     try {
-      [growthStages, familyTimezone] = await Promise.all([
+      [growthStages, familyTimezone, familyCode] = await Promise.all([
         apiClient("/settings/growth-stages"),
-        getFamilyTimezone().then((res) => res?.timezone ?? "")
+        getFamilyTimezone().then((res) => res?.timezone ?? ""),
+        getFamilyCode().then((res) => res?.familyCode ?? "")
       ]);
     } catch (err) {
       console.warn("Nao foi possivel carregar configuracoes da familia.", err);
@@ -132,6 +135,19 @@ export async function renderPacus(root, navigate) {
             </div>
             <div class="task-actions">
               <button class="btn btn-ghost" id="change-timezone">Alterar</button>
+            </div>
+          </div>
+
+          <div class="task-card">
+            <div class="task-card__content">
+              <strong class="task-title">Código da família</strong>
+              <span class="task-description">
+                ${
+                  familyCode
+                    ? `${escapeHtml(familyCode)} — a criança usa este código para logar num aparelho novo (tela de login → aba Criança).`
+                    : "Não foi possível carregar o código agora."
+                }
+              </span>
             </div>
           </div>
 

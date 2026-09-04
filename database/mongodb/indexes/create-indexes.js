@@ -3,6 +3,7 @@ db = db.getSiblingDB("pacus");
 
 db.users.createIndex({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: "string" } } });
 db.users.createIndex({ familyId: 1 });
+db.users.createIndex({ familyCode: 1 });
 
 db.pacus.createIndex({ userId: 1 }, { unique: true });
 

@@ -688,3 +688,55 @@ public class FakeAuditLogRepository
         return Task.CompletedTask;
     }
 }
+
+public class FakeUserRepository : IUserRepository
+{
+    public readonly List<User> Users = new();
+
+    public Task<User?> GetByIdAsync(ObjectId id) =>
+        Task.FromResult(Users.FirstOrDefault(u => u.Id == id));
+
+    public Task<User?> GetByEmailAsync(string email) =>
+        Task.FromResult(Users.FirstOrDefault(u => u.Email == email));
+
+    public Task<User> CreateAsync(User user)
+    {
+        Users.Add(user);
+        return Task.FromResult(user);
+    }
+
+    public Task UpdateAsync(User user)
+    {
+        var index = Users.FindIndex(u => u.Id == user.Id);
+        if (index >= 0) Users[index] = user;
+        return Task.CompletedTask;
+    }
+
+    public Task<List<User>> GetByFamilyAndRoleAsync(ObjectId familyId, UserRole role) =>
+        Task.FromResult(Users.Where(u => u.FamilyId == familyId && u.Role == role).ToList());
+
+    public Task<List<User>> GetByFamilyCodeAsync(string familyCode) =>
+        Task.FromResult(Users.Where(u => u.FamilyCode == familyCode).ToList());
+
+    public Task<List<User>> GetByFamilyAsync(ObjectId familyId) =>
+        Task.FromResult(Users.Where(u => u.FamilyId == familyId).ToList());
+
+    public Task DeleteAllByFamilyAsync(ObjectId familyId)
+    {
+        Users.RemoveAll(u => u.FamilyId == familyId);
+        return Task.CompletedTask;
+    }
+}
+
+// Fake burro (nao faz hash de verdade) -- os testes que usam isto so precisam
+// verificar/gravar consistentemente entre Hash() e Verify(), nunca a forca
+// criptografica real (isso e coberto por PasswordHasherTests, se/quando
+// existir, contra a implementacao real de Pacus.Infrastructure). Evita a
+// camada de testes unitarios depender do projeto Infrastructure so por causa
+// disto.
+public class FakePasswordHasher : IPasswordHasher
+{
+    public string Hash(string plainText) => $"fake-hash:{plainText}";
+
+    public bool Verify(string hash, string plainText) => hash == $"fake-hash:{plainText}";
+}

@@ -16,5 +16,9 @@ public record BootstrapResponse(
     string Message,
     // Codigo de recuperacao de senha do adulto -- so vem preenchido aqui, uma unica vez.
     // Depois disso so o hash fica salvo no banco.
-    string RecoveryCode
+    string RecoveryCode,
+    // Codigo curto da familia (ver User.FamilyCode) -- mostrado ao adulto ao final do
+    // cadastro pra ele anotar/compartilhar com a crianca; pode ser reconsultado depois
+    // via GET /family/code.
+    string FamilyCode
 );

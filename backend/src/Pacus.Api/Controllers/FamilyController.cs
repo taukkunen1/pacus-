@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MongoDB.Bson;
 using Pacus.Api.Auth;
 using Pacus.Application.DTOs;
@@ -49,6 +50,58 @@ public class FamilyController : ControllerBase
             .ToList();
 
         return Ok(result);
+    }
+
+    // Usado pela crianca pra logar num aparelho novo, sem precisar colar um
+    // ObjectId do Mongo -- so o codigo curto da familia (ver User.FamilyCode),
+    // que o adulto anota/compartilha no cadastro (ou reconsulta via GET
+    // /family/code). Anonimo porque a crianca ainda nao esta autenticada nesse
+    // momento; protegido pela mesma politica de rate limit do login ("auth") pra
+    // dificultar tentar codigos aleatorios em sequencia -- o espaco de codigos e
+    // grande (33^6), mas nao ha motivo pra deixar sem limite mesmo assim.
+    [AllowAnonymous]
+    [EnableRateLimiting("auth")]
+    [HttpGet("by-code/{code}/children")]
+    public async Task<IActionResult> GetChildrenByFamilyCode(string code)
+    {
+        var normalized = NormalizeFamilyCode(code);
+
+        var members = normalized is null
+            ? new List<User>()
+            : await _userRepository.GetByFamilyCodeAsync(normalized);
+
+        var result = members
+            .Where(m => m.Role == UserRole.Child)
+            .Select(c => new ChildProfileDto(c.Id.ToString(), c.Name))
+            .ToList();
+
+        return Ok(result);
+    }
+
+    // Pro adulto reconsultar o codigo da propria familia quando quiser (ex.: pra
+    // cadastrar a crianca num segundo aparelho depois do primeiro login, quando o
+    // codigo mostrado uma vez no cadastro ja nao esta mais a mao).
+    [RequireRole(UserRole.Adult)]
+    [HttpGet("code")]
+    public async Task<IActionResult> GetFamilyCode()
+    {
+        var user = await _userRepository.GetByIdAsync(_currentUser.UserId);
+        if (user is null) return NotFound();
+
+        return Ok(new FamilyCodeDto(user.FamilyCode));
+    }
+
+    // Aceita o codigo com ou sem o traco, em qualquer capitalizacao (o
+    // auto-formatador do frontend ja insere o traco, mas esta normalizacao cobre
+    // quem digita/cola sem ele). Devolve null quando o formato nao bate com o
+    // esperado (6 caracteres alfanumericos) -- deixa a busca no repositorio
+    // resolver como "codigo nao encontrado" (lista vazia) em vez de um erro
+    // separado, que so daria a quem esta tentando codigos aleatorios um sinal a
+    // mais sobre por que a busca falhou.
+    private static string? NormalizeFamilyCode(string? code)
+    {
+        var cleaned = new string((code ?? string.Empty).Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant();
+        return cleaned.Length == 6 ? $"{cleaned[..3]}-{cleaned[3..]}" : null;
     }
 
     // So o adulto troca o PIN da crianca -- ate aqui, o PIN so podia ser definido uma

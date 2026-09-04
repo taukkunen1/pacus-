@@ -5,13 +5,18 @@
 // componente centraliza a lista de abas num lugar so, pra toda tela poder
 // incluir a mesma barra (com a aba certa marcada como ativa) e nao precisar
 // duplicar/dessincronizar a lista de novo.
+import { appState } from "../state/app-state.js";
 
 const NAV_ITEMS = [
   { key: "today", label: "Hoje" },
   { key: "history", label: "Histórico" },
   { key: "points", label: "Pontos" },
   { key: "pacus", label: "PACUS" },
-  { key: "store", label: "Loja" }
+  { key: "store", label: "Loja" },
+  // So aparece pro adulto (ver screens/settings.js) -- o painel de
+  // configuracoes da familia que morava dentro da aba PACUS ganhou aba
+  // propria, e a crianca nem precisa ver essa opcao na barra.
+  { key: "settings", label: "Config", adultOnly: true }
 ];
 
 // `badges` e opcional: { [navKey]: count }. So aparece um numerozinho no canto
@@ -19,9 +24,12 @@ const NAV_ITEMS = [
 // resgates aguardando aprovacao (adulto). Cada tela calcula os proprios numeros
 // com os dados que ja carregou (nao faz nenhuma chamada nova aqui).
 export function renderBottomNav(activeKey, badges = {}) {
+  const isAdult = (appState.user?.role ?? "").toLowerCase() === "adult";
+  const items = NAV_ITEMS.filter((item) => !item.adultOnly || isAdult);
+
   return `
     <nav class="bottom-nav" aria-label="Navegação principal">
-      ${NAV_ITEMS.map((item) => {
+      ${items.map((item) => {
         const count = Number(badges[item.key]) || 0;
         return `
           <button

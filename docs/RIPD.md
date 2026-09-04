@@ -30,8 +30,8 @@ Cada área de risco tem:
   - Nenhum dado sensível (art. 5º, II) é coletado de ninguém, criança incluída.
   - PIN da criança tratado com o mesmo hashing forte do adulto (PBKDF2-SHA256).
   - Rate limiting no login da criança (item A1) — mitiga o risco específico de um PIN de 4 dígitos ser mais fácil de adivinhar que uma senha.
-- **Risco residual:** não há verificação de idade/identidade de quem se cadastra como adulto, nem tela de consentimento específica e destacada (diferente de um checkbox genérico de aceite dos Termos).
-- **Recomendação:** este é exatamente o item **C3** do checklist (`[DEPOIS]`) — decisão de produto sobre exigir e-mail do responsável, dupla confirmação, ou uma tela de consentimento dedicada. Não é algo que dá para resolver só com código; precisa de uma decisão de vocês sobre o fluxo de cadastro.
+- **Risco residual:** não há verificação de idade/identidade de quem se cadastra como adulto (permanece uma limitação conhecida, dependente de identidade externa e fora do escopo deste produto).
+- **Recomendação:** o item **C3** do checklist foi implementado — o cadastro (`BootstrapRequest.ResponsibleConsent`) agora exige um checkbox de consentimento específico e destacado ("Confirmo que sou responsável pela criança e autorizo o tratamento dos dados necessários para usar o PACUS"), versionado via `BootstrapService.ChildDataConsentVersion`, distinto do aceite genérico dos Termos. O item pode ser considerado `[FEITO]`.
 
 ## 2. Autenticação
 
@@ -125,6 +125,6 @@ Cada área de risco tem:
 
 ## Conclusão
 
-Das sete áreas avaliadas, cinco (autenticação, isolamento por família, exposição por ObjectId, exclusão de conta, dados de comportamento/rotina) têm mitigações técnicas já implementadas e testadas, com risco residual baixo para o estágio atual do produto. As outras duas (dados de crianças, incidentes de segurança) dependem de itens que este relatório não pode fechar sozinho: a primeira é uma decisão de produto sobre o fluxo de cadastro (item C3, `[DEPOIS]`); a segunda é o próprio item D3 (plano de resposta a incidentes), tratado a seguir.
+Das sete áreas avaliadas, seis (autenticação, isolamento por família, exposição por ObjectId, exclusão de conta, dados de comportamento/rotina, e agora dados de crianças com o consentimento destacado do item C3) têm mitigações técnicas já implementadas e testadas, com risco residual baixo para o estágio atual do produto. A única pendência que este relatório não pode fechar sozinho é o item D3 (plano de resposta a incidentes), tratado a seguir.
 
-Nenhuma das sete áreas indica um risco alto e não mitigado que justificasse pausar o lançamento do produto — mas o item C3 (consentimento destacado para dados de crianças) e a conclusão do D3 são as duas peças que mais reduziriam o risco residual, se priorizadas.
+Nenhuma das sete áreas indica um risco alto e não mitigado que justificasse pausar o lançamento do produto — a conclusão do D3 é a peça que mais reduziria o risco residual remanescente, se priorizada.

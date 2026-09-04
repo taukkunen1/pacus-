@@ -188,7 +188,9 @@ public class FamilyCodeHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                 adultEmail,
                 adultPassword,
                 childName = $"Crianca {suffix}",
-                childPin
+                childPin,
+                responsibleConsent = true
+            });
             });
 
         Assert.Contains(

@@ -5,7 +5,8 @@ public record BootstrapRequest(
     string AdultEmail,
     string AdultPassword,
     string ChildName,
-    string ChildPin
+    string ChildPin,
+    bool ResponsibleConsent
 );
 
 public record BootstrapResponse(

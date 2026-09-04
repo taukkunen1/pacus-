@@ -447,7 +447,9 @@ public sealed class PointsHttpIntegrationTests
                     adultPassword,
                     childName =
                         $"Crianca {suffix}",
-                    childPin
+                    childPin,
+                    responsibleConsent = true
+                });
                 });
 
         Assert.Contains(

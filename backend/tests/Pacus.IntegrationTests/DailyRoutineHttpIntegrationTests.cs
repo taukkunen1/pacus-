@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -160,7 +160,9 @@ public class DailyRoutineHttpIntegrationTests : IClassFixture<MongoIntegrationFi
                 adultEmail = $"adult-{suffix}@test.local",
                 adultPassword = "Teste123!",
                 childName = $"Crianca {suffix}",
-                childPin
+                childPin,
+                responsibleConsent = true
+            });
             });
 
         Assert.Contains(
@@ -203,7 +205,9 @@ public class DailyRoutineHttpIntegrationTests : IClassFixture<MongoIntegrationFi
                 adultEmail,
                 adultPassword,
                 childName = $"Crianca {suffix}",
-                childPin = "1234"
+                childPin = "1234",
+                responsibleConsent = true
+            });
             });
 
         Assert.Contains(

@@ -26,13 +26,13 @@ Convenção:
 - [x] **[AQUI] B3. Endpoint de exclusão de conta** com estratégia de cascata/anonimização definida por collection (a partir do mapa de dados do B1). Ver log de progresso.
 - [x] **[AQUI] B4. Rascunho de Política de Privacidade e Termos de Uso** (documento — você revisa e, se quiser, valida com um advogado antes de publicar). Ver `docs/POLITICA_PRIVACIDADE.md` e `docs/TERMOS_DE_USO.md`.
 - [ ] **[DEPOIS] B5. Publicar Política de Privacidade/Termos no site**, decidir onde ficam hospedados e como o usuário aceita (tela de consentimento) — decisão de produto/UX sua.
-- [ ] **[DEPOIS] B6. Registro de consentimentos** — depende de decidir o fluxo de aceite (B5) antes de implementar o armazenamento.
+- [x] **B6. Registro de consentimentos.** O cadastro exige aceite explícito do responsável antes de criar o perfil infantil. O backend registra data/hora e a versão do texto aceito no perfil adulto; o perfil da criança não armazena esse dado.
 
 ## Fase C — Crianças (Prioridade 3)
 
 - [x] **[AQUI] C1. Revisão dos campos da collection `users`** — checar se há dado coletado sem necessidade clara e propor remoção. Ver `docs/DATA_MAP.md` (seção 1 e achado #5).
 - [x] **[AQUI] C2. Teste específico: criança da Família A não enumera/acessa nada da Família B** (cobertura adicional além do que já existe). Ver log de progresso.
-- [ ] **[DEPOIS] C3. Decisão de produto sobre vínculo responsável-criança e regras de criação de conta infantil** (ex.: exigir e-mail do responsável, dupla confirmação) — depende de como vocês querem que o cadastro funcione.
+- [x] **C3. Vínculo responsável-criança e regras de criação de conta infantil.** Decisão implementada: somente o adulto cria a família e o primeiro perfil infantil; a criança não se cadastra, entra pelo código da família e pelo próprio PIN. O adulto deve confirmar explicitamente que é responsável e autoriza o tratamento dos dados da criança.
 
 ## Fase D — Governança (Prioridade 4)
 

@@ -18,6 +18,11 @@ public class User
     // Rotacionado (novo codigo gerado e devolvido) a cada reset bem-sucedido.
     public string? RecoveryCodeHash { get; set; }
 
+    // Registro do aceite específico do responsável pelo tratamento dos dados
+    // da criança no cadastro inicial. Nunca é gravado no perfil infantil.
+    public DateTime? ChildDataConsentAt { get; set; }
+    public string? ChildDataConsentVersion { get; set; }
+
     public string Timezone { get; set; } = "America/Sao_Paulo";
 
     // Codigo curto da familia (formato "XXX-YYY", gerado uma vez no bootstrap e

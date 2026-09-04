@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -419,7 +419,9 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
                 adultEmail,
                 adultPassword,
                 childName,
-                childPin
+                childPin,
+                responsibleConsent = true
+            });
             });
 
         Assert.Contains(

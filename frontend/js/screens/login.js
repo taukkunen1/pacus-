@@ -197,6 +197,10 @@ export function renderLogin(root, onSuccess) {
           <label for="reg-child-pin">PIN da criança (4 dígitos)</label>
           <input id="reg-child-pin" type="text" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required />
         </div>
+        <label class="consent-check">
+          <input id="reg-responsible-consent" type="checkbox" required />
+          <span>Confirmo que sou responsável pela criança e autorizo o tratamento dos dados necessários para usar o PACUS.</span>
+        </label>
         <p class="error-text hidden" id="register-error"></p>
         <button type="submit" class="btn btn-primary btn-block">Criar família</button>
         <button type="button" class="btn btn-ghost btn-block" id="back-to-login-from-register-btn">Voltar</button>
@@ -214,6 +218,7 @@ export function renderLogin(root, onSuccess) {
       const adultPassword = slot.querySelector("#reg-adult-password").value;
       const childName = slot.querySelector("#reg-child-name").value.trim();
       const childPin = slot.querySelector("#reg-child-pin").value.trim();
+      const responsibleConsent = slot.querySelector("#reg-responsible-consent").checked;
       const errorEl = slot.querySelector("#register-error");
       const submitBtn = slot.querySelector('#register-form button[type="submit"]');
       const originalLabel = submitBtn.textContent;
@@ -224,7 +229,7 @@ export function renderLogin(root, onSuccess) {
       submitBtn.textContent = "Criando...";
       try {
         const result = await withSlowLoadHint(
-          createFamily(adultName, adultEmail, adultPassword, childName, childPin),
+          createFamily(adultName, adultEmail, adultPassword, childName, childPin, responsibleConsent),
           () => { submitBtn.textContent = "Ainda conectando..."; errorEl.textContent = SLOW_LOAD_MESSAGE; errorEl.classList.remove("hidden", "error-text"); errorEl.classList.add("hint-text"); }
         );
         renderRegisterSuccess(result, adultEmail);

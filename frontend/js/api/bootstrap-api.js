@@ -5,8 +5,8 @@ import { apiClient } from "./api-client.js";
 // Devolve, so nesta resposta, o codigo de recuperacao de senha do adulto e o
 // codigo da familia que a crianca vai usar pra logar -- a tela de cadastro
 // (screens/login.js) deve orientar o usuario a guardar os dois.
-export const createFamily = (adultName, adultEmail, adultPassword, childName, childPin) =>
+export const createFamily = (adultName, adultEmail, adultPassword, childName, childPin, responsibleConsent) =>
   apiClient("/bootstrap", {
     method: "POST",
-    body: JSON.stringify({ adultName, adultEmail, adultPassword, childName, childPin }),
+    body: JSON.stringify({ adultName, adultEmail, adultPassword, childName, childPin, responsibleConsent }),
   });

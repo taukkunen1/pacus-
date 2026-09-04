@@ -27,7 +27,8 @@ public class HabitatDebugHttpTests : IClassFixture<MongoIntegrationFixture>
             adultEmail = $"adult-{suffix}@test.local",
             adultPassword = "Teste123!",
             childName = $"Crianca {suffix}",
-            childPin = "1234"
+            childPin = "1234",
+            responsibleConsent = true
         };
 
         var bootstrap = await client.PostAsJsonAsync(

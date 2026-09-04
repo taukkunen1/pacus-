@@ -34,10 +34,10 @@ Desde então, o desenvolvimento foi integrado em `main`. No estado atual, `featu
 
 ## Segurança e LGPD (`docs/SECURITY_LGPD_CHECKLIST.md`)
 
-15 itens concluídos, 7 pendentes (todos marcados `[DEPOIS]`, ou seja, dependem de uma decisão de produto/infra sua, não de código):
+17 itens concluídos, 5 pendentes (todos marcados `[DEPOIS]`, ou seja, dependem de uma decisão de produto/infra sua, não de código):
 
 - **Concluído:** rate limiting, testes de isolamento por família, correção de um bug real de checagem de posse em `TasksController.Delete`, renomeação `UserId → FamilyId`, log de auditoria, mapa de dados das 12 collections, exportação de dados (LGPD, portabilidade), exclusão de conta (hard delete + anonimização de `audit_logs` com TTL de 12 meses), rascunhos de Política de Privacidade/Termos de Uso, RIPD e Plano de Resposta a Incidentes.
-- **Pendente (decisão sua):** confirmar hardening de infra no Render/Atlas (A6), checar histórico do Git por segredo vazado (A7), **rotacionar o PAT do GitHub por um fine-grained token limitado a este repositório** (A8), publicar Política/Termos e implementar tela de consentimento (B5/B6), decisão sobre fluxo de cadastro infantil (C3) e canal de contato de privacidade (D4).
+- **Pendente (decisão sua):** confirmar hardening de infra no Render/Atlas (A6), checar histórico do Git por segredo vazado (A7), **rotacionar o PAT do GitHub por um fine-grained token limitado a este repositório** (A8), publicar Política/Termos no site (B5) e definir o canal de contato de privacidade (D4).
 
 O item **A8** é particularmente relevante agora: o checklist já pedia a troca do token clássico por um fine-grained scoped a este repo — vale fazer isso com o token que você colou nesta conversa.
 

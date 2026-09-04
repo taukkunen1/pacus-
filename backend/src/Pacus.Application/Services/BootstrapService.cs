@@ -11,6 +11,7 @@ namespace Pacus.Application.Services;
 
 public class BootstrapService : IBootstrapService
 {
+    private const string ChildDataConsentVersion = "2026-09-04";
     private static readonly Regex EmailPattern = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
     private const int MaxFamilyCodeAttempts = 10;
 
@@ -73,6 +74,8 @@ public class BootstrapService : IBootstrapService
             Email = email,
             PasswordHash = _passwordHasher.Hash(request.AdultPassword),
             RecoveryCodeHash = _passwordHasher.Hash(recoveryCode),
+            ChildDataConsentAt = now,
+            ChildDataConsentVersion = ChildDataConsentVersion,
             Timezone = "America/Sao_Paulo",
             FamilyCode = familyCode,
             FamilyId = familyId,
@@ -163,6 +166,9 @@ public class BootstrapService : IBootstrapService
 
         if (!Regex.IsMatch(request.ChildPin ?? string.Empty, "^[0-9]{4}$"))
             throw new ValidationException("O PIN da crianca deve ter exatamente 4 digitos numericos.");
+
+        if (!request.ResponsibleConsent)
+            throw new ValidationException("O aceite do responsavel pelo tratamento dos dados da crianca e obrigatorio.");
     }
 
     private async Task<string> GenerateUniqueFamilyCodeAsync()

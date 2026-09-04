@@ -19,7 +19,7 @@ Cada collection tem uma tabela de campos e uma seção de contexto com:
 
 ### Nota geral sobre dados de crianças (LGPD art. 14)
 
-O PACUS não coleta dados diretamente de crianças de forma autônoma: a conta da criança é criada pelo adulto responsável através do fluxo de bootstrap, que já pressupõe consentimento do responsável para o uso do produto em nome do filho. Isso cobre a base legal do art. 14, §1º, mas **não substitui um texto de consentimento específico e em destaque** — esse é o item C3 do checklist (`[DEPOIS]`, decisão de produto pendente: exigir e-mail do responsável, tela de consentimento dedicada, etc.).
+O PACUS não coleta dados diretamente de crianças de forma autônoma: a conta da criança é criada pelo adulto responsável através do fluxo de bootstrap. O cadastro exige um aceite específico e destacado: o adulto confirma ser responsável e autoriza o tratamento dos dados necessários ao uso do PACUS. A data/hora e a versão do texto aceito ficam registradas apenas no perfil adulto, cobrindo a evidência do consentimento exigida pelo art. 14, §1º.
 
 ### Nota geral sobre base legal
 

@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -373,7 +373,9 @@ public class HabitatHttpIntegrationTests : IClassFixture<MongoIntegrationFixture
                 adultEmail,
                 adultPassword,
                 childName = $"Crianca {suffix}",
-                childPin = "1234"
+                childPin = "1234",
+                responsibleConsent = true
+            });
             });
 
         Assert.Contains(

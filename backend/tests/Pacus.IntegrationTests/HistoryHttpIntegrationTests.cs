@@ -269,7 +269,10 @@ public sealed class HistoryHttpIntegrationTests
                     childName =
                         $"Crianca {suffix}",
 
-                    childPin
+                    childPin,
+
+                    responsibleConsent = true
+                });
                 });
 
         Assert.Contains(

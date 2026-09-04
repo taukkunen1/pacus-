@@ -17,7 +17,8 @@ public class BootstrapServiceTests
             AdultEmail: $"pedro-{Guid.NewGuid():N}@example.com",
             AdultPassword: "senha-forte-123",
             ChildName: "Hector",
-            ChildPin: "1234"
+            ChildPin: "1234",
+            ResponsibleConsent: true
         );
 
     private static BootstrapService BuildSystem(out FakeUserRepository users)
@@ -66,7 +67,16 @@ public class BootstrapServiceTests
         string adultName, string adultEmail, string adultPassword, string childName, string childPin)
     {
         var service = BuildSystem(out _);
-        var request = new BootstrapRequest(adultName, adultEmail, adultPassword, childName, childPin);
+        var request = new BootstrapRequest(adultName, adultEmail, adultPassword, childName, childPin, true);
+
+        await Assert.ThrowsAsync<ValidationException>(() => service.CreateInitialFamilyAsync(request));
+    }
+
+    [Fact]
+    public async Task CriaFamilia_SemAceiteDoResponsavel_LancaValidationException()
+    {
+        var service = BuildSystem(out _);
+        var request = ValidRequest() with { ResponsibleConsent = false };
 
         await Assert.ThrowsAsync<ValidationException>(() => service.CreateInitialFamilyAsync(request));
     }

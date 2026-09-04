@@ -16,7 +16,11 @@ import {
   updateDailyTask,
   deleteDailyTask,
   reorderDailyTasks,
-  selectTaskOption
+  selectTaskOption,
+  getTasks,
+  updateTask,
+  deleteTask,
+  activateTask
 } from "../api/tasks-api.js";
 
 import { getPendingRedemptions } from "../api/store-api.js";
@@ -31,9 +35,24 @@ import {
 import { showToast } from "../components/toast.js";
 import { pickEffortMessage } from "../utils/effort-messages.js";
 import { appState } from "../state/app-state.js";
-import { promptTaskForm, showMessageModal, promptReactionForm } from "../components/modal.js";
+import { promptTaskForm, showMessageModal, promptReactionForm, promptPermanentTaskForm } from "../components/modal.js";
 import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
 import { withSlowLoadHint, SLOW_LOAD_MESSAGE } from "../utils/slow-load-hint.js";
+
+// Abreviacao em portugues -> nome em ingles do enum DayOfWeek do backend
+// (Enum.TryParse so aceita "Monday", "Tuesday" etc). Cobre a semana inteira --
+// usado so pelo selo de recorrencia customizada na lista de tarefas
+// permanentes (ver recurrenceBadge abaixo); a escolha dos dias em si agora e
+// feita com checkboxes no painel de components/modal.js promptPermanentTaskForm.
+const DAY_ABBR = [
+  { abbr: "seg", key: "Monday" },
+  { abbr: "ter", key: "Tuesday" },
+  { abbr: "qua", key: "Wednesday" },
+  { abbr: "qui", key: "Thursday" },
+  { abbr: "sex", key: "Friday" },
+  { abbr: "sab", key: "Saturday" },
+  { abbr: "dom", key: "Sunday" }
+];
 
 const PERIODS = [
   "morning",
@@ -128,14 +147,22 @@ export async function renderHome(
   }
 
   // Numerozinho na aba "Loja" avisando o adulto de resgate(s) aguardando aprovacao --
-  // so uma contagem leve, sem mudar nada na tela de hoje em si.
+  // so uma contagem leve, sem mudar nada na tela de hoje em si. Aproveitamos o
+  // mesmo carregamento (bloco isAdult) pra buscar tambem as tarefas
+  // permanentes, que agora sao geridas aqui em vez da tela do PACUS -- sem
+  // round-trip extra so pra elas.
   let pendingRedemptionsCount = 0;
+  let permanentTasks = [];
   if (isAdult) {
     try {
-      const pending = await getPendingRedemptions();
+      const [pending, tasks] = await Promise.all([
+        getPendingRedemptions(),
+        getTasks()
+      ]);
       pendingRedemptionsCount = pending?.length ?? 0;
+      permanentTasks = tasks ?? [];
     } catch (err) {
-      console.warn("Nao foi possivel carregar resgates pendentes.", err);
+      console.warn("Nao foi possivel carregar resgates pendentes ou tarefas permanentes.", err);
     }
   }
 
@@ -447,6 +474,29 @@ export async function renderHome(
         </div>
       </div>
 
+      ${isAdult ? `
+        <section class="task-management">
+          <div class="screen-header">
+            <div>
+              <p class="eyebrow">ROTINA</p>
+              <h2>Tarefas permanentes</h2>
+            </div>
+
+            <button
+              class="btn btn-primary"
+              id="add-permanent-task"
+              type="button"
+            >
+              + Nova tarefa
+            </button>
+          </div>
+
+          <div id="permanent-task-list">
+            ${renderPermanentTasks()}
+          </div>
+        </section>
+      ` : ""}
+
       ${renderBottomNav("today", {
         today: !isAdult ? Math.max(0, totalTasks() - doneTasks()) : 0,
         store: isAdult ? pendingRedemptionsCount : 0
@@ -455,6 +505,177 @@ export async function renderHome(
 
     attachHandlers();
     startGameTimerCountdown();
+  }
+
+  // Selo curto na lista de tarefas permanentes mostrando em quais dias a
+  // tarefa aparece, quando nao e todo dia (o caso mais comum nao precisa de
+  // selo nenhum).
+  function recurrenceBadge(task) {
+    if (task.recurrence === "weekday") return `<span>📅 dias úteis</span>`;
+    if (task.recurrence === "weekend") return `<span>📅 fim de semana</span>`;
+    if (task.recurrence === "weekday_rotation") return `<span>🔁 1 atividade/dia útil</span>`;
+
+    if (task.recurrence === "custom" && (task.customDays ?? []).length) {
+      const labels = task.customDays
+        .map((day) => DAY_ABBR.find((d) => d.key.toLowerCase() === String(day).toLowerCase())?.abbr)
+        .filter(Boolean)
+        .join(", ");
+      return `<span>📅 ${escapeHtml(labels)}</span>`;
+    }
+
+    return "";
+  }
+
+  function renderPermanentTasks() {
+    if (!permanentTasks.length) {
+      return `
+        <div class="task-card">
+          <div class="task-card__content">
+            <strong class="task-title">
+              Nenhuma tarefa permanente
+            </strong>
+
+            <span class="task-description">
+              Crie uma tarefa para ela aparecer automaticamente nas próximas rotinas.
+            </span>
+          </div>
+        </div>
+      `;
+    }
+
+    return permanentTasks
+      .map((task) => {
+        const active = task.active !== false;
+
+        return `
+          <article class="task-card">
+            <div class="task-card__content">
+              <strong class="task-title">
+                ${escapeHtml(task.title)}
+              </strong>
+
+              ${
+                task.description
+                  ? `
+                    <span class="task-description">
+                      ${escapeHtml(task.description)}
+                    </span>
+                  `
+                  : ""
+              }
+
+              <div class="task-meta">
+                <span>${typeLabel(task.type)}</span>
+                <span>${periodLabel(task.period)}</span>
+                <span>${task.points} PP</span>
+                <span>${active ? "Ativa" : "Inativa"}</span>
+                ${recurrenceBadge(task)}
+              </div>
+            </div>
+
+            <div class="task-actions">
+              <button
+                class="btn btn-ghost"
+                data-permanent-task-action="edit"
+                data-permanent-task-id="${escapeHtml(String(task.id))}"
+              >
+                Editar
+              </button>
+
+              ${
+                active
+                  ? `
+                    <button
+                      class="btn btn-ghost"
+                      data-permanent-task-action="delete"
+                      data-permanent-task-id="${escapeHtml(String(task.id))}"
+                    >
+                      Desativar
+                    </button>
+                  `
+                  : `
+                    <button
+                      class="btn btn-primary"
+                      data-permanent-task-action="activate"
+                      data-permanent-task-id="${escapeHtml(String(task.id))}"
+                    >
+                      Ativar
+                    </button>
+                  `
+              }
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+  }
+
+  async function createPermanentTask() {
+    const result = await promptPermanentTaskForm({
+      title: "Nova tarefa permanente",
+      values: { type: "challenge", points: 1, period: activePeriod },
+      confirmLabel: "Adicionar"
+    });
+
+    if (!result) return;
+
+    try {
+      const created = await createTask(result);
+      permanentTasks = [created, ...permanentTasks];
+      showToast("Tarefa permanente criada.");
+      draw();
+    } catch (err) {
+      showToast(err.message, { error: true });
+    }
+  }
+
+  async function editPermanentTask(id) {
+    const task = permanentTasks.find((item) => String(item.id) === String(id));
+    if (!task) return;
+
+    const result = await promptPermanentTaskForm({
+      title: "Editar tarefa",
+      values: task,
+      confirmLabel: "Salvar"
+    });
+
+    if (!result) return;
+
+    try {
+      const updated = await updateTask(id, result);
+      permanentTasks = permanentTasks.map((item) => (String(item.id) === String(id) ? updated : item));
+      showToast("Tarefa permanente atualizada.");
+      draw();
+    } catch (err) {
+      showToast(err.message, { error: true });
+    }
+  }
+
+  async function deletePermanentTask(id) {
+    const task = permanentTasks.find((item) => String(item.id) === String(id));
+    if (!task) return;
+
+    if (!window.confirm(`Desativar a tarefa "${task.title}"?`)) return;
+
+    try {
+      await deleteTask(id);
+      permanentTasks = permanentTasks.filter((item) => String(item.id) !== String(id));
+      showToast("Tarefa permanente desativada.");
+      draw();
+    } catch (err) {
+      showToast(err.message, { error: true });
+    }
+  }
+
+  async function reactivatePermanentTask(id) {
+    try {
+      await activateTask(id);
+      permanentTasks = await getTasks();
+      showToast("Tarefa permanente ativada.");
+      draw();
+    } catch (err) {
+      showToast(err.message, { error: true });
+    }
   }
 
   async function handleGameTimerAction(action) {
@@ -507,6 +728,34 @@ export async function renderHome(
       });
 
     attachBottomNav(content, navigate);
+
+    content
+      .querySelector("#add-permanent-task")
+      ?.addEventListener("click", createPermanentTask);
+
+    content
+      .querySelectorAll('[data-permanent-task-action="edit"]')
+      .forEach((button) => {
+        button.addEventListener("click", () =>
+          editPermanentTask(button.dataset.permanentTaskId)
+        );
+      });
+
+    content
+      .querySelectorAll('[data-permanent-task-action="delete"]')
+      .forEach((button) => {
+        button.addEventListener("click", () =>
+          deletePermanentTask(button.dataset.permanentTaskId)
+        );
+      });
+
+    content
+      .querySelectorAll('[data-permanent-task-action="activate"]')
+      .forEach((button) => {
+        button.addEventListener("click", () =>
+          reactivatePermanentTask(button.dataset.permanentTaskId)
+        );
+      });
 
     content
       .querySelectorAll('[data-action="view-reaction"]')
@@ -640,9 +889,15 @@ export async function renderHome(
             // tarefa — inclui o tipo (obrigatoria/deve fazer/desafio) e o
             // periodo (manha/tarde/noite) como grupos de botoes visiveis,
             // que antes ficavam escondidos (o periodo nem aparecia).
+            // Mesmo toggle "repetir nos proximos dias" da criacao (ver
+            // #add-task acima) -- so o adulto ve a opcao, o backend tambem
+            // bloqueia pra crianca. Editar e marcar permanente cria uma
+            // tarefa permanente nova com os dados atuais, alem de salvar a
+            // edicao na tarefa de hoje normalmente.
             const result = await promptTaskForm({
               title: "Editar tarefa",
               values: task,
+              showPermanentToggle: isAdult,
               confirmLabel: "Salvar"
             });
 
@@ -658,6 +913,12 @@ export async function renderHome(
                   task.id,
                   fields
                 );
+
+              if (permanent) {
+                const created = await createTask(fields);
+                permanentTasks = [created, ...permanentTasks];
+                showToast("Tarefa permanente criada.");
+              }
 
               balance =
                 await getPointsBalance();

@@ -1,15 +1,7 @@
 import { apiClient } from "../api/api-client.js";
 import { renderTank } from "../pacus/habitat.js";
-import {
-  getTasks,
-  createTask,
-  updateTask,
-  deleteTask,
-  activateTask
-} from "../api/tasks-api.js";
-import { periodLabel, typeLabel } from "../utils/format.js";
 import { showToast } from "../components/toast.js";
-import { promptPermanentTaskForm, promptInput } from "../components/modal.js";
+import { promptInput } from "../components/modal.js";
 import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
 import { appState } from "../state/app-state.js";
 import {
@@ -19,21 +11,6 @@ import {
   updateFamilyTimezone,
   generateRecoveryCode
 } from "../api/family-api.js";
-
-// Abreviacao em portugues -> nome em ingles do enum DayOfWeek do backend
-// (Enum.TryParse so aceita "Monday", "Tuesday" etc). Cobre a semana inteira --
-// usado so pelo selo de recorrencia customizada na lista de tarefas
-// permanentes (ver recurrenceBadge abaixo); a escolha dos dias em si agora e
-// feita com checkboxes no painel de components/modal.js promptPermanentTaskForm.
-const DAY_ABBR = [
-  { abbr: "seg", key: "Monday" },
-  { abbr: "ter", key: "Tuesday" },
-  { abbr: "qua", key: "Wednesday" },
-  { abbr: "qui", key: "Thursday" },
-  { abbr: "sex", key: "Friday" },
-  { abbr: "sab", key: "Saturday" },
-  { abbr: "dom", key: "Sunday" }
-];
 
 export async function renderPacus(root, navigate) {
   root.innerHTML = `
@@ -49,45 +26,14 @@ export async function renderPacus(root, navigate) {
   const isAdult = (appState.user?.role ?? "").toLowerCase() === "adult";
 
   let pacus = null;
-  let tasks = [];
   let growthStages = [];
   let familyTimezone = "";
-
-  try {
-    tasks = await getTasks();
-  } catch (err) {
-    content.innerHTML = `
-      <div class="screen-header">
-        <div>
-          <p class="eyebrow">PACUS</p>
-          <h1>Meu companheiro</h1>
-        </div>
-
-        <button class="btn btn-ghost" id="back">
-          Hoje
-        </button>
-      </div>
-
-      <p class="error-text">
-        Nao foi possivel carregar as tarefas permanentes:
-        ${escapeHtml(err.message)}
-      </p>
-    `;
-
-    content.querySelector("#back")
-      ?.addEventListener(
-        "click",
-        () => navigate("today")
-      );
-
-    return;
-  }
 
   try {
     pacus = await apiClient("/pacus/me");
   } catch (err) {
     console.warn(
-      "PACUS nao encontrado. A tela de tarefas permanentes continuara disponivel.",
+      "PACUS nao encontrado.",
       err
     );
   }
@@ -149,7 +95,6 @@ export async function renderPacus(root, navigate) {
           : `
             <div class="error-text">
               O registro do PACUS desta família não foi encontrado.
-              O gerenciamento das tarefas continua disponível.
             </div>
           `
       }
@@ -229,26 +174,6 @@ export async function renderPacus(root, navigate) {
         </section>
       ` : ""}
 
-      <section class="task-management">
-        <div class="screen-header">
-          <div>
-            <p class="eyebrow">ROTINA</p>
-            <h2>Tarefas permanentes</h2>
-          </div>
-
-          <button
-            class="btn btn-primary"
-            id="add-permanent-task"
-          >
-            + Nova tarefa
-          </button>
-        </div>
-
-        <div id="permanent-task-list">
-          ${renderPermanentTasks()}
-        </div>
-      </section>
-
       ${renderBottomNav("pacus")}
     `;
 
@@ -260,55 +185,6 @@ export async function renderPacus(root, navigate) {
       );
 
     attachBottomNav(content, navigate);
-
-    content
-      .querySelector("#add-permanent-task")
-      ?.addEventListener(
-        "click",
-        createPermanentTask
-      );
-
-    content
-      .querySelectorAll(
-        "[data-task-action=edit]"
-      )
-      .forEach((button) => {
-        button.addEventListener(
-          "click",
-          () =>
-            editPermanentTask(
-              button.dataset.taskId
-            )
-        );
-      });
-
-    content
-      .querySelectorAll(
-        "[data-task-action=delete]"
-      )
-      .forEach((button) => {
-        button.addEventListener(
-          "click",
-          () =>
-            deletePermanentTask(
-              button.dataset.taskId
-            )
-        );
-      });
-
-    content
-      .querySelectorAll(
-        "[data-task-action=activate]"
-      )
-      .forEach((button) => {
-        button.addEventListener(
-          "click",
-          () =>
-            reactivatePermanentTask(
-              button.dataset.taskId
-            )
-        );
-      });
 
     content.querySelector("#change-timezone")?.addEventListener("click", changeTimezone);
     content.querySelector("#change-child-pin")?.addEventListener("click", changeChildPin);
@@ -490,234 +366,6 @@ export async function renderPacus(root, navigate) {
       adult: "Adulto"
     };
     return labels[String(stage).toLowerCase()] ?? escapeHtml(String(stage));
-  }
-
-  function renderPermanentTasks() {
-    if (!tasks.length) {
-      return `
-        <div class="task-card">
-          <div class="task-card__content">
-            <strong class="task-title">
-              Nenhuma tarefa permanente
-            </strong>
-
-            <span class="task-description">
-              Crie uma tarefa para ela aparecer automaticamente nas próximas rotinas.
-            </span>
-          </div>
-        </div>
-      `;
-    }
-
-    return tasks
-      .map((task) => {
-        const active = task.active !== false;
-
-        return `
-          <article
-            class="task-card"
-          >
-            <div class="task-card__content">
-              <strong class="task-title">
-                ${escapeHtml(task.title)}
-              </strong>
-
-              ${
-                task.description
-                  ? `
-                    <span class="task-description">
-                      ${escapeHtml(task.description)}
-                    </span>
-                  `
-                  : ""
-              }
-
-              <div class="task-meta">
-                <span>
-                  ${typeLabel(task.type)}
-                </span>
-
-                <span>
-                  ${periodLabel(task.period)}
-                </span>
-
-                <span>
-                  ${task.points} PP
-                </span>
-
-                <span>
-                  ${active ? "Ativa" : "Inativa"}
-                </span>
-
-                ${recurrenceBadge(task)}
-              </div>
-            </div>
-
-            <div class="task-actions">
-              <button
-                class="btn btn-ghost"
-                data-task-action="edit"
-                data-task-id="${escapeHtml(String(task.id))}"
-              >
-                Editar
-              </button>
-
-              ${
-                active
-                  ? `
-                    <button
-                      class="btn btn-ghost"
-                      data-task-action="delete"
-                      data-task-id="${escapeHtml(String(task.id))}"
-                    >
-                      Desativar
-                    </button>
-                  `
-                  : `
-                    <button
-                      class="btn btn-primary"
-                      data-task-action="activate"
-                      data-task-id="${escapeHtml(String(task.id))}"
-                    >
-                      Ativar
-                    </button>
-                  `
-              }
-            </div>
-          </article>
-        `;
-      })
-      .join("");
-  }
-
-  // Selo curto na lista de tarefas permanentes mostrando em quais dias a
-  // tarefa aparece, quando nao e todo dia (o caso mais comum nao precisa de
-  // selo nenhum).
-  function recurrenceBadge(task) {
-    if (task.recurrence === "weekday") return `<span>📅 dias úteis</span>`;
-    if (task.recurrence === "weekend") return `<span>📅 fim de semana</span>`;
-    if (task.recurrence === "weekday_rotation") return `<span>🔁 1 atividade/dia útil</span>`;
-
-    if (task.recurrence === "custom" && (task.customDays ?? []).length) {
-      const labels = task.customDays
-        .map((day) => DAY_ABBR.find((d) => d.key.toLowerCase() === String(day).toLowerCase())?.abbr)
-        .filter(Boolean)
-        .join(", ");
-      return `<span>📅 ${escapeHtml(labels)}</span>`;
-    }
-
-    return "";
-  }
-
-  // Painel unico (components/modal.js promptPermanentTaskForm), mesmo padrao
-  // do editor de tarefas do dia: Tipo e Periodo como grupos de botoes,
-  // recorrencia com os blocos de dias/variantes revelados so quando fazem
-  // sentido, Opcoes e Motivos como listas editaveis -- tudo isso substitui a
-  // antiga cadeia de window.prompt/window.confirm (que pedia, por exemplo,
-  // digitar "mandatory, expected ou challenge" por extenso).
-  async function createPermanentTask() {
-    const result = await promptPermanentTaskForm({
-      title: "Nova tarefa permanente",
-      values: { type: "challenge", points: 1, period: "morning" },
-      confirmLabel: "Adicionar"
-    });
-
-    if (!result) return;
-
-    try {
-      const created = await createTask(result);
-
-      tasks = [created, ...tasks];
-
-      showToast("Tarefa permanente criada.");
-
-      draw();
-    } catch (err) {
-      showToast(err.message, { error: true });
-    }
-  }
-
-  async function editPermanentTask(id) {
-    const task = tasks.find((item) => String(item.id) === String(id));
-    if (!task) return;
-
-    const result = await promptPermanentTaskForm({
-      title: "Editar tarefa",
-      values: task,
-      confirmLabel: "Salvar"
-    });
-
-    if (!result) return;
-
-    try {
-      const updated = await updateTask(id, result);
-
-      tasks = tasks.map((item) => (String(item.id) === String(id) ? updated : item));
-
-      showToast("Tarefa permanente atualizada.");
-
-      draw();
-    } catch (err) {
-      showToast(err.message, { error: true });
-    }
-  }
-
-  async function deletePermanentTask(id) {
-    const task = tasks.find(
-      (item) =>
-        String(item.id) === String(id)
-    );
-
-    if (!task) {
-      return;
-    }
-
-    if (
-      !window.confirm(
-        `Desativar a tarefa "${task.title}"?`
-      )
-    ) {
-      return;
-    }
-
-    try {
-      await deleteTask(id);
-
-      tasks = tasks.filter(
-        (item) =>
-          String(item.id) !== String(id)
-      );
-
-      showToast(
-        "Tarefa permanente desativada."
-      );
-
-      draw();
-    } catch (err) {
-      showToast(
-        err.message,
-        { error: true }
-      );
-    }
-  }
-
-  async function reactivatePermanentTask(id) {
-    try {
-      await activateTask(id);
-
-      tasks = await getTasks();
-
-      showToast(
-        "Tarefa permanente ativada."
-      );
-
-      draw();
-    } catch (err) {
-      showToast(
-        err.message,
-        { error: true }
-      );
-    }
   }
 }
 

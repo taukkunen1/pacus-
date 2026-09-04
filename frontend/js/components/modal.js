@@ -894,7 +894,20 @@ export function promptPermanentTaskForm({
         </div>
 
         <div class="field">
-          <label>Quando aparece</label>
+          <label class="task-form-checkbox">
+            <input
+              type="checkbox"
+              id="template-form-show-recurrence"
+              ${(values.recurrence ?? "daily") !== "daily" ? "checked" : ""}
+            />
+            <span>Mudar quando essa tarefa aparece (padrão: todos os dias)</span>
+          </label>
+
+          <div
+            id="template-form-recurrence-block"
+            class="${(values.recurrence ?? "daily") !== "daily" ? "" : "hidden"}"
+            style="margin-top: var(--space-2);"
+          >
           <div class="task-form-type-group" role="radiogroup" aria-label="Recorrência da tarefa" id="template-form-recurrence-group">
             ${RECURRENCE_OPTIONS.map(
               (opt) => `
@@ -962,6 +975,7 @@ export function promptPermanentTaskForm({
             `
             ).join("")}
           </div>
+          </div>
         </div>
 
         <div class="field">
@@ -998,6 +1012,8 @@ export function promptPermanentTaskForm({
     const errorText = overlay.querySelector("#template-form-error");
     const customDaysBlock = overlay.querySelector("#template-form-custom-days");
     const variantsBlock = overlay.querySelector("#template-form-variants");
+    const showRecurrenceCheckbox = overlay.querySelector("#template-form-show-recurrence");
+    const recurrenceBlock = overlay.querySelector("#template-form-recurrence-block");
 
     // Editor de lista repetivel (min/max linhas, com botao de adicionar/remover) --
     // usado tanto pras Opções quanto pros Motivos abaixo. Duplicar essa logica em
@@ -1092,6 +1108,15 @@ export function promptPermanentTaskForm({
       .forEach((input) => input.addEventListener("change", updateRecurrenceVisibility));
     updateRecurrenceVisibility();
 
+    // Colapsado por padrão -- deixa a tela igual ao editor de tarefa do dia
+    // (Nome/Descrição/Pontos/Tipo/Período) na maioria dos casos, já que a
+    // maior parte das tarefas permanentes é mesmo "todos os dias". So expande
+    // sozinho quando a tarefa ja tem uma recorrencia diferente configurada,
+    // pra nao esconder um ajuste que a pessoa ja tinha feito.
+    showRecurrenceCheckbox.addEventListener("change", () => {
+      recurrenceBlock.classList.toggle("hidden", !showRecurrenceCheckbox.checked);
+    });
+
     titleInput.focus();
 
     function showError(message) {
@@ -1124,8 +1149,9 @@ export function promptPermanentTaskForm({
         overlay.querySelector('input[name="template-form-type"]:checked')?.value ?? "mandatory";
       const period =
         overlay.querySelector('input[name="template-form-period"]:checked')?.value ?? "morning";
-      const recurrence =
-        overlay.querySelector('input[name="template-form-recurrence"]:checked')?.value ?? "daily";
+      const recurrence = showRecurrenceCheckbox.checked
+        ? overlay.querySelector('input[name="template-form-recurrence"]:checked')?.value ?? "daily"
+        : "daily";
 
       let customDays = null;
       if (recurrence === "custom") {

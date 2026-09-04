@@ -58,6 +58,26 @@ public class PacusController : ControllerBase
         if (request.Size is not null) pacus.Size = request.Size.Value;
         if (request.TotalClosedDays is not null) pacus.TotalClosedDays = request.TotalClosedDays.Value;
 
+        if (request.ColorHue is not null)
+        {
+            // -1 e o sinal de "limpar a cor manual, volta pra derivada automaticamente"
+            // (ver comentario em UpdatePacusStateRequest.ColorHue) -- null aqui ja
+            // significa "nao mexer neste campo", entao precisa de outro valor pra
+            // representar "mexer, mas apagando".
+            if (request.ColorHue.Value == -1)
+            {
+                pacus.ColorHue = null;
+            }
+            else if (request.ColorHue.Value is < 0 or > 359)
+            {
+                return BadRequest(new { error = "ColorHue deve estar entre 0 e 359 (ou -1 para limpar)." });
+            }
+            else
+            {
+                pacus.ColorHue = request.ColorHue.Value;
+            }
+        }
+
         pacus.UpdatedAt = DateTime.UtcNow;
         await _pacusRepository.UpdateAsync(pacus);
 

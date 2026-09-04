@@ -9,5 +9,10 @@ namespace Pacus.Application.DTOs;
 public record UpdatePacusStateRequest(
     PacusStage? Stage,
     double? Size,
-    int? TotalClosedDays
+    int? TotalClosedDays,
+    // 0-359. Enviar null nao muda a cor atual -- pra voltar pra cor derivada
+    // automaticamente (ver Pacus.ColorHue), o frontend manda -1 como sinal
+    // explicito de "limpar", tratado a parte no controller (nao pode reusar
+    // null pra isso porque null aqui ja significa "nao mexer neste campo").
+    int? ColorHue
 );

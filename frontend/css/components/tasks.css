@@ -273,11 +273,53 @@
 }
 .game-timer--unlocked {
   color: var(--color-tide-deep);
-  background: linear-gradient(90deg, var(--color-sun), #ffe0a3);
+  background: linear-gradient(90deg, var(--color-lagoon-light), #8fdcd5);
   box-shadow: var(--shadow-float);
   font-weight: 600;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  transition: background var(--duration-med) var(--ease-water);
+}
+.game-timer__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 .game-timer__icon { font-size: var(--step-lg); }
+
+/* Barra de progresso do tempo de jogo restante -- esvazia visualmente
+   conforme o tempo acaba, e a cor de fundo do cartao inteiro muda junto
+   (ok -> aviso -> critico). Ver startGameTimerCountdown em screens/home.js,
+   que atualiza a largura da barra e as classes a cada tick. */
+.game-timer__bar {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(10, 43, 41, 0.15);
+  overflow: hidden;
+}
+.game-timer__bar-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-tide-deep);
+  transition: width var(--duration-med) var(--ease-water);
+}
+
+.game-timer--warning {
+  background: linear-gradient(90deg, var(--color-sun), #ffe0a3);
+}
+.game-timer--critical {
+  background: linear-gradient(90deg, var(--color-danger), #f2a89f);
+  animation: game-timer-pulse 1.4s ease-in-out infinite;
+}
+@keyframes game-timer-pulse {
+  0%, 100% { box-shadow: var(--shadow-float); }
+  50% { box-shadow: 0 4px 20px -2px rgba(224, 102, 90, 0.6); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-timer--critical { animation: none; }
+}
+
 .game-timer--paused {
   background: linear-gradient(90deg, #e4e9ec, #cfd8dd);
   color: var(--color-tide-deep);

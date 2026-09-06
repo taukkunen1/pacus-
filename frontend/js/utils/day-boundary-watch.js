@@ -21,6 +21,29 @@
 export function watchForDayBoundary(onBoundary) {
   let timerId = null;
 
+  // Dia local atual, so pra comparar depois -- "voltar o foco" (troca de aba,
+  // alt-tab, minimizar) acontece a toda hora e NAO significa que o dia virou.
+  // Antes disparava onBoundary() incondicionalmente em todo focus/
+  // visibilitychange, o que forcava a tela "Hoje" inteira a recarregar (com o
+  // flash de "Carregando sua rotina...") sempre que alguem so trocava de aba
+  // por um instante -- o timer de jogo em si nao precisa disso, ja que
+  // startGameTimerCountdown (screens/home.js) recalcula sozinho a cada
+  // segundo sem bater no servidor. Agora so dispara de verdade quando o dia
+  // (ano/mes/dia local) mudou desde a ultima checagem.
+  function dayKey() {
+    const now = new Date();
+    return `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+  }
+
+  let lastDayKey = dayKey();
+
+  function checkAndFireIfNewDay() {
+    const key = dayKey();
+    if (key === lastDayKey) return;
+    lastDayKey = key;
+    onBoundary();
+  }
+
   function scheduleNextMidnight() {
     const now = new Date();
     // +5s de folga pra garantir que ja virou o dia local quando disparar.
@@ -28,22 +51,22 @@ export function watchForDayBoundary(onBoundary) {
     const msUntil = nextMidnight.getTime() - now.getTime();
 
     timerId = setTimeout(() => {
-      onBoundary();
+      checkAndFireIfNewDay();
       scheduleNextMidnight();
     }, msUntil);
   }
 
   function handleVisibilityChange() {
-    if (!document.hidden) onBoundary();
+    if (!document.hidden) checkAndFireIfNewDay();
   }
 
   scheduleNextMidnight();
   document.addEventListener("visibilitychange", handleVisibilityChange);
-  window.addEventListener("focus", onBoundary);
+  window.addEventListener("focus", checkAndFireIfNewDay);
 
   return function stopWatching() {
     if (timerId) clearTimeout(timerId);
     document.removeEventListener("visibilitychange", handleVisibilityChange);
-    window.removeEventListener("focus", onBoundary);
+    window.removeEventListener("focus", checkAndFireIfNewDay);
   };
 }

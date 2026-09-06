@@ -272,19 +272,24 @@ export async function renderHome(
     const isPaused = Boolean(routine.gameTimerPausedAt);
 
     return `
-      <div class="game-timer game-timer--unlocked ${isPaused ? "game-timer--paused" : ""}">
-        <span class="game-timer__icon">${isPaused ? "⏸️" : "🎮"}</span>
-        <span id="game-timer-remaining">calculando...</span>
-        <div class="game-timer__controls">
-          ${isAdult ? `
-            <button type="button" class="game-timer__btn" id="game-timer-minus-5" title="Remover 5 minutos">−5</button>
-          ` : ""}
-          <button type="button" class="game-timer__btn game-timer__btn--toggle" id="game-timer-toggle" title="${isPaused ? "Despausar" : "Pausar"}">
-            ${isPaused ? "▶️ Despausar" : "⏸️ Pausar"}
-          </button>
-          ${isAdult ? `
-            <button type="button" class="game-timer__btn" id="game-timer-plus-5" title="Adicionar 5 minutos">+5</button>
-          ` : ""}
+      <div class="game-timer game-timer--unlocked ${isPaused ? "game-timer--paused" : ""}" id="game-timer-container">
+        <div class="game-timer__row">
+          <span class="game-timer__icon">${isPaused ? "⏸️" : "🎮"}</span>
+          <span id="game-timer-remaining">calculando...</span>
+          <div class="game-timer__controls">
+            ${isAdult ? `
+              <button type="button" class="game-timer__btn" id="game-timer-minus-5" title="Remover 5 minutos">−5</button>
+            ` : ""}
+            <button type="button" class="game-timer__btn game-timer__btn--toggle" id="game-timer-toggle" title="${isPaused ? "Despausar" : "Pausar"}">
+              ${isPaused ? "▶️ Despausar" : "⏸️ Pausar"}
+            </button>
+            ${isAdult ? `
+              <button type="button" class="game-timer__btn" id="game-timer-plus-5" title="Adicionar 5 minutos">+5</button>
+            ` : ""}
+          </div>
+        </div>
+        <div class="game-timer__bar" aria-hidden="true">
+          <div class="game-timer__bar-fill" id="game-timer-bar-fill"></div>
         </div>
       </div>
     `;
@@ -322,8 +327,28 @@ export async function renderHome(
       }
 
       const remainingMs = durationMs - computeGameTimerElapsedMs();
+      const barFill = content.querySelector("#game-timer-bar-fill");
+      const container = content.querySelector("#game-timer-container");
+      const pct = durationMs > 0 ? Math.max(0, Math.min(100, (remainingMs / durationMs) * 100)) : 0;
+
+      if (barFill) barFill.style.width = `${pct}%`;
+
+      // So aplica os niveis de urgencia (aviso/critico) quando NAO pausado --
+      // pausado ja tem sua propria cor (cinza) e nao deve competir com elas.
+      // Limiares em % do tempo total, nao em minutos fixos, pra fazer sentido
+      // tanto pra quem tem 30min quanto pra quem tem 3h de jogo por dia.
+      if (container && !isPaused) {
+        container.classList.remove("game-timer--warning", "game-timer--critical");
+        if (pct <= 15) {
+          container.classList.add("game-timer--critical");
+        } else if (pct <= 33) {
+          container.classList.add("game-timer--warning");
+        }
+      }
+
       if (remainingMs <= 0) {
         el.textContent = "Tempo de jogo de hoje já acabou. Até amanhã!";
+        if (barFill) barFill.style.width = "0%";
         clearInterval(gameTimerIntervalId);
         gameTimerIntervalId = null;
         return;

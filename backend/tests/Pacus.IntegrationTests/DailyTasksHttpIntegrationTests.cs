@@ -779,7 +779,6 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                     childPin,
                     responsibleConsent = true
                 });
-                });
 
         Assert.Contains(
             response.StatusCode,

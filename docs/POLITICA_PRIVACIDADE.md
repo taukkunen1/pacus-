@@ -10,7 +10,7 @@ O PACUS é um aplicativo de rotina para famílias, com histórico diário de tar
 
 O controlador dos dados pessoais tratados pelo PACUS é:
 
-- **Responsável:** Pedro 🔲 *(complete com seu nome completo antes de publicar)*
+- **Responsável:** Pedro
 - **Contato para assuntos de privacidade e exercício de direitos LGPD:** pedro.hdslima98@gmail.com
 
 Esta política se aplica a todos os usuários do PACUS — adultos responsáveis e crianças cujas contas são criadas por eles — e descreve quais dados coletamos, por quê, por quanto tempo guardamos, com quem compartilhamos (ninguém, hoje) e quais direitos você tem sobre eles.

@@ -422,7 +422,6 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
                 childPin,
                 responsibleConsent = true
             });
-            });
 
         Assert.Contains(
             response.StatusCode,

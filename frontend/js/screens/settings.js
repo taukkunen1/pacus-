@@ -122,6 +122,16 @@ export async function renderSettings(root, navigate) {
             ${growthStages.length ? `<button class="btn btn-ghost" id="clear-growth-stages">Limpar</button>` : ""}
           </div>
         </div>
+        <div class="task-card">
+          <div class="task-card__content">
+            <strong class="task-title">Privacidade e termos</strong>
+            <span class="task-description">Como tratamos os dados da família e as regras de uso do PACUS.</span>
+          </div>
+          <div class="task-actions">
+            <a class="btn btn-ghost" href="./privacidade.html" target="_blank" rel="noopener">Privacidade</a>
+            <a class="btn btn-ghost" href="./termos.html" target="_blank" rel="noopener">Termos de Uso</a>
+          </div>
+        </div>
       </section>
 
       ${renderBottomNav("settings")}

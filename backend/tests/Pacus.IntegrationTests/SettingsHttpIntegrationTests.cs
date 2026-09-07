@@ -158,7 +158,6 @@ public class SettingsHttpIntegrationTests : IClassFixture<MongoIntegrationFixtur
                 childPin,
                 responsibleConsent = true
             });
-            });
 
         Assert.Contains(
             response.StatusCode,

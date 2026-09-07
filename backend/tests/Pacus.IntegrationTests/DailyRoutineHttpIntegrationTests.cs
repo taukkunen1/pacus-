@@ -416,8 +416,6 @@ public class DailyRoutineHttpIntegrationTests : IClassFixture<MongoIntegrationFi
 
             });
 
-            });
-
 
 
         Assert.Contains(

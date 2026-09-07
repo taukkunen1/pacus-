@@ -191,7 +191,6 @@ public class FamilyCodeHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                 childPin,
                 responsibleConsent = true
             });
-            });
 
         Assert.Contains(
             response.StatusCode,

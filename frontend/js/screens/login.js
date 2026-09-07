@@ -41,6 +41,12 @@ export function renderLogin(root, onSuccess) {
         </div>
 
         <div id="login-form-slot"></div>
+
+        <p class="login-legal-links">
+          <a href="./privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>
+          ·
+          <a href="./termos.html" target="_blank" rel="noopener">Termos de Uso</a>
+        </p>
       </div>
     </div>
   `;

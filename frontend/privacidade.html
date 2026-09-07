@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Política de Privacidade — Pacus</title>
+<link rel="stylesheet" href="css/reset.css" />
+<link rel="stylesheet" href="css/variables.css" />
+<link rel="stylesheet" href="css/global.css" />
+<link rel="stylesheet" href="css/layout.css" />
+<style>
+  .legal-doc { max-width: 720px; margin: 0 auto; padding: 24px 20px 72px; line-height: 1.65; }
+  .legal-doc h1 { margin-top: 0; font-size: 1.6rem; }
+  .legal-doc h2 { margin-top: 2em; font-size: 1.15rem; }
+  .legal-doc p { margin: 0.9em 0; }
+  .legal-doc ul { margin: 0.9em 0; padding-left: 1.4em; }
+  .legal-doc li { margin: 0.4em 0; }
+  .legal-doc blockquote { margin: 1.2em 0; padding: 0.7em 1em; border-left: 3px solid currentColor; opacity: 0.75; font-size: 0.92em; }
+  .legal-doc a { color: inherit; text-decoration: underline; }
+  .legal-back { display: inline-block; margin-bottom: 20px; text-decoration: none; opacity: 0.8; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <div class="container legal-doc">
+    <a class="legal-back" href="./index.html">&larr; Voltar ao Pacus</a>
+<h1>Política de Privacidade do PACUS</h1>
+<p><strong>Última atualização: 29 de agosto de 2026</strong></p>
+<blockquote>
+<p>⚠️ <strong>Rascunho — item B4 do checklist de segurança e LGPD.</strong> Este documento foi redigido com base no código-fonte real do PACUS (ver `docs/DATA_MAP.md`) e cobre o que a aplicação efetivamente faz hoje. Ele <strong>não foi revisado por um advogado</strong>. Antes de publicar, revise especialmente as seções marcadas com 🔲 (dados que faltam preencher) e considere validar o texto com um profissional, principalmente as partes sobre dados de crianças (art. 14 da LGPD).</p>
+</blockquote>
+<h2>1. Quem somos</h2>
+<p>O PACUS é um aplicativo de rotina para famílias, com histórico diário de tarefas, sistema de pontos ("Pacus Points") e um bichinho virtual ("PACUS") que cresce com o uso do app.</p>
+<p>O controlador dos dados pessoais tratados pelo PACUS é:</p>
+<ul>
+<li><strong>Responsável:</strong> Pedro 🔲 *(complete com seu nome completo antes de publicar)*</li>
+<li><strong>Contato para assuntos de privacidade e exercício de direitos LGPD:</strong> pedro.hdslima98@gmail.com</li>
+</ul>
+<p>Esta política se aplica a todos os usuários do PACUS — adultos responsáveis e crianças cujas contas são criadas por eles — e descreve quais dados coletamos, por quê, por quanto tempo guardamos, com quem compartilhamos (ninguém, hoje) e quais direitos você tem sobre eles.</p>
+<h2>2. Como uma conta é criada</h2>
+<p>O PACUS funciona em núcleos familiares. Um adulto cria a conta da família (via cadastro inicial) e, dentro dela, cria o perfil de uma ou mais crianças. <strong>A criança não se cadastra sozinha</strong> — o perfil dela é criado e controlado pelo adulto responsável, que autentica com e-mail e senha; a criança acessa com um PIN numérico de 4 dígitos definido pelo adulto.</p>
+<h2>3. Quais dados coletamos e por quê</h2>
+<p>O PACUS coleta apenas o necessário para o app funcionar — não usamos os dados para publicidade, não vendemos dados a terceiros e não fazemos perfilamento comportamental para fins comerciais. O detalhamento completo, coleção por coleção do banco de dados, está em `docs/DATA_MAP.md` (documento técnico, item B1 da nossa auditoria interna); o resumo abaixo é a versão em linguagem simples.</p>
+<h3>3.1 Dados de cadastro e identificação</h3>
+<ul>
+<li><strong>Do adulto:</strong> nome, e-mail, senha (armazenada com hash — nunca em texto puro), fuso horário.</li>
+<li><strong>Da criança:</strong> nome, PIN de acesso (também armazenado com hash), fuso horário. A criança não informa e-mail.</li>
+</ul>
+<p>*Finalidade:* autenticar o acesso e identificar quem fez cada ação no app.</p>
+<p>*Base legal:* execução do contrato de uso do serviço (LGPD, art. 7º, V); para o perfil da criança, o consentimento do responsável é dado no próprio ato de criar o perfil (art. 14, §1º).</p>
+<h3>3.2 Dados de uso do app</h3>
+<ul>
+<li>Tarefas configuradas pela família (título, tipo, pontos, período do dia) e o histórico diário de quais foram concluídas.</li>
+<li>Saldo e histórico de Pacus Points (cada tarefa concluída gera uma transação de pontos).</li>
+<li>Estado de crescimento do PACUS (o bichinho virtual) e o "habitat" (customizações visuais) da família.</li>
+<li>Itens da lojinha de recompensas cadastrados pelo adulto e os resgates feitos pela criança.</li>
+<li>Configurações da conta (preferências salvas pela família).</li>
+</ul>
+<p>*Finalidade:* fazer o app funcionar — é o próprio propósito do PACUS (acompanhar rotina, calcular pontos, mostrar o crescimento do bichinho).</p>
+<p>*Base legal:* execução do contrato (art. 7º, V).</p>
+<h3>3.3 Logs de auditoria e segurança</h3>
+<p>Registramos internamente algumas ações administrativas sensíveis — exclusão permanente de uma tarefa, aprovação/rejeição de um resgate na loja, ajuste manual de saldo de pontos — guardando quem fez, quando e o que mudou, separado do dado em si. Também aplicamos limite de tentativas (rate limiting) nos formulários de login e cadastro, para dificultar tentativas de adivinhação de senha/PIN.</p>
+<p>*Finalidade:* responsabilização (saber quem fez o quê) e prevenção a fraude/abuso.</p>
+<p>*Base legal:* legítimo interesse (art. 7º, IX), equilibrado com a minimização de dados — ver seção 6 sobre como tratamos esses registros quando você exclui sua conta.</p>
+<h3>3.4 O que <strong>não</strong> coletamos</h3>
+<p>Não coletamos dados sensíveis na forma do art. 5º, II da LGPD (origem racial ou étnica, convicção religiosa, opinião política, dado de saúde, biometria, orientação sexual, etc.). Não usamos cookies de rastreamento publicitário nem compartilhamos dados com redes de anúncio.</p>
+<h2>4. Com quem compartilhamos seus dados</h2>
+<p>Hoje, <strong>não compartilhamos dados com nenhum terceiro</strong> para fins comerciais ou de marketing. Os dados ficam armazenados em nossa infraestrutura de hospedagem (banco de dados MongoDB Atlas e servidor de aplicação), que atua estritamente como operador técnico — ou seja, processa os dados por nossa conta, sob nossas instruções, e não os usa para fins próprios.</p>
+<p>🔲 *Se no futuro passarmos a usar outros serviços de terceiros (ex. envio de e-mail, análise de erros/crash reporting), esta seção deve ser atualizada para listá-los.*</p>
+<h2>5. Por quanto tempo guardamos seus dados</h2>
+<p>Os dados de uso (tarefas, histórico, pontos, resgates, crescimento do PACUS) são mantidos enquanto sua conta estiver ativa, para preservar o histórico da família. Os logs de auditoria seguem uma regra própria — veja a seção 6.</p>
+<h2>6. Exclusão de conta</h2>
+<p>Você pode excluir permanentemente a conta da sua família a qualquer momento, direto no app (área de configurações do adulto), mediante confirmação da sua senha. Ao confirmar a exclusão:</p>
+<ul>
+<li><strong>Todos os dados de uso da família são apagados de forma definitiva e irreversível</strong> — perfis, tarefas, histórico diário, pontos, estado do PACUS, habitat, configurações, itens de loja e resgates.</li>
+<li><strong>Os logs de auditoria são uma exceção:</strong> em vez de apagados imediatamente, eles são *anonimizados* — perdem o vínculo com quem praticou a ação, mas o registro da ação em si (o quê, quando) é preservado por até 12 meses, e então apagado automaticamente. Isso existe para que possamos investigar fraude ou abuso ocorrido pouco antes de uma exclusão de conta, sem manter dado pessoal além do necessário.</li>
+</ul>
+<p>Não há como desfazer uma exclusão de conta.</p>
+<h2>7. Seus direitos como titular dos dados (LGPD, art. 18)</h2>
+<p>Você tem direito a:</p>
+<ul>
+<li><strong>Confirmação e acesso</strong> — saber se tratamos seus dados e quais são.</li>
+<li><strong>Portabilidade</strong> — baixar uma cópia de todos os dados da sua família em formato legível (JSON), direto no app (área de configurações do adulto) ou pedindo pelo e-mail de contato.</li>
+<li><strong>Correção</strong> — pedir a correção de dados incompletos, inexatos ou desatualizados.</li>
+<li><strong>Eliminação</strong> — excluir sua conta e os dados associados a qualquer momento (ver seção 6).</li>
+<li><strong>Informação sobre compartilhamento</strong> — saber com quem compartilhamos seus dados (ver seção 4 — hoje, ninguém).</li>
+<li><strong>Revogação do consentimento</strong> — quando o tratamento depender de consentimento, você pode revogá-lo a qualquer momento.</li>
+</ul>
+<p>Para exercer qualquer um desses direitos, entre em contato pelo e-mail informado na seção 1.</p>
+<h2>8. Dados de crianças</h2>
+<p>O perfil da criança no PACUS é criado e administrado pelo adulto responsável — a criança não se cadastra de forma autônoma, não informa e-mail, e não tem acesso às configurações da família. O ato do adulto criar o perfil da criança e configurar seu acesso constitui a base legal para o tratamento dos dados dela (LGPD, art. 14, §1º).</p>
+<p>No cadastro, o adulto confirma esse consentimento de forma explícita e destacada, por meio de um checkbox específico (distinto do aceite geral dos Termos de Uso), antes que o perfil da criança seja criado.</p>
+<h2>9. Segurança</h2>
+<p>Aplicamos medidas técnicas para proteger seus dados, entre elas:</p>
+<ul>
+<li>Senhas e PINs armazenados com hash (nunca em texto puro).</li>
+<li>Isolamento dos dados por família — cada família só acessa os próprios dados.</li>
+<li>Autenticação obrigatória (token) em todos os endpoints que expõem dados pessoais.</li>
+<li>Limite de tentativas de login/PIN, para dificultar ataques de força bruta.</li>
+<li>Log de auditoria para ações administrativas sensíveis.</li>
+<li>Comunicação com o servidor via HTTPS.</li>
+</ul>
+<p>Nenhum sistema é 100% imune a incidentes. Caso ocorra um incidente de segurança que afete seus dados, seguiremos nosso plano de resposta a incidentes 🔲 *(referência ao item D3 do checklist interno, ainda a ser implementado)* e cumpriremos as obrigações de notificação previstas na LGPD.</p>
+<h2>10. Alterações nesta política</h2>
+<p>Podemos atualizar esta política periodicamente. Quando isso acontecer, atualizaremos a data no topo do documento 🔲 *(decisão de produto pendente: se e como notificar usuários existentes de mudanças relevantes — hoje não há mecanismo de notificação no app)*.</p>
+<h2>11. Contato</h2>
+<p>Dúvidas sobre esta política ou sobre como tratamos seus dados: pedro.hdslima98@gmail.com</p>
+  </div>
+</div>
+</body>
+</html>

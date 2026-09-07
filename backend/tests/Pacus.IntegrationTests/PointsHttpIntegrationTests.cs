@@ -450,7 +450,6 @@ public sealed class PointsHttpIntegrationTests
                     childPin,
                     responsibleConsent = true
                 });
-                });
 
         Assert.Contains(
             response.StatusCode,

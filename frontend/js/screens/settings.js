@@ -132,6 +132,16 @@ export async function renderSettings(root, navigate) {
             <a class="btn btn-ghost" href="./termos.html" target="_blank" rel="noopener">Termos de Uso</a>
           </div>
         </div>
+
+        <div class="task-card">
+          <div class="task-card__content">
+            <strong class="task-title">Sair da conta</strong>
+            <span class="task-description">Encerra sua sessão neste aparelho. Será preciso fazer login de novo.</span>
+          </div>
+          <div class="task-actions">
+            <button class="btn btn-ghost" id="logout">Sair</button>
+          </div>
+        </div>
       </section>
 
       ${renderBottomNav("settings")}
@@ -144,6 +154,15 @@ export async function renderSettings(root, navigate) {
     content.querySelector("#generate-recovery-code")?.addEventListener("click", handleGenerateRecoveryCode);
     content.querySelector("#add-growth-stage")?.addEventListener("click", addGrowthStage);
     content.querySelector("#clear-growth-stages")?.addEventListener("click", clearGrowthStages);
+    content.querySelector("#logout")?.addEventListener("click", handleLogout);
+  }
+
+  // Reaproveita o mesmo fluxo que o app ja usa quando a sessao expira
+  // (token invalido -> evento "pacus:unauthorized" -> app.js limpa o token e
+  // manda pra tela de login), em vez de duplicar essa logica aqui.
+  function handleLogout() {
+    if (!window.confirm("Sair da conta neste aparelho?")) return;
+    window.dispatchEvent(new CustomEvent("pacus:unauthorized"));
   }
 
   async function changeTimezone() {

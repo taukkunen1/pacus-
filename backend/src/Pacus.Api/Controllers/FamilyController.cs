@@ -5,7 +5,9 @@ using Microsoft.AspNetCore.RateLimiting;
 using MongoDB.Bson;
 using Pacus.Api.Auth;
 using Pacus.Application.DTOs;
+using Pacus.Application.Exceptions;
 using Pacus.Application.Interfaces;
+using Pacus.Application.Services;
 using Pacus.Domain.Entities;
 using Pacus.Domain.Enums;
 
@@ -18,6 +20,11 @@ namespace Pacus.Api.Controllers;
 [Route("api/v1/family")]
 public class FamilyController : ControllerBase
 {
+    // Mesmo limite de tentativas do bootstrap (ver BootstrapService) -- usado
+    // aqui pra gerar o codigo de contas antigas que ainda nao tinham um
+    // (GetFamilyCode).
+    private const int MaxFamilyCodeAttempts = 10;
+
     private readonly IUserRepository _userRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IFamilyTimezoneService _familyTimezoneService;
@@ -88,7 +95,43 @@ public class FamilyController : ControllerBase
         var user = await _userRepository.GetByIdAsync(_currentUser.UserId);
         if (user is null) return NotFound();
 
+        // Familias criadas antes deste recurso existir (ver
+        // BootstrapService.CreateInitialFamilyAsync) ficaram com FamilyCode
+        // vazio -- a tela de Configuracoes mostrava "nao disponivel" pra sempre
+        // e a crianca dessas familias nao tinha como logar num aparelho novo.
+        // Gera e salva o codigo agora, na primeira vez que o adulto consulta,
+        // e replica pra todo mundo da familia: a busca por codigo
+        // (GetByFamilyCodeAsync) filtra pelo campo FamilyCode de cada usuario,
+        // nao pelo FamilyId, entao a crianca precisa do mesmo valor gravado.
+        if (string.IsNullOrEmpty(user.FamilyCode))
+        {
+            var newCode = await GenerateUniqueFamilyCodeAsync();
+            var members = await _userRepository.GetByFamilyAsync(_currentUser.FamilyId);
+            foreach (var member in members)
+            {
+                member.FamilyCode = newCode;
+                member.UpdatedAt = DateTime.UtcNow;
+                await _userRepository.UpdateAsync(member);
+            }
+
+            user.FamilyCode = newCode;
+        }
+
         return Ok(new FamilyCodeDto(user.FamilyCode));
+    }
+
+    private async Task<string> GenerateUniqueFamilyCodeAsync()
+    {
+        for (var attempt = 0; attempt < MaxFamilyCodeAttempts; attempt++)
+        {
+            var candidate = AuthService.GenerateFamilyCode();
+            var existing = await _userRepository.GetByFamilyCodeAsync(candidate);
+            if (existing.Count == 0) return candidate;
+        }
+
+        // Mesmo raciocinio do bootstrap: espaco de codigos grande (33^6), entao
+        // preferimos falhar alto (409) a devolver um codigo que colide.
+        throw new ConflictException("Nao foi possivel gerar um codigo de familia unico. Tente novamente.");
     }
 
     // Aceita o codigo com ou sem o traco, em qualquer capitalizacao (o

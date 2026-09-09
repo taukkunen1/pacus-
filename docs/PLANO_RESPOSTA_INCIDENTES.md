@@ -12,7 +12,7 @@ Qualquer evento que exponha, altere ou destrua dados pessoais sem autorização,
 - Comprometimento do `JWT_SECRET` — permitiria forjar tokens de qualquer usuário.
 - Vazamento da connection string do MongoDB ou de outro segredo (ex. via commit acidental no Git — ver item A7).
 - Uma falha de isolamento por família (risco 3 do `docs/RIPD.md`) sendo explorada na prática, não só um risco teórico.
-- Acesso indevido à infraestrutura de hospedagem (Render, Atlas) por credenciais comprometidas.
+- Acesso indevido à infraestrutura de hospedagem (Fly.io, Atlas) por credenciais comprometidas.
 - Um bug que exponha dados de uma família para outra, mesmo sem intenção maliciosa de ninguém (ex. um endpoint novo que esqueceu de escopar por `FamilyId`).
 
 ## 2. Detecção
@@ -21,7 +21,7 @@ Como um incidente pode ser percebido, hoje:
 
 - **Log de auditoria** (item A5) — permite reconstruir ações administrativas sensíveis depois do fato, mas não é um sistema de alerta em tempo real.
 - **Relato de usuário** — a família percebe algo estranho na própria conta (dado que não reconhece, saldo alterado sem explicação) e avisa pelo canal de contato.
-- **Você mesmo, ao revisar logs de erro da hospedagem** (Render) ou métricas do MongoDB Atlas.
+- **Você mesmo, ao revisar logs de erro da hospedagem** (Fly.io) ou métricas do MongoDB Atlas.
 
 🔲 *Lacuna conhecida: não há monitoramento automatizado (alertas de acesso anômalo, IDS, etc.) — para o volume atual de usuários, isso é proporcional, mas deve ser revisitado se a base de usuários crescer.*
 
@@ -30,7 +30,7 @@ Como um incidente pode ser percebido, hoje:
 Ao suspeitar de um incidente:
 
 1. **Não mexa em nada que possa apagar evidência.** Antes de corrigir o problema, registre o que foi observado (prints, logs, timestamps).
-2. **Confirme o escopo:** que dado foi afetado, quantas famílias, desde quando. Use o log de auditoria (`audit_logs`) e os logs da hospedagem (Render/Atlas) para reconstruir a linha do tempo.
+2. **Confirme o escopo:** que dado foi afetado, quantas famílias, desde quando. Use o log de auditoria (`audit_logs`) e os logs da hospedagem (Fly.io/Atlas) para reconstruir a linha do tempo.
 3. **Identifique a causa raiz:** bug de código, credencial vazada, configuração de infraestrutura incorreta, ou ação de terceiro malicioso.
 4. **Classifique a severidade** com base no `docs/RIPD.md`: quantos titulares afetados, que categoria de dado (nunca há dado sensível no PACUS hoje, mas dado de criança pesa mais), reversível ou não.
 
@@ -40,7 +40,7 @@ Ações imediatas para estancar o incidente, adaptadas conforme a causa:
 
 - **Credencial comprometida** (`JWT_SECRET`, senha do MongoDB, PAT do GitHub): rotacionar imediatamente. Isso invalida todos os tokens JWT ativos — todos os usuários precisarão logar de novo, o que é aceitável frente ao risco.
 - **Bug de isolamento explorável**: colocar a API em modo de manutenção (ou desabilitar o endpoint específico via deploy de emergência) até a correção estar pronta, se o risco de exploração ativa for real.
-- **Acesso indevido à infraestrutura**: revogar a credencial usada, revisar quem mais tem acesso (Render, Atlas, GitHub), forçar troca de senha/token nesses serviços.
+- **Acesso indevido à infraestrutura**: revogar a credencial usada, revisar quem mais tem acesso (Fly.io, Atlas, GitHub), forçar troca de senha/token nesses serviços.
 - **Vazamento de segredo no histórico do Git** (item A7): rotacionar o segredo vazado imediatamente — reescrever o histórico do Git não é suficiente sozinho, porque uma cópia pode já ter sido clonada.
 
 ## 5. Correção
@@ -57,7 +57,7 @@ Depois de conter e corrigir, avaliar:
 - **Que dado foi exposto** — cruzar com o `docs/DATA_MAP.md` para saber exatamente que campos das collections afetadas.
 - **Risco ou dano relevante aos titulares** — a LGPD (art. 48) exige comunicação à ANPD e aos titulares afetados quando o incidente acarretar risco ou dano relevante. Para o PACUS, um vazamento de nome/tarefas de uma família é diferente (mais grave) de, por exemplo, um bug interno que nunca chegou a ser explorado por ninguém.
 
-🔲 *Decisão que precisa de vocês: definir o canal e o texto padrão de comunicação a titulares afetados, caso um incidente exija. O item D4 (canal de contato de privacidade, `[DEPOIS]`) é um pré-requisito prático disso — hoje o único canal é o e-mail pessoal do responsável.*
+O canal de contato de privacidade (item D4) está concluído — `pedro.hdslima98@gmail.com`, publicado na Política de Privacidade e visível no site. 🔲 *Ainda falta definir um texto padrão de comunicação a titulares afetados, caso um incidente exija — esse texto em si é uma decisão que precisa de vocês.*
 
 Se a avaliação concluir que há risco ou dano relevante:
 
@@ -88,6 +88,6 @@ Depois de qualquer incidente real (não simulações):
 
 Hoje, um único responsável técnico cobre todas as etapas acima:
 
-- **Responsável técnico e de privacidade:** Pedro 🔲 *(nome completo a preencher)* — pedro.hdslima98@gmail.com
+- **Responsável técnico e de privacidade:** Pedro — pedro.hdslima98@gmail.com
 
 Não há uma equipe de segurança dedicada nem um DPO (Encarregado de Dados) formalmente designado. 🔲 *Se o volume de usuários crescer, nomear um Encarregado (LGPD, art. 41) e formalizar esse papel é o próximo passo natural de governança.*

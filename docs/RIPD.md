@@ -103,8 +103,8 @@ Cada área de risco tem:
   - Log de auditoria para ações administrativas sensíveis (item A5) — ajuda a reconstruir "o que aconteceu" depois de um incidente envolvendo essas ações.
   - Rate limiting (item A1) — reduz a superfície de ataques automatizados de força bruta.
   - Hashing forte de credenciais — reduz o dano de um vazamento do banco.
-- **Risco residual:** não existe hoje um plano formal de resposta a incidentes (detecção, investigação, contenção, comunicação aos titulares e à ANPD quando aplicável). Itens de infraestrutura como TLS/CORS/allowlist de rede (item A6) e verificação de segredo vazado no histórico do Git (item A7) ainda são `[DEPOIS]`.
-- **Recomendação:** **é o próprio item D3** deste checklist — plano de resposta a incidentes, tratado a seguir como o próximo item. Depois disso, os itens `[DEPOIS]` de infraestrutura (A6, A7, A8) fecham a lacuna restante, mas dependem de acesso que só vocês têm (Render, Atlas, configurações do GitHub).
+- **Risco residual:** os itens de infraestrutura A6 (TLS/CORS/`ASPNETCORE_ENVIRONMENT=Production`/usuário do Mongo com privilégio mínimo), A7 (histórico do Git) e A8 (rotação de tokens do GitHub) foram concluídos em 2026-09-08 — ver `docs/SECURITY_LGPD_CHECKLIST.md`. A API migrou do Render para o Fly.io em 2026-09-09 (ver `docs/ESTADO_ATUAL.md`); a mesma configuração (usuário do Mongo com privilégio mínimo, CORS restrito, HTTPS) foi revalidada na nova hospedagem. Resta como decisão de produto aceita conscientemente: o Network Access do MongoDB Atlas permanece com `0.0.0.0/0` liberado (nem Render nem Fly.io oferecem IP de saída fixo grátis no plano gratuito), risco documentado e aceito pelo responsável técnico.
+- **Recomendação:** o plano formal de resposta a incidentes (item D3, `docs/PLANO_RESPOSTA_INCIDENTES.md`) e os itens de infraestrutura (A6, A7, A8) já foram concluídos. O risco residual que resta é o Network Access aberto do Atlas — revisitar se o produto crescer a ponto de justificar o custo de um IP dedicado.
 
 ## 7. Dados de comportamento/rotina
 

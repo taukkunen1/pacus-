@@ -1,6 +1,7 @@
 # fly.toml app configuration file generated for pacus-pacus-api on 2026-09-09T15:48:55Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+# Region set to iad (Ashburn) - cheapest region on Fly.io; sao paulo (gru) has ~60% price markup.
 #
 
 

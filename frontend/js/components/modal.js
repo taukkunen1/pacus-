@@ -219,6 +219,28 @@ const PERIOD_OPTIONS = [
   { value: "evening", label: "Noite" }
 ];
 
+// Opcoes de repeticao mostradas no editor rapido de tarefa (promptTaskForm) --
+// so as 3 mais pedidas (todos os dias / dia sim dia nao / dias especificos),
+// pra nao competir em complexidade com o editor completo de tarefa permanente
+// (promptPermanentTaskForm, com RECURRENCE_OPTIONS abaixo incluindo tambem
+// atalhos pra dias uteis/fim de semana e a rotina de atividade por dia util).
+// Os values batem com TaskTemplate.Recurrence* no backend.
+const QUICK_RECURRENCE_OPTIONS = [
+  { value: "daily", label: "Todos os dias" },
+  { value: "interval", label: "Dia sim, dia não" },
+  { value: "custom", label: "Dias específicos" }
+];
+
+// "Hoje" no fuso horario da familia -- unico timezone que o app usa hoje (ver
+// docs/DATA_MAP.md, achado sobre o campo `timezone` sempre gravado como
+// "America/Sao_Paulo"). en-CA formata datas como yyyy-MM-dd nativamente, sem
+// precisar remontar a string na mao. Usado como AnchorDate da recorrencia
+// "interval" (RecurrenceInterval no backend) quando a pessoa nao esta editando
+// uma tarefa que ja tinha uma data-ancora propria.
+function todayDateKey() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+}
+
 // Painel unico de criar/editar tarefa -- substitui a sequencia antiga de
 // varios window.prompt/confirm em fila (nome > descricao > pontos > tipo >
 // opcoes > motivo), que obrigava a pessoa a ir clicando OK varias vezes sem
@@ -341,6 +363,35 @@ export function promptTaskForm({
             <input type="checkbox" id="task-form-permanent" />
             <span>Repetir nos próximos dias (tarefa permanente)</span>
           </label>
+
+          <div id="task-form-recurrence-block" class="hidden" style="margin-top: var(--space-2);">
+            <div class="task-form-type-group" role="radiogroup" aria-label="Repetição da tarefa">
+              ${QUICK_RECURRENCE_OPTIONS.map(
+                (opt) => `
+                <label class="task-form-type-option">
+                  <input
+                    type="radio"
+                    name="task-form-recurrence"
+                    value="${opt.value}"
+                    ${opt.value === "daily" ? "checked" : ""}
+                  />
+                  <span>${escapeHtml(opt.label)}</span>
+                </label>
+              `
+              ).join("")}
+            </div>
+
+            <div id="task-form-custom-days" class="task-form-type-group hidden" style="margin-top: var(--space-2);">
+              ${CUSTOM_DAY_OPTIONS.map(
+                (opt) => `
+                <label class="task-form-type-option">
+                  <input type="checkbox" name="task-form-custom-day" value="${opt.value}" />
+                  <span>${escapeHtml(opt.label)}</span>
+                </label>
+              `
+              ).join("")}
+            </div>
+          </div>
         </div>`
             : ""
         }
@@ -436,6 +487,31 @@ export function promptTaskForm({
     });
     addOptionBtn.classList.toggle("hidden", !hasOptionsCheckbox.checked);
 
+    // So existe quando showPermanentToggle (ver template acima) -- painel de
+    // repeticao (todos os dias / dia sim dia nao / dias especificos) revelado
+    // so quando a pessoa marca "tarefa permanente", no mesmo padrao de
+    // colapsar-por-padrao do template-form-show-recurrence em
+    // promptPermanentTaskForm.
+    const permanentCheckbox = overlay.querySelector("#task-form-permanent");
+    const recurrenceBlock = overlay.querySelector("#task-form-recurrence-block");
+    const customDaysBlock = overlay.querySelector("#task-form-custom-days");
+
+    if (permanentCheckbox) {
+      permanentCheckbox.addEventListener("change", () => {
+        recurrenceBlock.classList.toggle("hidden", !permanentCheckbox.checked);
+      });
+
+      overlay
+        .querySelectorAll('input[name="task-form-recurrence"]')
+        .forEach((input) =>
+          input.addEventListener("change", () => {
+            const recurrence =
+              overlay.querySelector('input[name="task-form-recurrence"]:checked')?.value ?? "daily";
+            customDaysBlock.classList.toggle("hidden", recurrence !== "custom");
+          })
+        );
+    }
+
     titleInput.focus();
 
     function showError(message) {
@@ -492,6 +568,36 @@ export function promptTaskForm({
         ? Boolean(overlay.querySelector("#task-form-permanent")?.checked)
         : false;
 
+      // Recorrencia so importa quando a tarefa vira permanente -- pro caso
+      // "so hoje" o backend ignora esses campos de qualquer forma (ver
+      // DailyRoutineService.CreateAdHocTaskAsync, que sempre grava "daily"
+      // independente do que vier aqui), entao ficam null sem custo.
+      let recurrence = null;
+      let customDays = null;
+      let anchorDate = null;
+      let intervalDays = null;
+
+      if (permanent) {
+        recurrence =
+          overlay.querySelector('input[name="task-form-recurrence"]:checked')?.value ?? "daily";
+
+        if (recurrence === "custom") {
+          customDays = Array.from(
+            overlay.querySelectorAll('input[name="task-form-custom-day"]:checked')
+          ).map((input) => input.value);
+
+          if (customDays.length === 0) {
+            showError("Escolha pelo menos um dia da semana.");
+            return;
+          }
+        }
+
+        if (recurrence === "interval") {
+          anchorDate = values.anchorDate ?? todayDateKey();
+          intervalDays = values.intervalDays ?? 2;
+        }
+      }
+
       finish({
         title: trimmedTitle,
         description,
@@ -500,7 +606,11 @@ export function promptTaskForm({
         period,
         options,
         reason,
-        permanent
+        permanent,
+        recurrence,
+        customDays,
+        anchorDate,
+        intervalDays
       });
     }
 
@@ -756,6 +866,7 @@ export function promptStoreItemForm({
 
 const RECURRENCE_OPTIONS = [
   { value: "daily", label: "Todos os dias" },
+  { value: "interval", label: "Dia sim, dia não" },
   { value: "weekday", label: "Dias úteis" },
   { value: "weekend", label: "Fim de semana" },
   { value: "custom", label: "Dias específicos" },
@@ -1201,6 +1312,23 @@ export function promptPermanentTaskForm({
         }
       }
 
+      // "Dia sim, dia nao" (RecurrenceInterval no backend): a data-ancora fica
+      // fixa a partir de quando a tarefa foi criada com essa recorrencia --
+      // reeditar sem trocar de recorrencia preserva o padrao ja em curso
+      // (values.anchorDate) em vez de reancorar em hoje a cada salvamento, o
+      // que deslocaria os dias em que a tarefa aparece. So usa hoje quando a
+      // tarefa esta virando "interval" agora (values nao tinha uma ancora
+      // ainda, ex.: veio de outra recorrencia ou e nova).
+      let anchorDate = null;
+      let intervalDays = null;
+      if (recurrence === "interval") {
+        anchorDate =
+          values.recurrence === "interval" && values.anchorDate
+            ? values.anchorDate
+            : todayDateKey();
+        intervalDays = values.intervalDays ?? 2;
+      }
+
       if (hasOptionsCheckbox.checked && optionsEditor.getValues().length < 2) {
         showError("Uma tarefa com opções precisa de pelo menos 2 preenchidas.");
         return;
@@ -1218,6 +1346,8 @@ export function promptPermanentTaskForm({
         recurrence,
         customDays,
         variants,
+        anchorDate,
+        intervalDays,
         options: hasOptionsCheckbox.checked ? optionsEditor.getValues() : [],
         reasons: reasonsEditor.getValues()
       });

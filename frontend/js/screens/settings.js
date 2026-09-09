@@ -6,6 +6,7 @@ import { appState } from "../state/app-state.js";
 import {
   getFamilyChildren,
   updateChildPin,
+  createChild,
   getFamilyTimezone,
   updateFamilyTimezone,
   generateRecoveryCode,
@@ -98,6 +99,16 @@ export async function renderSettings(root, navigate) {
 
         <div class="task-card">
           <div class="task-card__content">
+            <strong class="task-title">Adicionar criança</strong>
+            <span class="task-description">Cadastra uma nova criança nesta família, com nome e PIN de login próprios.</span>
+          </div>
+          <div class="task-actions">
+            <button class="btn btn-ghost" id="add-child">+ Criança</button>
+          </div>
+        </div>
+
+        <div class="task-card">
+          <div class="task-card__content">
             <strong class="task-title">PIN da criança</strong>
             <span class="task-description">Redefine o PIN de login de uma das crianças da família.</span>
           </div>
@@ -150,6 +161,7 @@ export async function renderSettings(root, navigate) {
     attachBottomNav(content, navigate);
 
     content.querySelector("#change-timezone")?.addEventListener("click", changeTimezone);
+    content.querySelector("#add-child")?.addEventListener("click", addChild);
     content.querySelector("#change-child-pin")?.addEventListener("click", changeChildPin);
     content.querySelector("#generate-recovery-code")?.addEventListener("click", handleGenerateRecoveryCode);
     content.querySelector("#add-growth-stage")?.addEventListener("click", addGrowthStage);
@@ -191,6 +203,43 @@ export async function renderSettings(root, navigate) {
     try {
       const result = await generateRecoveryCode();
       window.alert(`Seu novo código de recuperação é:\n\n${result.recoveryCode}\n\nGuarde em lugar seguro — ele só aparece esta vez.`);
+    } catch (err) {
+      showToast(err.message, { error: true });
+    }
+  }
+
+  // Cadastra uma crianca na familia ja existente (ver FamilyController.CreateChild) --
+  // ate esse recurso existir, so dava pra ter uma crianca vinda do cadastro
+  // inicial da familia, entao uma familia que ficasse sem nenhuma (ex.: exclusao
+  // manual de um registro no banco) nao tinha como se recuperar pelo app.
+  async function addChild() {
+    const name = await promptInput({
+      title: "Adicionar criança",
+      label: "Nome da criança",
+      placeholder: "Nome"
+    });
+    if (!name?.trim()) return;
+
+    const pin = await promptInput({
+      title: "Adicionar criança",
+      label: "PIN de login (4 dígitos)",
+      placeholder: "0000",
+      type: "text"
+    });
+    if (!pin?.trim()) return;
+
+    if (!/^[0-9]{4}$/.test(pin.trim())) {
+      showToast("O PIN deve ter exatamente 4 dígitos numéricos.", { error: true });
+      return;
+    }
+
+    try {
+      await createChild(name.trim(), pin.trim());
+      // O codigo da familia pode ter sido gerado agora mesmo (familia que nunca
+      // tinha um, ver CreateChild) -- reconsulta pra mostrar o valor atualizado.
+      familyCode = (await getFamilyCode())?.familyCode ?? familyCode;
+      showToast(`${name.trim()} adicionada à família.`);
+      draw();
     } catch (err) {
       showToast(err.message, { error: true });
     }

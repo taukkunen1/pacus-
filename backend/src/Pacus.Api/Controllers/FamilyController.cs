@@ -85,6 +85,70 @@ public class FamilyController : ControllerBase
         return Ok(result);
     }
 
+    // Adiciona uma crianca a uma familia ja existente -- ate agora a unica forma
+    // de criar uma crianca era no bootstrap (1 adulto + 1 crianca juntos), entao
+    // uma familia que perdesse a crianca (ex.: exclusao manual no banco) ou
+    // quisesse uma segunda crianca ficava sem nenhum jeito de resolver isso pelo
+    // app. Mesmo formato de dados do bootstrap (BootstrapService), so que
+    // reaproveitando familyId/timezone/familyCode ja existentes da familia em vez
+    // de criar tudo do zero.
+    [RequireRole(UserRole.Adult)]
+    [HttpPost("children")]
+    public async Task<IActionResult> CreateChild([FromBody] CreateChildRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return BadRequest(new { error = "Nome da crianca e obrigatorio." });
+
+        if (!Regex.IsMatch(request.Pin ?? string.Empty, "^[0-9]{4}$"))
+            return BadRequest(new { error = "O PIN deve ter exatamente 4 digitos numericos." });
+
+        var adult = await _userRepository.GetByIdAsync(_currentUser.UserId);
+        if (adult is null) return NotFound();
+
+        // Mesmo backfill do GetFamilyCode: garante que a familia ja tem um codigo
+        // antes de criar a crianca, senao ela nasceria sem nenhum jeito de logar
+        // num aparelho novo ate o adulto abrir a tela de Configuracoes depois.
+        if (string.IsNullOrEmpty(adult.FamilyCode))
+        {
+            adult.FamilyCode = await GenerateUniqueFamilyCodeAsync();
+            adult.UpdatedAt = DateTime.UtcNow;
+            await _userRepository.UpdateAsync(adult);
+        }
+
+        var now = DateTime.UtcNow;
+        var child = new User
+        {
+            Id = ObjectId.GenerateNewId(),
+            Role = UserRole.Child,
+            Name = request.Name.Trim(),
+            PinHash = _passwordHasher.Hash(request.Pin!),
+            Timezone = adult.Timezone,
+            FamilyCode = adult.FamilyCode,
+            FamilyId = _currentUser.FamilyId,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+
+        await _userRepository.CreateAsync(child);
+
+        // Log de auditoria (mesmo padrao das outras acoes administrativas sensiveis --
+        // checklist de seguranca, item A5): criar uma crianca da acesso ao app com ela.
+        await _auditLogRepository.CreateAsync(new AuditLog
+        {
+            Id = ObjectId.GenerateNewId(),
+            FamilyId = _currentUser.FamilyId,
+            Action = "child.created",
+            EntityType = "User",
+            EntityId = child.Id.ToString(),
+            Details = $"Crianca '{child.Name}' adicionada a familia.",
+            ActorId = _currentUser.UserId,
+            ActorRole = UserRole.Adult,
+            CreatedAt = now,
+        });
+
+        return Ok(new ChildProfileDto(child.Id.ToString(), child.Name));
+    }
+
     // Pro adulto reconsultar o codigo da propria familia quando quiser (ex.: pra
     // cadastrar a crianca num segundo aparelho depois do primeiro login, quando o
     // codigo mostrado uma vez no cadastro ja nao esta mais a mao).

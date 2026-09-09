@@ -73,7 +73,7 @@ public class FamilyChildrenHttpIntegrationTests : IClassFixture<MongoIntegration
             .GetDatabase(factory.DatabaseName)
             .GetCollection<Pacus.Domain.Entities.User>("users");
         await users.UpdateManyAsync(
-            u => u.FamilyId == MongoDB.Bson.ObjectId.Parse(family.FamilyId),
+            MongoDB.Driver.Builders<Pacus.Domain.Entities.User>.Filter.Eq(u => u.FamilyId, MongoDB.Bson.ObjectId.Parse(family.FamilyId)),
             MongoDB.Driver.Builders<Pacus.Domain.Entities.User>.Update.Set(u => u.FamilyCode, string.Empty));
 
         var response = await client.PostAsJsonAsync(

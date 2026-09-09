@@ -19,6 +19,16 @@ export const updateChildPin = (childId, newPin) =>
     body: JSON.stringify({ newPin }),
   });
 
+// Adiciona uma crianca a familia ja existente (ver FamilyController.CreateChild) --
+// ate esse endpoint existir, a unica forma de ter uma crianca era no cadastro
+// inicial da familia (bootstrap-api.js), entao nao tinha como reparar uma familia
+// que ficasse sem nenhuma crianca cadastrada.
+export const createChild = (name, pin) =>
+  apiClient("/family/children", {
+    method: "POST",
+    body: JSON.stringify({ name, pin }),
+  });
+
 export const getFamilyTimezone = () => apiClient("/family/timezone");
 
 export const updateFamilyTimezone = (timezone) =>

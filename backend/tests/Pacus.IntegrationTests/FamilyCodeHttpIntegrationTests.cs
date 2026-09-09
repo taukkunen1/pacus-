@@ -2,6 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using Pacus.Domain.Entities;
 
 namespace Pacus.IntegrationTests;
 
@@ -123,6 +126,50 @@ public class FamilyCodeHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(family.FamilyCode, body.GetProperty("familyCode").GetString());
+    }
+
+    // Cobre contas criadas antes do sistema de codigo de familia existir (o
+    // campo FamilyCode ficava vazio) -- reproduzido aqui limpando o campo
+    // direto no Mongo apos o bootstrap, ja que hoje nao ha como criar uma
+    // familia assim pela API. Ver FamilyController.GetFamilyCode.
+    [Fact]
+    public async Task GetFamilyCode_ForLegacyAccountWithEmptyCode_GeneratesAndSharesOneWithTheChild()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+
+        var users = new MongoClient(_mongo.ConnectionString)
+            .GetDatabase(factory.DatabaseName)
+            .GetCollection<User>("users");
+
+        var familyId = ObjectId.Parse(family.FamilyId);
+        await users.UpdateManyAsync(
+            u => u.FamilyId == familyId,
+            Builders<User>.Update.Set(u => u.FamilyCode, string.Empty));
+
+        await LoginAdultAsync(client, family);
+
+        var response = await client.GetAsync("/api/v1/family/code");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var newCode = body.GetProperty("familyCode").GetString();
+
+        Assert.NotNull(newCode);
+        Assert.Matches("^[A-Z2-9]{3}-[A-Z2-9]{3}$", newCode);
+
+        // O codigo novo precisa ter sido gravado pra crianca tambem -- senao ela
+        // continuaria sem conseguir logar num aparelho novo com ele.
+        var childrenResponse = await client.GetAsync($"/api/v1/family/by-code/{newCode}/children");
+        Assert.Equal(HttpStatusCode.OK, childrenResponse.StatusCode);
+
+        var childrenBody = await childrenResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var children = childrenBody.EnumerateArray().ToList();
+
+        Assert.Single(children);
+        Assert.Equal(family.ChildUserId, children[0].GetProperty("id").GetString());
     }
 
     [Fact]

@@ -13,11 +13,11 @@ public class UserRepository : IUserRepository
 
     public UserRepository(MongoDbContext context) => _context = context;
 
-    public Task<User?> GetByIdAsync(ObjectId id) =>
-        _context.Users.Find(u => u.Id == id).FirstOrDefaultAsync();
+    public async Task<User?> GetByIdAsync(ObjectId id) =>
+        await _context.Users.Find(u => u.Id == id).FirstOrDefaultAsync();
 
-    public Task<User?> GetByEmailAsync(string email) =>
-        _context.Users.Find(u => u.Email == email).FirstOrDefaultAsync();
+    public async Task<User?> GetByEmailAsync(string email) =>
+        await _context.Users.Find(u => u.Email == email).FirstOrDefaultAsync();
 
     public async Task<User> CreateAsync(User user)
     {
@@ -36,6 +36,20 @@ public class UserRepository : IUserRepository
 
     public Task<List<User>> GetByFamilyAsync(ObjectId familyId) =>
         _context.Users.Find(u => u.FamilyId == familyId).ToListAsync();
+
+    public Task UpdateFamilyCodeForFamilyAsync(ObjectId familyId, string familyCode) =>
+        _context.Users.UpdateManyAsync(
+            u => u.FamilyId == familyId,
+            Builders<User>.Update
+                .Set(u => u.FamilyCode, familyCode)
+                .Set(u => u.UpdatedAt, DateTime.UtcNow));
+
+    public Task UpdateTimezoneForFamilyAsync(ObjectId familyId, string timezone) =>
+        _context.Users.UpdateManyAsync(
+            u => u.FamilyId == familyId,
+            Builders<User>.Update
+                .Set(u => u.Timezone, timezone)
+                .Set(u => u.UpdatedAt, DateTime.UtcNow));
 
     public Task DeleteAllByFamilyAsync(ObjectId familyId) =>
         _context.Users.DeleteManyAsync(u => u.FamilyId == familyId);

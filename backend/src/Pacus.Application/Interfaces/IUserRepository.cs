@@ -21,6 +21,13 @@ public interface IUserRepository
     // Todos os membros da familia (adulto + crianca(s)), para exportacao de dados (LGPD, item B2).
     Task<List<User>> GetByFamilyAsync(ObjectId familyId);
 
+    // Atualiza o FamilyCode/Timezone de todos os membros da familia numa unica
+    // operacao (revisao de melhorias, 2026-09-10) -- antes FamilyController fazia
+    // um GetByFamilyAsync + loop com UpdateAsync por membro (N+1: um round-trip ao
+    // Mongo por pessoa da familia so pra propagar o mesmo valor pra todo mundo).
+    Task UpdateFamilyCodeForFamilyAsync(ObjectId familyId, string familyCode);
+    Task UpdateTimezoneForFamilyAsync(ObjectId familyId, string timezone);
+
     // Remove todos os usuarios da familia -- exclusao de conta (LGPD, item B3).
     Task DeleteAllByFamilyAsync(ObjectId familyId);
 }

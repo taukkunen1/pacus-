@@ -170,13 +170,10 @@ public class FamilyController : ControllerBase
         if (string.IsNullOrEmpty(user.FamilyCode))
         {
             var newCode = await GenerateUniqueFamilyCodeAsync();
-            var members = await _userRepository.GetByFamilyAsync(_currentUser.FamilyId);
-            foreach (var member in members)
-            {
-                member.FamilyCode = newCode;
-                member.UpdatedAt = DateTime.UtcNow;
-                await _userRepository.UpdateAsync(member);
-            }
+            // UpdateManyAsync em vez de buscar todos os membros e atualizar um a um
+            // (revisao de melhorias, 2026-09-10): mesmo resultado, um unico
+            // round-trip ao Mongo em vez de N (um por pessoa da familia).
+            await _userRepository.UpdateFamilyCodeForFamilyAsync(_currentUser.FamilyId, newCode);
 
             user.FamilyCode = newCode;
         }
@@ -273,13 +270,10 @@ public class FamilyController : ControllerBase
             return BadRequest(new { error = "Fuso horario invalido (use um id IANA, ex.: America/Sao_Paulo)." });
         }
 
-        var members = await _userRepository.GetByFamilyAsync(_currentUser.FamilyId);
-        foreach (var member in members)
-        {
-            member.Timezone = request.Timezone;
-            member.UpdatedAt = DateTime.UtcNow;
-            await _userRepository.UpdateAsync(member);
-        }
+        // UpdateManyAsync em vez do loop anterior de buscar + atualizar membro a
+        // membro (revisao de melhorias, 2026-09-10) -- mesmo resultado, um unico
+        // round-trip ao Mongo em vez de N.
+        await _userRepository.UpdateTimezoneForFamilyAsync(_currentUser.FamilyId, request.Timezone);
 
         return Ok(new { timezone = request.Timezone });
     }

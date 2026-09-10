@@ -22,8 +22,8 @@ public class TaskTemplateRepository : ITaskTemplateRepository
             .SortBy(t => t.Order)
             .ToListAsync();
 
-    public Task<TaskTemplate?> GetByIdAsync(ObjectId id) =>
-        _context.TaskTemplates.Find(t => t.Id == id).FirstOrDefaultAsync();
+    public async Task<TaskTemplate?> GetByIdAsync(ObjectId id) =>
+        await _context.TaskTemplates.Find(t => t.Id == id).FirstOrDefaultAsync();
 
     public async Task<TaskTemplate> CreateAsync(TaskTemplate template)
     {

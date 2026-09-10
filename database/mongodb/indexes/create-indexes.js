@@ -5,7 +5,16 @@ db.users.createIndex({ email: 1 }, { unique: true, partialFilterExpression: { em
 db.users.createIndex({ familyId: 1 });
 db.users.createIndex({ familyCode: 1 });
 
-db.pacus.createIndex({ userId: 1 }, { unique: true });
+// Corrigido de "userId" para "familyId" (revisao de melhorias, 2026-09-10): a
+// entidade Pacus.cs nao tem [BsonElement("userId")] como as outras (DailyRoutine,
+// Settings, StoreItem, TaskTemplate, PointTransaction, Redemption, ver comentario
+// "Renomeado de UserId -> FamilyId" nelas) -- o campo grava mesmo como "familyId"
+// no Mongo (convencao camelCase). Um indice unico em "userId" aqui ficaria
+// indexando um campo que nao existe em nenhum documento: o Mongo trata "campo
+// ausente" como null, e um indice unico so aceita um documento com null -- a
+// segunda familia a criar seu Pacus (bootstrap) receberia MongoWriteException
+// (duplicate key), virando 500 nao tratado.
+db.pacus.createIndex({ familyId: 1 }, { unique: true });
 
 db.task_templates.createIndex({ userId: 1, active: 1 });
 
@@ -40,7 +49,9 @@ db.store_items.createIndex({ userId: 1, active: 1 });
 db.redemptions.createIndex({ userId: 1, status: 1 });
 db.redemptions.createIndex({ storeItemId: 1 });
 
-db.habitats.createIndex({ userId: 1 }, { unique: true });
+// Mesma correcao do indice de db.pacus acima: Habitat.cs tambem nao renomeia o
+// campo para "userId", ele grava como "familyId".
+db.habitats.createIndex({ familyId: 1 }, { unique: true });
 
 db.pacus_growth.createIndex({ userId: 1, date: 1 }, { unique: true });
 db.pacus_growth.createIndex({ pacusId: 1, createdAt: -1 });

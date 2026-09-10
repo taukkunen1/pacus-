@@ -12,8 +12,8 @@ public class SettingsRepository : ISettingsRepository
 
     public SettingsRepository(MongoDbContext context) => _context = context;
 
-    public Task<Settings?> GetByUserIdAsync(ObjectId userId) =>
-        _context.Settings.Find(s => s.FamilyId == userId).FirstOrDefaultAsync();
+    public async Task<Settings?> GetByUserIdAsync(ObjectId userId) =>
+        await _context.Settings.Find(s => s.FamilyId == userId).FirstOrDefaultAsync();
 
     public Task UpsertAsync(Settings settings) =>
         _context.Settings.ReplaceOneAsync(

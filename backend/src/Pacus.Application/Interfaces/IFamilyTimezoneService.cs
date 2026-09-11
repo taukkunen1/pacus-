@@ -10,4 +10,12 @@ namespace Pacus.Application.Interfaces;
 public interface IFamilyTimezoneService
 {
     Task<string> GetTimezoneAsync(ObjectId familyId);
+
+    // Revisao de API (2026-09-11, achado #1): GetTimezoneAsync e cacheado em
+    // memoria (ver FamilyTimezoneService) porque e chamado em quase toda
+    // requisicao (AutonomyController, DailyRoutinesController, FamilyController,
+    // PointsController, StoreService) so pra ler um valor que quase nunca muda.
+    // UpdateTimezone (FamilyController) chama isto logo apos gravar o novo fuso
+    // pra nao deixar a familia presa no valor antigo ate o cache expirar sozinho.
+    void InvalidateCache(ObjectId familyId);
 }

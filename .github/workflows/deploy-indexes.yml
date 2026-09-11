@@ -1,0 +1,42 @@
+name: Deploy MongoDB Indexes
+
+# Revisao de API (2026-09-11, achado #7): ate aqui, aplicar indices novos ou
+# alterados em database/mongodb/indexes/create-indexes.js contra o Atlas de
+# producao era 100% manual (rodar "mongosh $MONGODB_URI create-indexes.js" a
+# mao) -- facil de esquecer depois de um PR que mexe nesse arquivo, e o app
+# continua rodando sem avisar ate dar problema de performance ou (indice
+# unico) um erro de escrita inesperado.
+#
+# Este workflow so tem efeito se o secret MONGODB_URI estiver configurado em
+# Settings > Secrets and variables > Actions deste repositorio -- sem ele, o
+# job roda e sai limpo (skip), sem quebrar o pipeline. O script em si e
+# idempotente (db.createIndex e no-op se o indice ja existe com a mesma
+# definicao), entao rodar de novo em cada push que toca a pasta e seguro.
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "database/mongodb/indexes/**"
+  workflow_dispatch: {}
+
+jobs:
+  deploy-indexes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Aplicar indices no MongoDB Atlas
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${MONGODB_URI:-}" ]; then
+            echo "::warning::Secret MONGODB_URI nao configurado -- pulando aplicacao automatica de indices."
+            echo "Configure em Settings > Secrets and variables > Actions para habilitar este passo, ou rode manualmente:"
+            echo '  mongosh "$MONGODB_URI" database/mongodb/indexes/create-indexes.js'
+            exit 0
+          fi
+
+          npm install -g mongosh
+          mongosh "$MONGODB_URI" database/mongodb/indexes/create-indexes.js

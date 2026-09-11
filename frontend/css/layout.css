@@ -42,4 +42,17 @@
 .points-hero strong { font:600 3rem var(--font-display); color:var(--color-sun); }
 .points-hero span { color:var(--text-on-dark-dim); }
 .points-hero small { margin-top:8px; }
+
+/* Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md), item 2:
+   lembrete gentil, nunca um bloqueio -- por isso fica acima do game-timer, não
+   dentro dele nem desabilitando nenhum botão. */
+.minimum-goal-nudge { margin:0 0 var(--space-3); padding:var(--space-3); border-radius:var(--radius-md,12px); background:rgba(255,200,87,.1); color:var(--text-on-dark-dim); font-size:var(--step-sm); }
+.minimum-goal-nudge strong { color:var(--color-sun); }
+
+/* Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md), item 6. */
+.autonomy-report { margin-bottom:var(--space-6); padding:var(--space-4); border-radius:var(--radius-lg); background:rgba(234,246,243,.06); }
+.autonomy-report h2 { margin-top:0; }
+.autonomy-report__list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+.autonomy-report__list li { display:flex; align-items:center; gap:8px; font-size:var(--step-sm); }
+.autonomy-report__trend { margin:var(--space-3) 0 0; color:var(--text-on-dark-dim); font-size:var(--step-xs,.8rem); font-style:italic; }
 @media (max-width:360px) { .bottom-nav button { font-size:.68rem; } .history-summary, .pacus-stats { grid-template-columns:1fr; } }

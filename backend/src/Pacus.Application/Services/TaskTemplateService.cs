@@ -50,6 +50,7 @@ public class TaskTemplateService : ITaskTemplateService
             IntervalDays = intervalDays,
             Options = options,
             Reasons = reasons,
+            MinimumGoalLabel = request.MinimumGoalLabel,
             CreatedBy = createdBy,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -93,6 +94,7 @@ public class TaskTemplateService : ITaskTemplateService
         // foi regravado desde esta mudanca).
         template.Reasons = reasons;
         template.Reason = null;
+        template.MinimumGoalLabel = request.MinimumGoalLabel;
         template.UpdatedAt = DateTime.UtcNow;
 
         await _taskTemplateRepository.UpdateAsync(template);

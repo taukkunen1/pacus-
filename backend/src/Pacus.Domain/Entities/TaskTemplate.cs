@@ -103,4 +103,14 @@ public class TaskTemplate
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public DateTime? DeletedAt { get; set; }
+
+    // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md): meta minima e
+    // facil de comecar, pra tarefas que costumam ficar pra tras (ex.: "minimo de 5
+    // minutos" numa tarefa de leitura). O objetivo inicial e comecar, nao
+    // necessariamente cumprir a tarefa inteira -- por isso e so um texto livre
+    // definido pelo adulto (ou sugerido a partir do historico de conclusao baixa,
+    // ver IAutonomyService), nunca validado/bloqueado pelo backend. Null = sem meta
+    // minima definida. Copiado para cada DailyTask gerado (DailyTask.MinimumGoalLabel),
+    // igual Reason/Options.
+    public string? MinimumGoalLabel { get; set; }
 }

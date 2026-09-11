@@ -24,6 +24,11 @@ import {
 } from "../api/tasks-api.js";
 
 import { getPendingRedemptions } from "../api/store-api.js";
+import {
+  setTaskInitiative,
+  setTaskSkipReason,
+  setEveningPlan
+} from "../api/autonomy-api.js";
 import { renderTank, REACTION_ICONS } from "../pacus/habitat.js";
 import { renderTaskSection } from "../components/task-list.js";
 import { formatOperationalDate } from "../utils/date.js";
@@ -35,9 +40,36 @@ import {
 import { showToast } from "../components/toast.js";
 import { pickEffortMessage } from "../utils/effort-messages.js";
 import { appState } from "../state/app-state.js";
-import { promptTaskForm, promptPermanentTaskForm, showMessageModal, promptReactionForm } from "../components/modal.js";
+import {
+  promptTaskForm,
+  promptPermanentTaskForm,
+  showMessageModal,
+  promptReactionForm,
+  promptChoiceForm,
+  promptEveningPlanForm
+} from "../components/modal.js";
 import { renderBottomNav, attachBottomNav } from "../components/bottom-nav.js";
 import { withSlowLoadHint, SLOW_LOAD_MESSAGE } from "../utils/slow-load-hint.js";
+
+// Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md), item 4:
+// "Como você começou essa tarefa?" -- autodeclaração da própria criança, sem
+// nenhuma tentativa de detectar isso automaticamente (o app não tem push).
+const INITIATIVE_OPTIONS = [
+  { value: "selfStarted", label: "Percebi sozinho e comecei", emoji: "🟢" },
+  { value: "promptedByPacus", label: "O PACUS me ajudou a lembrar", emoji: "🟡" },
+  { value: "promptedByAdult", label: "Um adulto me lembrou", emoji: "🔴" }
+];
+
+// Item 5: "O que aconteceu?" -- nunca usado pra punir, só pra entender.
+const SKIP_REASON_OPTIONS = [
+  { value: "sleepy", label: "Estava com sono", emoji: "😴" },
+  { value: "preferredOtherActivity", label: "Preferi outra atividade", emoji: "🎮" },
+  { value: "noTime", label: "Não deu tempo", emoji: "⏰" },
+  { value: "notInTheMood", label: "Não estava com vontade", emoji: "😐" },
+  { value: "disliked", label: "Não gostei", emoji: "📚" },
+  { value: "forgot", label: "Esqueci", emoji: "🤷" },
+  { value: "other", label: "Outro", emoji: "✏️" }
+];
 
 const PERIODS = [
   "morning",
@@ -239,6 +271,29 @@ export async function renderHome(
   // tarefas da manhã, sem framing de cadeado/bloqueio. Escopo do pedido é só
   // as tarefas da manhã (mesmo criterio que já decide quando o timer destrava
   // de verdade, ver SyncGameTimerAsync no backend) -- não conta o dia inteiro.
+  // Item 2 da spec de autonomia: "Primeiro → Depois" -- nunca trava nem tira
+  // pontos, só um lembrete gentil de organização quando ainda sobra alguma
+  // tarefa com meta mínima (ex.: leitura) não feita, mesmo com o tempo de tela
+  // já liberado. A criança continua com autonomia total sobre como usar as
+  // 2h -- isso não impede o botão "jogar" logo abaixo, só aparece acima dele.
+  function renderMinimumGoalNudge() {
+    const pending = routine.tasks.find(
+      (task) =>
+        task.status !== "done" &&
+        !task.deletedAt &&
+        task.minimumGoalLabel
+    );
+
+    if (!pending) return "";
+
+    return `
+      <p class="minimum-goal-nudge">
+        <span aria-hidden="true">🎯</span>
+        Primeiro <strong>${escapeHtml(pending.minimumGoalLabel)}</strong> de "${escapeHtml(pending.title)}". Depois é só aproveitar seu tempo de tela.
+      </p>
+    `;
+  }
+
   function renderGameTimer() {
     if (!routine?.gameTimerEnabled) return "";
 
@@ -272,6 +327,7 @@ export async function renderHome(
     const isPaused = Boolean(routine.gameTimerPausedAt);
 
     return `
+      ${renderMinimumGoalNudge()}
       <div class="game-timer game-timer--unlocked ${isPaused ? "game-timer--paused" : ""}" id="game-timer-container">
         <div class="game-timer__row">
           <span class="game-timer__icon">${isPaused ? "⏸️" : "🎮"}</span>
@@ -471,7 +527,8 @@ export async function renderHome(
               {
                 canManage: true,
                 type,
-                period: activePeriod
+                period: activePeriod,
+                currentPeriod: currentPeriodGuess()
               }
             )
         ).join("")}
@@ -484,6 +541,22 @@ export async function renderHome(
           type="button"
         >
           + Nova tarefa
+        </button>
+
+        <button
+          class="btn btn-ghost"
+          id="evening-plan"
+          type="button"
+        >
+          🌙 Planejar minha noite
+        </button>
+
+        <button
+          class="btn btn-ghost"
+          id="whats-next"
+          type="button"
+        >
+          ❓ E agora?
         </button>
       </div>
 
@@ -909,6 +982,69 @@ export async function renderHome(
         }
       );
 
+    // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md), item 1:
+    // "como você quer organizar sua noite?" -- a criança monta a ordem/momento das
+    // tarefas restantes (pendentes) da tarde/noite. Não trava nada: é só o
+    // combinado que ela mesma escolheu.
+    content
+      .querySelector("#evening-plan")
+      ?.addEventListener("click", async () => {
+        const remaining = routine.tasks.filter(
+          (task) =>
+            task.status !== "done" &&
+            !task.deletedAt &&
+            (task.period === "afternoon" || task.period === "evening")
+        );
+
+        if (!remaining.length) {
+          showToast("Você já cuidou de tudo da tarde e da noite. 🎉");
+          return;
+        }
+
+        const plan = await promptEveningPlanForm({
+          tasks: remaining,
+          initialPlan: routine.eveningPlan ?? []
+        });
+
+        if (!plan) return;
+
+        try {
+          routine = await setEveningPlan(plan);
+          showToast("Combinado! Sua noite está planejada.");
+          draw();
+        } catch (err) {
+          showToast(err.message, { error: true });
+        }
+      });
+
+    // Item 7: "E agora?" -- sugere a próxima tarefa pendente (do combinado da
+    // noite, se houver um, ou da ordem normal da rotina), incentivando a criança
+    // a consultar a própria rotina em vez de esperar alguém falar.
+    content
+      .querySelector("#whats-next")
+      ?.addEventListener("click", () => {
+        const plannedIds = (routine.eveningPlan ?? [])
+          .slice()
+          .sort((a, b) => a.order - b.order)
+          .map((item) => item.taskId);
+
+        const pending = routine.tasks.filter(
+          (task) => task.status !== "done" && !task.deletedAt
+        );
+
+        const next =
+          plannedIds
+            .map((id) => pending.find((task) => String(task.id) === String(id)))
+            .find(Boolean) ??
+          pending.sort((a, b) => a.order - b.order)[0];
+
+        showToast(
+          next
+            ? `E agora: ${next.title}`
+            : "Você já cuidou de tudo por aqui. 🐟✨"
+        );
+      });
+
     content
       .querySelectorAll(
         "[data-task-action=edit]"
@@ -1152,6 +1288,58 @@ export async function renderHome(
         );
       });
 
+    // Item 5 da spec de autonomia: "O que aconteceu?" -- nunca usado pra punir,
+    // só pra entender por que a tarefa ficou pra trás (ver docs/ESTADO_ATUAL.md).
+    content
+      .querySelectorAll("[data-task-action=skip-reason]")
+      .forEach((button) => {
+        button.addEventListener("click", async () => {
+          const card = button.closest(".task-card");
+          const taskId = card?.dataset.taskId;
+          if (!taskId) return;
+
+          const answer = await promptChoiceForm({
+            title: "O que aconteceu?",
+            options: SKIP_REASON_OPTIONS,
+            noteOptionValue: "other",
+            notePlaceholder: "Conte com suas palavras...",
+            confirmLabel: "Contar"
+          });
+
+          if (!answer) return;
+
+          try {
+            routine = await setTaskSkipReason(taskId, answer.value, answer.note);
+            draw();
+          } catch (err) {
+            showToast(err.message, { error: true });
+          }
+        });
+      });
+
+    // Item 4 da spec de autonomia: pergunta "Como você começou essa tarefa?"
+    // depois de concluir, sem travar nada -- fechar sem responder é uma opção
+    // válida (ver promptChoiceForm/skipLabel). Concede um pequeno bônus de
+    // pontos quando a resposta não depende de um adulto (ver
+    // DailyRoutineService.SetTaskInitiativeAsync).
+    async function askInitiative(taskId) {
+      const answer = await promptChoiceForm({
+        title: "Como você começou essa tarefa?",
+        options: INITIATIVE_OPTIONS,
+        confirmLabel: "Contar"
+      });
+
+      if (!answer) return;
+
+      try {
+        routine = await setTaskInitiative(taskId, answer.value);
+        balance = await getPointsBalance();
+        draw();
+      } catch (err) {
+        showToast(err.message, { error: true });
+      }
+    }
+
     content
       .querySelectorAll(".task-check")
       .forEach((button) => {
@@ -1222,6 +1410,16 @@ export async function renderHome(
 
                   showToast(`${message} +${justCompleted.points} PP`);
                 }
+
+                // Item 4 da spec de autonomia: "Como você começou essa tarefa?"
+                // -- convite, nunca obrigatório (a criança pode fechar sem
+                // responder), e só perguntado uma vez por tarefa. Disparado
+                // depois do draw() acima pra não atrasar a sensação de "marquei
+                // e pronto" da conclusão em si (ver DailyRoutineService.
+                // SetTaskInitiativeAsync no backend).
+                if (justCompleted && !justCompleted.initiative) {
+                  askInitiative(justCompleted.id);
+                }
               }
 
               draw();
@@ -1269,4 +1467,3 @@ function escapeHtml(value = "") {
 
   return div.innerHTML;
 }
-

@@ -20,6 +20,14 @@ public static class TimezoneHelper
         return parsed.AddDays(1).ToString("yyyy-MM-dd");
     }
 
+    // Soma (ou subtrai, com days negativo) dias a uma data YYYY-MM-DD. Usado por
+    // relatorios que olham uma janela de dias (ex. IAutonomyService.GetWeeklyReportAsync).
+    public static string AddDays(string date, int days)
+    {
+        var parsed = DateTime.ParseExact(date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        return parsed.AddDays(days).ToString("yyyy-MM-dd");
+    }
+
     // Compara duas datas YYYY-MM-DD como texto (funciona por serem zero-padded e ISO 8601).
     public static bool IsBefore(string date, string other) =>
         string.Compare(date, other, StringComparison.Ordinal) < 0;

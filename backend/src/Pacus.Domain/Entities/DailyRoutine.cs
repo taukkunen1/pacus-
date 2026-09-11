@@ -59,4 +59,14 @@ public class DailyRoutine
     // precisar de migracao. Nunca exposto na API (nao esta em DailyRoutineResponse) -- e
     // um detalhe interno de persistencia, nao algo que o frontend precise decidir sobre.
     public int Version { get; set; } = 0;
+
+    // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md): o "combinado"
+    // que a propria crianca monta no inicio da tarde/noite, respondendo "como voce
+    // quer organizar sua noite?" -- ordem e/ou momento aproximado de tarefas
+    // restantes, escolhidos por ela. Nao e uma nova trava nem substitui a ordem
+    // normal da rotina (DailyTask.Order/today/order); e so o compromisso que ela
+    // mesma assumiu, mostrado de volta pra ela. Lista vazia = ainda nao planejou a
+    // noite hoje.
+    public List<EveningPlanItem> EveningPlan { get; set; } = new();
+    public DateTime? EveningPlanSetAt { get; set; }
 }

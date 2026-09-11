@@ -90,6 +90,11 @@ public class FakeDailyRoutineRepository : IDailyRoutineRepository
         GameTimerEnabled = source.GameTimerEnabled,
         GameTimerMinutes = source.GameTimerMinutes,
         Version = source.Version,
+        // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md).
+        EveningPlan = source.EveningPlan
+            .Select(i => new EveningPlanItem { TaskId = i.TaskId, ApproxLabel = i.ApproxLabel, Order = i.Order })
+            .ToList(),
+        EveningPlanSetAt = source.EveningPlanSetAt,
     };
 
     private static DailyTask CloneTask(DailyTask t) => new()
@@ -112,6 +117,11 @@ public class FakeDailyRoutineRepository : IDailyRoutineRepository
         DeletedAt = t.DeletedAt,
         CreatedAt = t.CreatedAt,
         UpdatedAt = t.UpdatedAt,
+        // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md).
+        MinimumGoalLabel = t.MinimumGoalLabel,
+        Initiative = t.Initiative,
+        SkipReason = t.SkipReason,
+        SkipReasonNote = t.SkipReasonNote,
     };
 
     public Task<(List<DailyRoutine> Items, long TotalCount)> GetHistoryAsync(

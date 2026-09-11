@@ -1791,3 +1791,253 @@ function escapeHtml(value = "") {
   div.textContent = String(value);
   return div.innerHTML;
 }
+// Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md): painel generico
+// de escolha unica em "pills" (mesmo visual de task-form-type-group), com um campo
+// de texto livre opcional que so aparece quando a opcao marcada com
+// noteOptionValue e selecionada. Usado tanto pelo chip de iniciativa ("Como você
+// começou?") quanto pelo seletor de motivo ("O que aconteceu?").
+//
+// options: [{ value, label, emoji? }]. Resolve com { value, note } se confirmar,
+// ou null se fechar sem responder -- nunca obrigatorio (ver skipLabel).
+export function promptChoiceForm({
+  title,
+  message = "",
+  options,
+  initialValue = null,
+  noteOptionValue = null,
+  notePlaceholder = "Conte com suas palavras...",
+  confirmLabel = "Salvar",
+  skipLabel = "Agora não",
+}) {
+  return new Promise((resolve) => {
+    closeActiveModal();
+
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal-box modal-box--form" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}">
+        <h3 class="modal-title">${escapeHtml(title)}</h3>
+        ${message ? `<p class="modal-hint">${escapeHtml(message)}</p>` : ""}
+
+        <div class="field">
+          <div class="task-form-type-group" role="radiogroup" aria-label="${escapeHtml(title)}">
+            ${options
+              .map(
+                (option) => `
+              <label class="task-form-type-option">
+                <input
+                  type="radio"
+                  name="choice-form-value"
+                  value="${escapeHtml(option.value)}"
+                  ${option.value === initialValue ? "checked" : ""}
+                />
+                <span>${option.emoji ? `${option.emoji} ` : ""}${escapeHtml(option.label)}</span>
+              </label>
+            `
+              )
+              .join("")}
+          </div>
+        </div>
+
+        <div class="field" data-choice-note-field hidden>
+          <textarea
+            class="modal-textarea"
+            rows="2"
+            placeholder="${escapeHtml(notePlaceholder)}"
+          ></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-modal-action="cancel">${escapeHtml(skipLabel)}</button>
+          <button type="button" class="btn btn-primary" data-modal-action="ok">${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    activeModal = overlay;
+
+    const noteField = overlay.querySelector("[data-choice-note-field]");
+    const noteTextarea = noteField.querySelector("textarea");
+
+    function syncNoteVisibility() {
+      const checked = overlay.querySelector('input[name="choice-form-value"]:checked')?.value;
+      noteField.hidden = !(noteOptionValue && checked === noteOptionValue);
+    }
+
+    overlay.querySelectorAll('input[name="choice-form-value"]').forEach((input) => {
+      input.addEventListener("change", syncNoteVisibility);
+    });
+    syncNoteVisibility();
+
+    function finish(result) {
+      overlay.remove();
+      if (activeModal === overlay) activeModal = null;
+      resolve(result);
+    }
+
+    function submit() {
+      const value = overlay.querySelector('input[name="choice-form-value"]:checked')?.value;
+      if (!value) return;
+      const note =
+        noteOptionValue && value === noteOptionValue
+          ? noteTextarea.value.trim() || null
+          : null;
+      finish({ value, note });
+    }
+
+    overlay
+      .querySelector('[data-modal-action="ok"]')
+      .addEventListener("click", submit);
+
+    overlay
+      .querySelector('[data-modal-action="cancel"]')
+      .addEventListener("click", () => finish(null));
+
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) finish(null);
+    });
+
+    overlay.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") finish(null);
+    });
+  });
+}
+
+// Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md), item 1: "como
+// você quer organizar sua noite?" -- a criança escolhe a ordem das tarefas
+// restantes (setas pra cima/baixo, mesmo padrão de reordenar tarefas permanentes)
+// e opcionalmente um momento aproximado pra cada uma (ex.: "depois do banho").
+// Nunca substitui a ordem normal da rotina -- e só o combinado que ela mesma
+// assumiu, mostrado de volta pra ela.
+//
+// tasks: [{ id, title }] na ordem atual da rotina. initialPlan (se houver, ver
+// DailyRoutine.EveningPlan): [{ taskId, approxLabel }] pra pre-popular caso a
+// crianca esteja reabrindo o planejamento no mesmo dia. Resolve com
+// [{ taskId, approxLabel }] na ordem escolhida, ou null se cancelar.
+export function promptEveningPlanForm({ tasks, initialPlan = [] }) {
+  return new Promise((resolve) => {
+    closeActiveModal();
+
+    const initialOrder = initialPlan.length
+      ? initialPlan
+          .map((item) => tasks.find((t) => String(t.id) === String(item.taskId)))
+          .filter(Boolean)
+      : tasks;
+    const missing = tasks.filter(
+      (t) => !initialOrder.some((o) => o.id === t.id)
+    );
+    let order = [...initialOrder, ...missing];
+    const labels = new Map(
+      initialPlan.map((item) => [String(item.taskId), item.approxLabel || ""])
+    );
+
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal-box modal-box--form" role="dialog" aria-modal="true" aria-label="Planejar minha noite">
+        <h3 class="modal-title">Como você quer organizar sua noite?</h3>
+        <p class="modal-hint">Escolha a ordem e, se quiser, um momento pra cada tarefa (ex.: "depois do banho").</p>
+        <ul class="evening-plan-list"></ul>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-modal-action="cancel">Cancelar</button>
+          <button type="button" class="btn btn-primary" data-modal-action="ok">Combinado!</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    activeModal = overlay;
+
+    const list = overlay.querySelector(".evening-plan-list");
+
+    function renderList() {
+      list.innerHTML = order
+        .map(
+          (task, index) => `
+        <li class="evening-plan-item" data-task-id="${escapeHtml(String(task.id))}">
+          <div class="evening-plan-item__order">
+            <button type="button" class="task-more" data-plan-action="up" ${
+              index === 0 ? "disabled" : ""
+            } aria-label="Mover para cima">▲</button>
+            <button type="button" class="task-more" data-plan-action="down" ${
+              index === order.length - 1 ? "disabled" : ""
+            } aria-label="Mover para baixo">▼</button>
+          </div>
+          <div class="evening-plan-item__body">
+            <p class="evening-plan-item__title">${escapeHtml(task.title)}</p>
+            <input
+              type="text"
+              class="evening-plan-item__label"
+              placeholder="Momento (opcional), ex.: depois do banho"
+              value="${escapeHtml(labels.get(String(task.id)) || "")}"
+              data-plan-label
+            />
+          </div>
+        </li>
+      `
+        )
+        .join("");
+
+      list.querySelectorAll("[data-plan-label]").forEach((input) => {
+        input.addEventListener("input", () => {
+          const taskId = input.closest(".evening-plan-item").dataset.taskId;
+          labels.set(taskId, input.value);
+        });
+      });
+
+      list.querySelectorAll('[data-plan-action="up"]').forEach((button) => {
+        button.addEventListener("click", () => {
+          const taskId = button.closest(".evening-plan-item").dataset.taskId;
+          const index = order.findIndex((t) => String(t.id) === taskId);
+          if (index > 0) {
+            [order[index - 1], order[index]] = [order[index], order[index - 1]];
+            renderList();
+          }
+        });
+      });
+
+      list.querySelectorAll('[data-plan-action="down"]').forEach((button) => {
+        button.addEventListener("click", () => {
+          const taskId = button.closest(".evening-plan-item").dataset.taskId;
+          const index = order.findIndex((t) => String(t.id) === taskId);
+          if (index < order.length - 1) {
+            [order[index + 1], order[index]] = [order[index], order[index + 1]];
+            renderList();
+          }
+        });
+      });
+    }
+
+    renderList();
+
+    function finish(result) {
+      overlay.remove();
+      if (activeModal === overlay) activeModal = null;
+      resolve(result);
+    }
+
+    overlay
+      .querySelector('[data-modal-action="ok"]')
+      .addEventListener("click", () => {
+        finish(
+          order.map((task) => ({
+            taskId: task.id,
+            approxLabel: (labels.get(String(task.id)) || "").trim() || null,
+          }))
+        );
+      });
+
+    overlay
+      .querySelector('[data-modal-action="cancel"]')
+      .addEventListener("click", () => finish(null));
+
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) finish(null);
+    });
+
+    overlay.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") finish(null);
+    });
+  });
+}

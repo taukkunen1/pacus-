@@ -75,6 +75,7 @@ public class AutonomyPlanningTests
         var userId = ObjectId.GenerateNewId();
         var actorId = ObjectId.GenerateNewId();
 
+        await service.CreateRoutineForDateAsync(userId, "2026-09-10", "America/Sao_Paulo");
         var routine = await service.CreateAdHocTaskAsync(
             userId,
             new CreateTaskRequest("Ler", null, "mandatory", "evening", 5),
@@ -99,6 +100,7 @@ public class AutonomyPlanningTests
         var userId = ObjectId.GenerateNewId();
         var actorId = ObjectId.GenerateNewId();
 
+        await service.CreateRoutineForDateAsync(userId, "2026-09-10", "America/Sao_Paulo");
         var routine = await service.CreateAdHocTaskAsync(
             userId,
             new CreateTaskRequest("Ler", null, "mandatory", "evening", 5),
@@ -120,6 +122,7 @@ public class AutonomyPlanningTests
         var userId = ObjectId.GenerateNewId();
         var actorId = ObjectId.GenerateNewId();
 
+        await service.CreateRoutineForDateAsync(userId, "2026-09-10", "America/Sao_Paulo");
         var routine = await service.CreateAdHocTaskAsync(
             userId,
             new CreateTaskRequest("Ler", null, "mandatory", "evening", 5),
@@ -144,6 +147,7 @@ public class AutonomyPlanningTests
         var userId = ObjectId.GenerateNewId();
         var actorId = ObjectId.GenerateNewId();
 
+        await service.CreateRoutineForDateAsync(userId, "2026-09-10", "America/Sao_Paulo");
         var routine = await service.CreateAdHocTaskAsync(
             userId,
             new CreateTaskRequest("Ler", null, "mandatory", "evening", 5),
@@ -228,4 +232,3 @@ public class AutonomyPlanningTests
         Assert.Equal(0, report.PromptedByAdult);
     }
 }
-

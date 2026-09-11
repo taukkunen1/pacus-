@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Pacus.Api.Auth;
 using Pacus.Application.DTOs;
 using Pacus.Application.Interfaces;
@@ -35,7 +36,14 @@ public class AccountController : ControllerBase
         _currentUser = currentUser;
     }
 
+    // Revisao de API (2026-09-11, achado #2): a exclusao exige senha, mas a
+    // verificacao em si nao tinha limite de tentativas -- diferente do login
+    // (AuthController) e da criacao de familia (BootstrapController). Uma sessao
+    // comprometida (cookie/token vazado) podia tentar a senha varias vezes sem
+    // bloqueio. Reaproveita a mesma politica "auth" do Program.cs (10 tentativas
+    // a cada 5 min, particionado por IP).
     [HttpDelete]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> DeleteAccount([FromBody] AccountDeletionRequest request)
     {
         var user = await _userRepository.GetByIdAsync(_currentUser.UserId);

@@ -25,6 +25,10 @@ public class TaskTemplateService : ITaskTemplateService
         ObjectId createdBy,
         CreateTaskRequest request)
     {
+        TaskValidation.ValidateTitle(request.Title);
+        TaskValidation.ValidateDescription(request.Description);
+        TaskValidation.ValidatePoints(request.Points);
+
         var (type, period) = ParseTypeAndPeriod(request);
         var (recurrence, variants, customDays, anchorDate, intervalDays) = ParseRecurrenceAndVariants(request);
         var options = ParseOptions(request.Options);
@@ -64,6 +68,10 @@ public class TaskTemplateService : ITaskTemplateService
         string id,
         CreateTaskRequest request)
     {
+        TaskValidation.ValidateTitle(request.Title);
+        TaskValidation.ValidateDescription(request.Description);
+        TaskValidation.ValidatePoints(request.Points);
+
         if (!ObjectId.TryParse(id, out var templateId))
             throw new ValidationException("Id de tarefa invalido.");
 

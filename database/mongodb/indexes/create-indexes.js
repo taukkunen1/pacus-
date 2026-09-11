@@ -1,4 +1,10 @@
 // Executar via mongosh: mongosh "$MONGODB_URI" create-indexes.js
+//
+// Aplicado automaticamente pelo workflow .github/workflows/deploy-indexes.yml
+// a cada push em main que mexer nesta pasta, desde que o secret MONGODB_URI
+// esteja configurado no repositorio (revisao de API, 2026-09-11, achado #7).
+// Sem o secret, o workflow so pula o passo -- rodar manualmente continua
+// funcionando do mesmo jeito.
 db = db.getSiblingDB("pacus");
 
 db.users.createIndex({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: "string" } } });

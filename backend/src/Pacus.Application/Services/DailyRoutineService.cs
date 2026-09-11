@@ -274,9 +274,9 @@ public class DailyRoutineService : IDailyRoutineService
             throw new ValidationException($"Tipo de tarefa invalido: {request.Type}");
         if (!Enum.TryParse<TaskPeriod>(request.Period, ignoreCase: true, out var period))
             throw new ValidationException($"Periodo invalido: {request.Period}");
-        ValidatePoints(request.Points);
-        if (string.IsNullOrWhiteSpace(request.Title))
-            throw new ValidationException("O titulo da tarefa e obrigatorio.");
+        TaskValidation.ValidatePoints(request.Points);
+        TaskValidation.ValidateTitle(request.Title);
+        TaskValidation.ValidateDescription(request.Description);
         var options = TaskTemplateService.ParseOptions(request.Options);
         var reason = TaskTemplateService.ParseSingleReason(request.Reason);
         await EnsureChildPermissionAsync(userId, actorRole, p => p.CanCreateTasks);
@@ -394,7 +394,7 @@ public class DailyRoutineService : IDailyRoutineService
     public async Task<DailyRoutine> AdjustTaskPointsAsync(
         ObjectId userId, string taskId, int newPoints, ObjectId actorId, string actorRole)
     {
-        ValidatePoints(newPoints);
+        TaskValidation.ValidatePoints(newPoints);
 
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
             ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
@@ -458,13 +458,13 @@ public class DailyRoutineService : IDailyRoutineService
     public async Task<DailyRoutine> UpdateTaskAsync(
         ObjectId userId, string taskId, DailyTaskUpdateRequest request, ObjectId actorId, string actorRole)
     {
-        if (string.IsNullOrWhiteSpace(request.Title))
-            throw new ValidationException("O titulo da tarefa e obrigatorio.");
+        TaskValidation.ValidateTitle(request.Title);
+        TaskValidation.ValidateDescription(request.Description);
         if (!Enum.TryParse<TaskType>(request.Type, true, out var type))
             throw new ValidationException($"Tipo de tarefa invalido: {request.Type}");
         if (!Enum.TryParse<TaskPeriod>(request.Period, true, out var period))
             throw new ValidationException($"Periodo invalido: {request.Period}");
-        ValidatePoints(request.Points);
+        TaskValidation.ValidatePoints(request.Points);
         var options = TaskTemplateService.ParseOptions(request.Options);
         var reason = TaskTemplateService.ParseSingleReason(request.Reason);
         await EnsureChildPermissionAsync(userId, actorRole, p => p.CanEditTasks);
@@ -927,13 +927,6 @@ public class DailyRoutineService : IDailyRoutineService
     }
 
     private sealed record ResolvedTemplateContent(string Title, string? Description, int Points);
-
-    private static void ValidatePoints(int points)
-    {
-        if (points == 0 || points < -10 || points > 10)
-            throw new ValidationException(
-                "Cada tarefa deve valer entre 1 e 10 Pacus Points, ou entre -1 e -10 (penalidade). Zero nao e permitido.");
-    }
 
     private static DailyRoutineStats BuildStats(List<DailyTask> tasks)
     {

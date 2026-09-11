@@ -274,6 +274,9 @@ public class FamilyController : ControllerBase
         // membro (revisao de melhorias, 2026-09-10) -- mesmo resultado, um unico
         // round-trip ao Mongo em vez de N.
         await _userRepository.UpdateTimezoneForFamilyAsync(_currentUser.FamilyId, request.Timezone);
+        // Sem isto a familia ficaria ate 30 min presa no fuso antigo (ver cache
+        // em FamilyTimezoneService, achado #1 da revisao de API de 2026-09-11).
+        _familyTimezoneService.InvalidateCache(_currentUser.FamilyId);
 
         return Ok(new { timezone = request.Timezone });
     }

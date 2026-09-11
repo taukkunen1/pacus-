@@ -137,4 +137,15 @@ public class DailyRoutinesController : ControllerBase
             _currentUser.FamilyId, request.Icon, request.Message, _currentUser.UserId, _currentUser.Role.ToString());
         return Ok(routine.ToResponse());
     }
+
+    // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md), item 1: "como
+    // voce quer organizar sua noite?" -- sem RequireRole aqui de proposito, mesma
+    // logica do reorder acima (a crianca monta o proprio combinado).
+    [HttpPut("today/evening-plan")]
+    public async Task<IActionResult> SetEveningPlan([FromBody] SetEveningPlanRequest request)
+    {
+        var routine = await _dailyRoutineService.SetEveningPlanAsync(
+            _currentUser.FamilyId, request.Items, _currentUser.UserId, _currentUser.Role.ToString());
+        return Ok(routine.ToResponse());
+    }
 }

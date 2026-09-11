@@ -109,9 +109,11 @@ public class PointsController : ControllerBase
             });
         }
 
-        var newBalance = await _pointsService.GetBalanceAsync(_currentUser.FamilyId);
+        // Revisao de API (2026-09-11, achado #3): o novo saldo ja e conhecido --
+        // e exatamente request.Balance, por definicao do delta acima -- entao a
+        // segunda leitura ao banco aqui era so uma query a mais sem necessidade.
         var rate = await GetPointToBrlRateAsync();
-        return Ok(new { balance = newBalance, brl = newBalance * rate });
+        return Ok(new { balance = request.Balance, brl = request.Balance * rate });
     }
 
     // Antes este valor estava fixo (0.05) direto nos dois endpoints acima, ignorando

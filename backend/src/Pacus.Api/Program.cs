@@ -173,6 +173,11 @@ builder.Services.AddScoped<IAccountDeletionService, AccountDeletionService>();
 builder.Services.AddScoped<IFamilyTimezoneService, FamilyTimezoneService>();
 builder.Services.AddScoped<IAutonomyService, AutonomyService>();
 
+// Cache em memoria usado por FamilyTimezoneService (revisao de API, 2026-09-11,
+// achado #1) -- singleton por processo, coerente com FamilyTimezoneService sendo
+// Scoped mas dependendo de um cache compartilhado entre requisicoes.
+builder.Services.AddMemoryCache();
+
 builder.Services
     .AddControllers()
     .AddJsonOptions(options =>

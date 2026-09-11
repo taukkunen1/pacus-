@@ -99,6 +99,7 @@ public class DailyRoutineService : IDailyRoutineService
                 Status = TaskItemStatus.Pending,
                 Options = new List<string>(template.Options),
                 Reason = PickReason(template.EffectiveReasons),
+                MinimumGoalLabel = template.MinimumGoalLabel,
                 CompletedAt = null,
                 CreatedBy = userId.ToString(),
                 Origin = "template",
@@ -145,6 +146,7 @@ public class DailyRoutineService : IDailyRoutineService
                 Status = TaskItemStatus.Pending,
                 Options = new List<string>(pair.Template.Options),
                 Reason = PickReason(pair.Template.EffectiveReasons),
+                MinimumGoalLabel = pair.Template.MinimumGoalLabel,
                 CompletedAt = null,
                 CreatedBy = userId.ToString(),
                 Origin = "template",
@@ -639,6 +641,162 @@ public class DailyRoutineService : IDailyRoutineService
         };
 
         await _dailyRoutineRepository.UpdateAsync(routine);
+        return routine;
+    }
+
+    // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md). Bonus pequeno e
+    // deliberadamente menor que a maioria dos Points de tarefa -- o ponto nao e pagar
+    // pela iniciativa, e so reconhece-la um pouco mais que o "so terminei" normal.
+    // Nenhum bonus quando um adulto precisou lembrar (a tarefa em si continua valendo
+    // os Points normais via ToggleTaskAsync).
+    public const int InitiativeBonusSelfStarted = 2;
+    public const int InitiativeBonusPromptedByPacus = 1;
+
+    // A crianca monta o "combinado" da tarde/noite -- ver docs/ESTADO_ATUAL.md, item 1.
+    // Substitui qualquer plano anterior do mesmo dia (nao acumula); items vazio limpa o
+    // plano. Sem RequireRole aqui de proposito, igual ReorderTasksAsync -- e autonomia
+    // da propria crianca sobre o dia atual, um adulto tambem pode ajudar a montar.
+    public async Task<DailyRoutine> SetEveningPlanAsync(
+        ObjectId userId, List<EveningPlanItemRequest> items, ObjectId actorId, string actorRole)
+    {
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
+
+        var validTaskIds = routine.Tasks
+            .Where(t => t.DeletedAt is null)
+            .Select(t => t.Id)
+            .ToHashSet();
+
+        foreach (var item in items)
+        {
+            if (!validTaskIds.Contains(item.TaskId))
+                throw new ValidationException($"Tarefa {item.TaskId} nao encontrada na rotina atual.");
+        }
+
+        routine.EveningPlan = items
+            .Select((item, index) => new EveningPlanItem
+            {
+                TaskId = item.TaskId,
+                ApproxLabel = string.IsNullOrWhiteSpace(item.ApproxLabel) ? null : item.ApproxLabel.Trim(),
+                Order = index,
+            })
+            .ToList();
+        routine.EveningPlanSetAt = DateTime.UtcNow;
+
+        await _dailyRoutineRepository.UpdateAsync(routine);
+
+        await _taskEventRepository.CreateAsync(new TaskEvent
+        {
+            Id = ObjectId.GenerateNewId(),
+            UserId = userId,
+            DailyRoutineId = routine.Id,
+            TaskId = null,
+            EventType = TaskEventType.EveningPlanSet,
+            ActorId = actorId,
+            ActorRole = ParseRole(actorRole),
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        return routine;
+    }
+
+    // Autodeclaracao de como a tarefa foi comecada (item 4 da spec: "Incentivar
+    // iniciativa"). Concede um pequeno bonus de pontos via PointsService quando a
+    // iniciativa nao dependeu de um adulto -- reaproveita o mesmo mecanismo de
+    // PointTransaction usado por ToggleTaskAsync, so com um Reason proprio pra ficar
+    // claro no extrato que aquele credito e sobre iniciativa, nao sobre a tarefa em si.
+    public async Task<DailyRoutine> SetTaskInitiativeAsync(
+        ObjectId userId, string taskId, TaskInitiativeLevel initiative, ObjectId actorId, string actorRole)
+    {
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
+
+        var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
+            ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
+
+        var alreadyInformed = task.Initiative is not null;
+        task.Initiative = initiative;
+        task.UpdatedAt = DateTime.UtcNow;
+        await _dailyRoutineRepository.UpdateAsync(routine);
+
+        var actorRoleEnum = ParseRole(actorRole);
+
+        // So concede o bonus na primeira vez que a crianca informa (evita farmar pontos
+        // reabrindo o chip varias vezes pra mesma tarefa).
+        if (!alreadyInformed)
+        {
+            var bonus = initiative switch
+            {
+                TaskInitiativeLevel.SelfStarted => InitiativeBonusSelfStarted,
+                TaskInitiativeLevel.PromptedByPacus => InitiativeBonusPromptedByPacus,
+                _ => 0,
+            };
+
+            if (bonus > 0)
+            {
+                await _pointsService.RecordAsync(
+                    userId,
+                    routine.Id,
+                    routine.Date,
+                    task.Id,
+                    task.Title,
+                    PointTransactionType.Award,
+                    bonus,
+                    actorId,
+                    actorRoleEnum,
+                    reason: "Bonus de autonomia: iniciativa propria");
+            }
+        }
+
+        await _taskEventRepository.CreateAsync(new TaskEvent
+        {
+            Id = ObjectId.GenerateNewId(),
+            UserId = userId,
+            DailyRoutineId = routine.Id,
+            TaskId = task.Id,
+            TaskTemplateId = TryParseObjectId(task.TaskTemplateId),
+            EventType = TaskEventType.InitiativeSet,
+            ActorId = actorId,
+            ActorRole = actorRoleEnum,
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        return routine;
+    }
+
+    // Autodeclaracao de por que uma tarefa nao foi feita (item 5 da spec: "Nao utilizar
+    // punicao"). Nunca mexe em Points nem em Status -- so registra a resposta pra dar
+    // visibilidade de por que certas tarefas ficam pra tras, sem julgar.
+    public async Task<DailyRoutine> SetTaskSkipReasonAsync(
+        ObjectId userId, string taskId, TaskSkipReason reason, string? note, ObjectId actorId, string actorRole)
+    {
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
+
+        var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
+            ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
+
+        task.SkipReason = reason;
+        task.SkipReasonNote = reason == TaskSkipReason.Other && !string.IsNullOrWhiteSpace(note)
+            ? note.Trim()
+            : null;
+        task.UpdatedAt = DateTime.UtcNow;
+
+        await _dailyRoutineRepository.UpdateAsync(routine);
+
+        await _taskEventRepository.CreateAsync(new TaskEvent
+        {
+            Id = ObjectId.GenerateNewId(),
+            UserId = userId,
+            DailyRoutineId = routine.Id,
+            TaskId = task.Id,
+            TaskTemplateId = TryParseObjectId(task.TaskTemplateId),
+            EventType = TaskEventType.SkipReasonSet,
+            ActorId = actorId,
+            ActorRole = ParseRole(actorRole),
+            CreatedAt = DateTime.UtcNow,
+        });
+
         return routine;
     }
 

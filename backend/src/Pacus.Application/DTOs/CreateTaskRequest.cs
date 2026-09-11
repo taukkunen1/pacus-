@@ -29,7 +29,11 @@ public record CreateTaskRequest(
     // "Por que isso importa" -- ver TaskTemplate.Reasons. Pool de frases pertinentes;
     // DailyRoutineService sorteia uma diferente a cada dia gerado. Null/vazio = sem
     // motivo explicito.
-    List<string>? Reasons = null
+    List<string>? Reasons = null,
+    // Autonomia e planejamento (2026-09-10, ver TaskTemplate.MinimumGoalLabel): meta
+    // minima e facil de comecar, pra tarefas que costumam ficar pra tras (ex.:
+    // "minimo de 5 minutos"). Texto livre opcional, null = sem meta minima.
+    string? MinimumGoalLabel = null
 );
 
 public record TaskVariantRequest(

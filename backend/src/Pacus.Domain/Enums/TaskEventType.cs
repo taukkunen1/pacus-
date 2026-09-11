@@ -10,5 +10,10 @@ public enum TaskEventType
     Reordered,
     PointsProposed,
     PointsAdjusted,
-    OptionSelected
+    OptionSelected,
+
+    // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md).
+    InitiativeSet,
+    SkipReasonSet,
+    EveningPlanSet,
 }

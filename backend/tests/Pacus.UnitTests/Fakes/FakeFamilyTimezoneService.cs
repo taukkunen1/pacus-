@@ -10,4 +10,9 @@ public class FakeFamilyTimezoneService : IFamilyTimezoneService
     public string Timezone { get; set; } = "America/Sao_Paulo";
 
     public Task<string> GetTimezoneAsync(ObjectId familyId) => Task.FromResult(Timezone);
+
+    public void InvalidateCache(ObjectId familyId)
+    {
+        // Fake nao tem cache de verdade -- nada a invalidar.
+    }
 }

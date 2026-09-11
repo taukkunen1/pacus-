@@ -18,7 +18,9 @@ function pointsLabel(points) {
   return `${sign}${value} PP`;
 }
 
-function taskCard(task, canManage) {
+const PERIOD_ORDER = { morning: 0, afternoon: 1, evening: 2 };
+
+function taskCard(task, canManage, periodIsPast) {
   const done =
     task.status === "done" ||
     task.status === 1;
@@ -145,7 +147,31 @@ function taskCard(task, canManage) {
             : ""
         }
 
+        ${
+          task.minimumGoalLabel
+            ? `
+              <p class="task-minimum-goal">
+                <span aria-hidden="true">🎯</span> Meta mínima: ${escapeHtml(task.minimumGoalLabel)}
+              </p>
+            `
+            : ""
+        }
+
         ${optionChips}
+
+        ${
+          !done && periodIsPast && !task.skipReason
+            ? `
+              <button
+                type="button"
+                class="task-skip-reason-link"
+                data-task-action="skip-reason"
+              >
+                O que aconteceu?
+              </button>
+            `
+            : ""
+        }
       </div>
 
       <span class="task-points ${pointsClass}">
@@ -174,6 +200,15 @@ export function renderTaskSection(
   const type = String(options.type ?? "").toLowerCase();
   const period = String(options.period ?? "").toLowerCase();
 
+  // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md), item 5: so
+  // oferece "O que aconteceu?" pra tarefas de um período que já passou -- não faz
+  // sentido perguntar isso de uma tarefa da noite às 8h da manhã.
+  const currentPeriod = String(options.currentPeriod ?? "").toLowerCase();
+  const periodIsPast =
+    PERIOD_ORDER[period] !== undefined &&
+    PERIOD_ORDER[currentPeriod] !== undefined &&
+    PERIOD_ORDER[period] < PERIOD_ORDER[currentPeriod];
+
   const doneCount = tasks.filter(
     (task) =>
       task.status === "done" ||
@@ -187,7 +222,7 @@ export function renderTaskSection(
         <ul class="task-list">
           ${tasks
             .map((task) =>
-              taskCard(task, canManage)
+              taskCard(task, canManage, periodIsPast)
             )
             .join("")}
         </ul>

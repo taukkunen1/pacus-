@@ -18,8 +18,8 @@ public class StoreRepository : IStoreRepository
             .SortBy(i => i.Cost)
             .ToListAsync();
 
-    public Task<StoreItem?> GetItemByIdAsync(ObjectId id) =>
-        _context.StoreItems.Find(i => i.Id == id).FirstOrDefaultAsync();
+    public async Task<StoreItem?> GetItemByIdAsync(ObjectId id) =>
+        await _context.StoreItems.Find(i => i.Id == id).FirstOrDefaultAsync();
 
     public async Task<StoreItem> CreateItemAsync(StoreItem item)
     {
@@ -30,8 +30,8 @@ public class StoreRepository : IStoreRepository
     public Task UpdateItemAsync(StoreItem item) =>
         _context.StoreItems.ReplaceOneAsync(i => i.Id == item.Id, item);
 
-    public Task<Redemption?> GetRedemptionByIdAsync(ObjectId id) =>
-        _context.Redemptions.Find(r => r.Id == id).FirstOrDefaultAsync();
+    public async Task<Redemption?> GetRedemptionByIdAsync(ObjectId id) =>
+        await _context.Redemptions.Find(r => r.Id == id).FirstOrDefaultAsync();
 
     public async Task<Redemption> CreateRedemptionAsync(Redemption redemption)
     {

@@ -13,8 +13,8 @@ public class DailyRoutineRepository : IDailyRoutineRepository
 
     public DailyRoutineRepository(MongoDbContext context) => _context = context;
 
-    public Task<DailyRoutine?> GetByUserAndDateAsync(ObjectId userId, string date) =>
-        _context.DailyRoutines.Find(r => r.FamilyId == userId && r.Date == date).FirstOrDefaultAsync();
+    public async Task<DailyRoutine?> GetByUserAndDateAsync(ObjectId userId, string date) =>
+        await _context.DailyRoutines.Find(r => r.FamilyId == userId && r.Date == date).FirstOrDefaultAsync();
 
     public async Task<DailyRoutine> CreateAsync(DailyRoutine routine)
     {
@@ -96,8 +96,8 @@ public class DailyRoutineRepository : IDailyRoutineRepository
         return (items, totalCount);
     }
 
-    public Task<DailyRoutine?> GetLatestOpenAsync(ObjectId userId) =>
-        _context.DailyRoutines
+    public async Task<DailyRoutine?> GetLatestOpenAsync(ObjectId userId) =>
+        await _context.DailyRoutines
             .Find(r => r.FamilyId == userId && r.Status == Domain.Enums.RoutineStatus.Open)
             .SortByDescending(r => r.Date)
             .FirstOrDefaultAsync();

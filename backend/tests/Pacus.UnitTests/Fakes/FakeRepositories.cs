@@ -6,7 +6,7 @@ using Pacus.Domain.Enums;
 
 namespace Pacus.UnitTests.Fakes;
 
-// Fakes em memoria â€” permitem testar os services sem depender de um MongoDB real.
+// Fakes em memoria — permitem testar os services sem depender de um MongoDB real.
 
 public class FakeDailyRoutineRepository : IDailyRoutineRepository
 {
@@ -720,6 +720,26 @@ public class FakeUserRepository : IUserRepository
 
     public Task<List<User>> GetByFamilyAsync(ObjectId familyId) =>
         Task.FromResult(Users.Where(u => u.FamilyId == familyId).ToList());
+
+    public Task UpdateFamilyCodeForFamilyAsync(ObjectId familyId, string familyCode)
+    {
+        foreach (var member in Users.Where(u => u.FamilyId == familyId))
+        {
+            member.FamilyCode = familyCode;
+            member.UpdatedAt = DateTime.UtcNow;
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateTimezoneForFamilyAsync(ObjectId familyId, string timezone)
+    {
+        foreach (var member in Users.Where(u => u.FamilyId == familyId))
+        {
+            member.Timezone = timezone;
+            member.UpdatedAt = DateTime.UtcNow;
+        }
+        return Task.CompletedTask;
+    }
 
     public Task DeleteAllByFamilyAsync(ObjectId familyId)
     {

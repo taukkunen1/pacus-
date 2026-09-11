@@ -12,8 +12,8 @@ public class PacusGrowthRepository : IPacusGrowthRepository
 
     public PacusGrowthRepository(MongoDbContext context) => _context = context;
 
-    public Task<PacusGrowthLog?> GetByUserAndDateAsync(ObjectId userId, string date) =>
-        _context.PacusGrowthLogs.Find(l => l.UserId == userId && l.Date == date).FirstOrDefaultAsync();
+    public async Task<PacusGrowthLog?> GetByUserAndDateAsync(ObjectId userId, string date) =>
+        await _context.PacusGrowthLogs.Find(l => l.UserId == userId && l.Date == date).FirstOrDefaultAsync();
 
     public async Task<PacusGrowthLog> CreateAsync(PacusGrowthLog log)
     {

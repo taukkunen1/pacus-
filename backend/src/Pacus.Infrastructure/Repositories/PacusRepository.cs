@@ -12,8 +12,8 @@ public class PacusRepository : IPacusRepository
 
     public PacusRepository(MongoDbContext context) => _context = context;
 
-    public Task<PacusEntity?> GetByFamilyIdAsync(ObjectId familyId) =>
-        _context.Pacus.Find(p => p.FamilyId == familyId).FirstOrDefaultAsync();
+    public async Task<PacusEntity?> GetByFamilyIdAsync(ObjectId familyId) =>
+        await _context.Pacus.Find(p => p.FamilyId == familyId).FirstOrDefaultAsync();
 
     public async Task<PacusEntity> CreateAsync(PacusEntity pacus)
     {

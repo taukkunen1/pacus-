@@ -19,11 +19,21 @@ public class PointTransactionRepository : IPointTransactionRepository
     }
 
     // Fonte da verdade: soma de todos os deltas. balanceAfter em cada doc e so um snapshot de leitura rapida.
+    //
+    // Antes carregava TODAS as transacoes da familia pra memoria pra somar em C#
+    // (revisao de melhorias, 2026-09-10) -- uma familia com anos de historico ia
+    // trazer milhares de documentos so pra calcular um numero, numa chamada que
+    // acontece a cada conclusao de tarefa e a cada consulta de saldo. Agrega no
+    // proprio Mongo ($match + $group/$sum): so o total viaja pela rede.
     public async Task<int> GetBalanceAsync(ObjectId userId)
     {
-        var filter = Builders<PointTransaction>.Filter.Eq(t => t.FamilyId, userId);
-        var transactions = await _context.PointTransactions.Find(filter).ToListAsync();
-        return transactions.Sum(t => t.Points);
+        var result = await _context.PointTransactions
+            .Aggregate()
+            .Match(t => t.FamilyId == userId)
+            .Group(t => 1, g => new { Total = g.Sum(t => t.Points) })
+            .FirstOrDefaultAsync();
+
+        return result?.Total ?? 0;
     }
 
     // Paginado (achado #4 da auditoria de API de 2026-09-01 -- ver docs/ESTADO_ATUAL.md):

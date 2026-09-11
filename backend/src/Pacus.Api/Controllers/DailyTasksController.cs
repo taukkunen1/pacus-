@@ -123,4 +123,40 @@ public class DailyTasksController : ControllerBase
 
         return Ok(routine.ToResponse());
     }
+
+    // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md): "Como voce
+    // comecou?" -- sem RequireRole aqui de proposito, e a propria crianca quem
+    // autodeclara sua iniciativa.
+    [HttpPut("{id}/initiative")]
+    public async Task<IActionResult> SetInitiative(
+        string id,
+        [FromBody] SetTaskInitiativeRequest request)
+    {
+        var routine = await _dailyRoutineService.SetTaskInitiativeAsync(
+            _currentUser.FamilyId,
+            id,
+            request.Initiative,
+            _currentUser.UserId,
+            _currentUser.Role.ToString());
+
+        return Ok(routine.ToResponse());
+    }
+
+    // "O que aconteceu?" -- nunca usado pra punir (ver docs/ESTADO_ATUAL.md, "Nao
+    // utilizar punicao"). Sem RequireRole aqui de proposito, mesma logica acima.
+    [HttpPut("{id}/skip-reason")]
+    public async Task<IActionResult> SetSkipReason(
+        string id,
+        [FromBody] SetTaskSkipReasonRequest request)
+    {
+        var routine = await _dailyRoutineService.SetTaskSkipReasonAsync(
+            _currentUser.FamilyId,
+            id,
+            request.Reason,
+            request.Note,
+            _currentUser.UserId,
+            _currentUser.Role.ToString());
+
+        return Ok(routine.ToResponse());
+    }
 }

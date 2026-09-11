@@ -38,4 +38,25 @@ public class DailyTask
     public DateTime? DeletedAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md). Copiado do
+    // TaskTemplate no momento da geracao (mesma imutabilidade do resto da tarefa):
+    // meta minima e facil de comecar, pensada pra tarefas que a crianca costuma
+    // deixar pra tras (ex.: "minimo de 5 minutos" numa tarefa de leitura). Null =
+    // tarefa sem meta minima definida (comportamento normal).
+    public string? MinimumGoalLabel { get; set; }
+
+    // Autodeclarado pela crianca ao iniciar ou concluir a tarefa (chip rapido,
+    // "Como voce comecou?"): sozinha, com uma sugestao do proprio PACUS, ou com
+    // lembrete de um adulto. Null enquanto nao informado -- nunca obrigatorio,
+    // so um convite (ver DailyRoutineService.SetTaskInitiativeAsync).
+    public TaskInitiativeLevel? Initiative { get; set; }
+
+    // Autodeclarado pela crianca quando uma tarefa nao foi concluida (nunca usado
+    // pra punir -- ver docs/ESTADO_ATUAL.md, "Nao utilizar punicao"). Null enquanto
+    // nao perguntado/respondido.
+    public TaskSkipReason? SkipReason { get; set; }
+
+    // Texto livre opcional, so relevante quando SkipReason == Other.
+    public string? SkipReasonNote { get; set; }
 }

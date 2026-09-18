@@ -37,7 +37,7 @@ export function renderLogin(root, onSuccess) {
 
         <div class="role-switch" role="tablist">
           <button type="button" data-role="adult" class="is-active" role="tab">Adulto</button>
-          <button type="button" data-role="child" role="tab">Crianca</button>
+          <button type="button" data-role="child" role="tab">Membro</button>
         </div>
 
         <div id="login-form-slot"></div>
@@ -196,16 +196,16 @@ export function renderLogin(root, onSuccess) {
           <input id="reg-adult-password" type="password" autocomplete="new-password" minlength="8" required />
         </div>
         <div class="field">
-          <label for="reg-child-name">Nome da criança</label>
+          <label for="reg-child-name">Nome do membro</label>
           <input id="reg-child-name" type="text" required />
         </div>
         <div class="field">
-          <label for="reg-child-pin">PIN da criança (4 dígitos)</label>
+          <label for="reg-child-pin">PIN do membro (4 dígitos)</label>
           <input id="reg-child-pin" type="text" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required />
         </div>
         <label class="consent-check">
           <input id="reg-responsible-consent" type="checkbox" required />
-          <span>Confirmo que sou responsável pela criança e autorizo o tratamento dos dados necessários para usar o PACUS.</span>
+          <span>Confirmo que sou responsável pelo membro e autorizo o tratamento dos dados necessários para usar o PACUS.</span>
         </label>
         <p class="error-text hidden" id="register-error"></p>
         <button type="submit" class="btn btn-primary btn-block">Criar família</button>
@@ -266,7 +266,7 @@ export function renderLogin(root, onSuccess) {
       <div class="login-form">
         <p class="profile-picker-hint">Família criada! Guarde estas informações em lugar seguro:</p>
         <div class="field">
-          <label>Código da família — a criança usa para logar em novos aparelhos</label>
+          <label>Código da família — o membro usa para logar em novos aparelhos</label>
           <p class="register-code">${escapeHtml(result.familyCode)}</p>
         </div>
         <div class="field">

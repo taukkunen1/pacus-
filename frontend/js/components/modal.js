@@ -340,7 +340,7 @@ export function promptTaskForm({
         <div class="field">
           <label class="task-form-checkbox">
             <input type="checkbox" id="task-form-has-options" ${initialOptions.length > 0 ? "checked" : ""} />
-            <span>Tarefa com opções pra criança escolher (ex.: torre de copos / ponte de papel)</span>
+            <span>Tarefa com opções pro membro escolher (ex.: torre de copos / ponte de papel)</span>
           </label>
           <div id="task-form-options-list" class="task-form-options-list ${initialOptions.length > 0 ? "" : "hidden"}"></div>
         </div>
@@ -351,7 +351,7 @@ export function promptTaskForm({
             id="task-form-reason"
             type="text"
             value="${escapeHtml(values.reason ?? "")}"
-            placeholder="O que a criança vê como motivo, não como fazer"
+            placeholder="O que o membro vê como motivo, não como fazer"
           />
         </div>
 
@@ -1092,7 +1092,7 @@ export function promptPermanentTaskForm({
         <div class="field">
           <label class="task-form-checkbox">
             <input type="checkbox" id="template-form-has-options" ${initialOptions.length > 0 ? "checked" : ""} />
-            <span>Tarefa com opções pra criança escolher (ex.: torre de copos / ponte de papel)</span>
+            <span>Tarefa com opções pro membro escolher (ex.: torre de copos / ponte de papel)</span>
           </label>
           <div id="template-form-options-list" class="task-form-options-list ${initialOptions.length > 0 ? "" : "hidden"}"></div>
         </div>
@@ -1420,7 +1420,7 @@ export function promptReactionForm({ current = null } = {}) {
         </div>
 
         <div class="field">
-          <label for="reaction-form-message">Mensagem pra criança (opcional)</label>
+          <label for="reaction-form-message">Mensagem pro membro (opcional)</label>
           <textarea
             id="reaction-form-message"
             class="modal-textarea"
@@ -1905,7 +1905,7 @@ export function promptChoiceForm({
 }
 
 // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md), item 1: "como
-// você quer organizar sua noite?" -- a criança escolhe a ordem das tarefas
+// você quer organizar sua noite?" -- o membro escolhe a ordem das tarefas
 // restantes (setas pra cima/baixo, mesmo padrão de reordenar tarefas permanentes)
 // e opcionalmente um momento aproximado pra cada uma (ex.: "depois do banho").
 // Nunca substitui a ordem normal da rotina -- e só o combinado que ela mesma
@@ -1913,7 +1913,7 @@ export function promptChoiceForm({
 //
 // tasks: [{ id, title }] na ordem atual da rotina. initialPlan (se houver, ver
 // DailyRoutine.EveningPlan): [{ taskId, approxLabel }] pra pre-popular caso a
-// crianca esteja reabrindo o planejamento no mesmo dia. Resolve com
+// membro esteja reabrindo o planejamento no mesmo dia. Resolve com
 // [{ taskId, approxLabel }] na ordem escolhida, ou null se cancelar.
 export function promptEveningPlanForm({ tasks, initialPlan = [] }) {
   return new Promise((resolve) => {

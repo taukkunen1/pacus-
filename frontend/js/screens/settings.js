@@ -70,7 +70,7 @@ export async function renderSettings(root, navigate) {
           <div class="task-card__content">
             <strong class="task-title">Código da família</strong>
             <span class="task-description">
-              ${familyCode ? `<span class="register-code register-code--inline">${escapeHtml(familyCode)}</span>` : "não disponível"} — a criança digita este código para logar em um novo aparelho, no lugar de colar um id.
+              ${familyCode ? `<span class="register-code register-code--inline">${escapeHtml(familyCode)}</span>` : "não disponível"} — o membro digita este código para logar em um novo aparelho, no lugar de colar um id.
             </span>
           </div>
         </div>
@@ -99,18 +99,18 @@ export async function renderSettings(root, navigate) {
 
         <div class="task-card">
           <div class="task-card__content">
-            <strong class="task-title">Adicionar criança</strong>
-            <span class="task-description">Cadastra uma nova criança nesta família, com nome e PIN de login próprios.</span>
+            <strong class="task-title">Adicionar membro</strong>
+            <span class="task-description">Cadastra um novo membro nesta família, com nome e PIN de login próprios.</span>
           </div>
           <div class="task-actions">
-            <button class="btn btn-ghost" id="add-child">+ Criança</button>
+            <button class="btn btn-ghost" id="add-child">+ Membro</button>
           </div>
         </div>
 
         <div class="task-card">
           <div class="task-card__content">
-            <strong class="task-title">PIN da criança</strong>
-            <span class="task-description">Redefine o PIN de login de uma das crianças da família.</span>
+            <strong class="task-title">PIN do membro</strong>
+            <span class="task-description">Redefine o PIN de login de um dos membros da família.</span>
           </div>
           <div class="task-actions">
             <button class="btn btn-ghost" id="change-child-pin">Trocar PIN</button>
@@ -214,14 +214,14 @@ export async function renderSettings(root, navigate) {
   // manual de um registro no banco) nao tinha como se recuperar pelo app.
   async function addChild() {
     const name = await promptInput({
-      title: "Adicionar criança",
-      label: "Nome da criança",
+      title: "Adicionar membro",
+      label: "Nome do membro",
       placeholder: "Nome"
     });
     if (!name?.trim()) return;
 
     const pin = await promptInput({
-      title: "Adicionar criança",
+      title: "Adicionar membro",
       label: "PIN de login (4 dígitos)",
       placeholder: "0000",
       type: "text"
@@ -255,7 +255,7 @@ export async function renderSettings(root, navigate) {
     }
 
     if (!children.length) {
-      showToast("Nenhuma criança cadastrada nesta família.", { error: true });
+      showToast("Nenhum membro cadastrado nesta família.", { error: true });
       return;
     }
 
@@ -265,7 +265,7 @@ export async function renderSettings(root, navigate) {
       const choice = Number(
         await promptInput({
           title: "Trocar PIN",
-          label: "Qual criança? (digite o número)",
+          label: "Qual membro? (digite o número)",
           value: "1",
           hint: names
         })

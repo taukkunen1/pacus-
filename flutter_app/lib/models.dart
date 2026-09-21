@@ -1,7 +1,7 @@
 class DailyTask {
-  const DailyTask({required this.id, required this.title, required this.period, required this.type, required this.status, required this.points, this.description, this.minimumGoalLabel, this.deletedAt, this.options = const [], this.selectedOption, this.reason});
+  const DailyTask({required this.id, required this.title, required this.period, required this.type, required this.status, required this.points, this.order = 0, this.description, this.minimumGoalLabel, this.deletedAt, this.options = const [], this.selectedOption, this.reason});
   final String id, title, period, type, status;
-  final int points;
+  final int points, order;
   final String? description, minimumGoalLabel, selectedOption, reason;
   final List<String> options;
   final DateTime? deletedAt;
@@ -11,6 +11,7 @@ class DailyTask {
     id: json['id']?.toString() ?? '', title: json['title']?.toString() ?? 'Tarefa',
     period: json['period']?.toString() ?? 'morning', type: json['type']?.toString() ?? 'expected',
     status: json['status']?.toString() ?? 'pending', points: (json['points'] as num?)?.toInt() ?? 0,
+    order: (json['order'] as num?)?.toInt() ?? 0,
     description: json['description']?.toString(), minimumGoalLabel: json['minimumGoalLabel']?.toString(),
     options: ((json['options'] as List?) ?? const []).map((e) => e.toString()).toList(),
     selectedOption: json['selectedOption']?.toString(), reason: json['reason']?.toString(),
@@ -19,11 +20,12 @@ class DailyTask {
 }
 
 class DailyRoutine {
-  const DailyRoutine({required this.id, required this.familyId, required this.date, required this.gameTimerEnabled, required this.gameTimerMinutes, required this.gameTimerExtraMinutes, required this.tasks});
+  const DailyRoutine({required this.id, required this.familyId, required this.date, required this.gameTimerEnabled, required this.gameTimerMinutes, required this.gameTimerExtraMinutes, required this.tasks, this.reaction});
   final String id, familyId, date;
   final bool gameTimerEnabled;
   final int gameTimerMinutes, gameTimerExtraMinutes;
   final List<DailyTask> tasks;
+  final Map<String, dynamic>? reaction;
   int get availableGameMinutes => (gameTimerMinutes + gameTimerExtraMinutes).clamp(0, 1000000);
   int get doneTasks => tasks.where((t) => !t.isDeleted && t.isDone).length;
   int get totalTasks => tasks.where((t) => !t.isDeleted).length;
@@ -32,6 +34,7 @@ class DailyRoutine {
     gameTimerEnabled: json['gameTimerEnabled'] == true, gameTimerMinutes: (json['gameTimerMinutes'] as num?)?.toInt() ?? 120,
     gameTimerExtraMinutes: (json['gameTimerExtraMinutes'] as num?)?.toInt() ?? 0,
     tasks: ((json['tasks'] as List?) ?? const []).whereType<Map<String, dynamic>>().map(DailyTask.fromJson).toList(),
+    reaction: json['reaction'] is Map ? Map<String, dynamic>.from(json['reaction'] as Map) : null,
   );
 }
 

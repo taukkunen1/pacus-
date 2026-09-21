@@ -1,10 +1,12 @@
 
 import 'package:flutter/material.dart';
 import '../api.dart';
+import '../models.dart';
 
 class PointsScreen extends StatefulWidget {
-  const PointsScreen({super.key, required this.api});
+  const PointsScreen({super.key, required this.api, required this.session});
   final PacusApi api;
+  final AuthSession session;
   @override State<PointsScreen> createState() => _PointsScreenState();
 }
 
@@ -18,6 +20,52 @@ class _PointsScreenState extends State<PointsScreen> {
   String? error;
 
   @override void initState() { super.initState(); _load(reset: true); }
+
+  Future<void> _adjustBalance() async {
+    final balanceController = TextEditingController(text: (balance?['balance'] ?? 0).toString());
+    final reasonController = TextEditingController();
+    final payload = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Ajustar saldo de pontos'),
+        content: SizedBox(
+          width: 420,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(
+              controller: balanceController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Novo saldo absoluto'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(labelText: 'Motivo do ajuste'),
+            ),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, {
+              'balance': int.tryParse(balanceController.text) ?? 0,
+              'reason': reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),
+            }),
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+    balanceController.dispose();
+    reasonController.dispose();
+    if (payload == null) return;
+
+    try {
+      await widget.api.request('/points/adjust', method: 'POST', body: payload);
+      await _load(reset: true);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
 
   Future<void> _load({bool reset = false}) async {
     if (reset) { page = 1; transactions.clear(); balance = null; autonomy = null; }
@@ -50,6 +98,10 @@ class _PointsScreenState extends State<PointsScreen> {
                 const Text('Pacus Points', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 4),
                 Text('R\$ ' + (((balance?['brl'] as num?)?.toDouble() ?? 0).toStringAsFixed(2).replaceAll('.', ','))),
+                if (widget.session.isAdult) ...[
+                  const SizedBox(height: 14),
+                  OutlinedButton.icon(onPressed: _adjustBalance, icon: const Icon(Icons.tune), label: const Text('Ajustar saldo')),
+                ],
               ]),
             ),
           ),

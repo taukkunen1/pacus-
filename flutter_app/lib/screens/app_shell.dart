@@ -34,9 +34,9 @@ class _PacusShellState extends State<PacusShell> {
         _TabSpec('Histórico', Icons.history,
             HistoryScreen(api: widget.api)),
         _TabSpec('Pontos', Icons.stars_outlined,
-            PointsScreen(api: widget.api)),
+            PointsScreen(api: widget.api, session: widget.session)),
         _TabSpec('PACUS', Icons.water,
-            PacusScreen(api: widget.api)),
+            PacusScreen(api: widget.api, session: widget.session)),
         _TabSpec('Loja', Icons.storefront_outlined,
             StoreScreen(api: widget.api, session: widget.session)),
         if (widget.session.isAdult)

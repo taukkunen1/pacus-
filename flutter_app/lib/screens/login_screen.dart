@@ -80,6 +80,68 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _resetPassword() async {
+    final resetEmail = TextEditingController(text: email.text.trim());
+    final recovery = TextEditingController();
+    final newPassword = TextEditingController();
+
+    final payload = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Redefinir senha'),
+        content: SizedBox(
+          width: 460,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: resetEmail, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'E-mail')),
+            const SizedBox(height: 8),
+            TextField(controller: recovery, decoration: const InputDecoration(labelText: 'Código de recuperação')),
+            const SizedBox(height: 8),
+            TextField(controller: newPassword, obscureText: true, decoration: const InputDecoration(labelText: 'Nova senha')),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, {
+              'email': resetEmail.text.trim(),
+              'recoveryCode': recovery.text.trim(),
+              'newPassword': newPassword.text,
+            }),
+            child: const Text('Redefinir'),
+          ),
+        ],
+      ),
+    );
+
+    resetEmail.dispose(); recovery.dispose(); newPassword.dispose();
+    if (payload == null) return;
+
+    setState(() { busy = true; error = null; });
+    try {
+      final result = Map<String, dynamic>.from(
+        await widget.api.request('/auth/adult/reset-password', method: 'POST', body: payload, authenticated: false) as Map,
+      );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Senha atualizada'),
+          content: SelectableText(
+            (result['message']?.toString() ?? 'Senha redefinida.') +
+            '\n\nNovo código de recuperação: ' +
+            (result['newRecoveryCode']?.toString() ?? result['recoveryCode']?.toString() ?? ''),
+          ),
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Entendi'))],
+        ),
+      );
+      email.text = payload['email'].toString();
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   Future<void> _register() async {
     final adultName = TextEditingController();
     final adultEmail = TextEditingController();
@@ -191,6 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextField(controller: password, obscureText: true, autofillHints: const [AutofillHints.password], decoration: const InputDecoration(labelText: 'Senha')),
                   const SizedBox(height: 16),
                   FilledButton(onPressed: busy ? null : _loginAdult, child: const Padding(padding: EdgeInsets.all(14), child: Text('Entrar'))),
+                  TextButton(onPressed: busy ? null : _resetPassword, child: const Text('Esqueci minha senha')),
                   TextButton(onPressed: busy ? null : _register, child: const Text('Criar uma família')),
                 ] else ...[
                   TextField(controller: familyCode, textCapitalization: TextCapitalization.characters, decoration: const InputDecoration(labelText: 'Código da família', hintText: 'ABC-123')),

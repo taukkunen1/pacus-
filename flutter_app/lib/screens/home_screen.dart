@@ -196,6 +196,41 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _moveTaskWithinPeriod(DailyTask task, int delta) async {
+    final r = routine;
+    if (r == null) return;
+    final active = r.tasks.where((t) => !t.isDeleted).toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
+    final samePeriod = active.where((t) => t.period.toLowerCase() == task.period.toLowerCase()).toList();
+    final index = samePeriod.indexWhere((t) => t.id == task.id);
+    final target = index + delta;
+    if (index < 0 || target < 0 || target >= samePeriod.length) return;
+
+    final moving = samePeriod[index];
+    samePeriod[index] = samePeriod[target];
+    samePeriod[target] = moving;
+
+    final rebuilt = <DailyTask>[];
+    for (final period in const ['morning', 'afternoon', 'evening']) {
+      final items = period == task.period.toLowerCase()
+          ? samePeriod
+          : active.where((t) => t.period.toLowerCase() == period).toList();
+      rebuilt.addAll(items);
+    }
+
+    try {
+      await widget.api.request(
+        '/daily-routines/today/order',
+        method: 'PUT',
+        body: rebuilt.map((t) => t.id).toList(),
+      );
+      final updated = await widget.api.getToday();
+      if (mounted) setState(() => routine = updated);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    }
+  }
+
   Future<void> _setReaction(String icon) async {
     final controller = TextEditingController();
     final message = await showDialog<String>(
@@ -543,6 +578,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 12),
                   ],
                   _progressCard(r),
+                  if (r.reaction != null) ...[
+                    const SizedBox(height: 16),
+                    _receivedReactionCard(r.reaction!),
+                  ],
                   if (widget.session.isAdult) ...[
                     const SizedBox(height: 16),
                     _reactionCard(),
@@ -636,6 +675,39 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _receivedReactionCard(Map<String, dynamic> reaction) {
+    const icons = {
+      'heart': '❤️',
+      'clap': '👏',
+      'star': '⭐',
+      'hug': '🤗',
+    };
+    final icon = icons[reaction['icon']?.toString()] ?? '✨';
+    final message = reaction['message']?.toString().trim() ?? '';
+    return Card(
+      color: const Color(0xFFFFF4D8),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(icon, style: const TextStyle(fontSize: 34)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Reconhecimento de hoje', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+                if (message.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(message),
+                ],
+              ]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _reactionCard() => Card(
     child: Padding(
       padding: const EdgeInsets.all(18),
@@ -656,68 +728,144 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _tasksCard(DailyRoutine r) {
     final tasks = r.tasks.where((t) => !t.isDeleted).toList()
-      ..sort((a, b) => a.period.compareTo(b.period));
+      ..sort((a, b) => a.order.compareTo(b.order));
+
+    final morning = tasks.where((t) => t.period.toLowerCase() == 'morning').toList();
+    final afternoon = tasks.where((t) => t.period.toLowerCase() == 'afternoon').toList();
+    final evening = tasks.where((t) => t.period.toLowerCase() == 'evening').toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(children: [
+          const Expanded(child: Text('Minha rotina', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900))),
+          IconButton(onPressed: _createDailyTask, icon: const Icon(Icons.add_task), tooltip: 'Adicionar tarefa de hoje'),
+        ]),
+        const SizedBox(height: 10),
+        _periodSection(
+          title: 'Manhã',
+          icon: Icons.wb_sunny_outlined,
+          tasks: morning,
+          tint: const Color(0xFFFFF3D6),
+        ),
+        const SizedBox(height: 14),
+        _periodSection(
+          title: 'Tarde',
+          icon: Icons.light_mode_outlined,
+          tasks: afternoon,
+          tint: const Color(0xFFFFE7C7),
+        ),
+        const SizedBox(height: 14),
+        _periodSection(
+          title: 'Noite',
+          icon: Icons.nightlight_round,
+          tasks: evening,
+          tint: const Color(0xFFE8E7FA),
+        ),
+      ],
+    );
+  }
+
+  Widget _periodSection({
+    required String title,
+    required IconData icon,
+    required List<DailyTask> tasks,
+    required Color tint,
+  }) {
+    final done = tasks.where((t) => t.isDone).length;
+
     return Card(
+      color: tint,
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
-            const Expanded(child: Text('Minha rotina', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900))),
-            IconButton(onPressed: _createDailyTask, icon: const Icon(Icons.add_task), tooltip: 'Adicionar tarefa de hoje'),
+            Icon(icon),
+            const SizedBox(width: 10),
+            Expanded(child: Text(title, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900))),
+            Text('$done/${tasks.length}', style: const TextStyle(fontWeight: FontWeight.w800)),
           ]),
-          const SizedBox(height: 10),
-          if (tasks.isEmpty) const Text('Nenhuma tarefa para hoje.')
-          else ...tasks.map((task) => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                value: task.isDone,
-                onChanged: (_) => _toggleTask(task),
-                title: Text(task.title, style: TextStyle(fontWeight: FontWeight.w700, decoration: task.isDone ? TextDecoration.lineThrough : null)),
-                subtitle: Text(_periodLabel(task.period) + ' • ' + task.points.toString() + ' pontos'),
-                secondary: PopupMenuButton<String>(
-                  onSelected: (value) {
-                    if (value == 'edit') _editDailyTask(task);
-                    if (value == 'initiative') _setInitiative(task);
-                    if (value == 'skip') _setSkipReason(task);
-                    if (value == 'delete') _deleteDailyTask(task);
-                  },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'edit', child: Text('Editar')),
-                    PopupMenuItem(value: 'initiative', child: Text('Como comecei')),
-                    PopupMenuItem(value: 'skip', child: Text('O que aconteceu')),
-                    PopupMenuItem(value: 'delete', child: Text('Remover do dia')),
-                  ],
-                ),
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
-              if (task.options.isNotEmpty && !task.isDone)
-                Padding(
-                  padding: const EdgeInsets.only(left: 12, bottom: 10),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: task.options.map((option) => ChoiceChip(
-                      label: Text(option),
-                      selected: task.selectedOption == option,
-                      onSelected: (_) => _selectOption(task, option),
-                    )).toList(),
-                  ),
-                ),
+          const SizedBox(height: 12),
+          if (tasks.isEmpty)
+            Text('Nenhuma tarefa para ${title.toLowerCase()}.')
+          else
+            for (var i = 0; i < tasks.length; i++) ...[
+              _taskTile(tasks[i], canMoveUp: i > 0, canMoveDown: i < tasks.length - 1),
+              if (i < tasks.length - 1) const Divider(height: 1),
             ],
-          )),
         ]),
       ),
     );
   }
 
-  String _periodLabel(String period) {
-    switch (period.toLowerCase()) {
-      case 'morning': return 'Manhã';
-      case 'afternoon': return 'Tarde';
-      case 'evening': return 'Noite';
-      default: return period;
+  Widget _taskTile(DailyTask task, {required bool canMoveUp, required bool canMoveDown}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          value: task.isDone,
+          onChanged: (_) => _toggleTask(task),
+          title: Text(
+            task.title,
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              decoration: task.isDone ? TextDecoration.lineThrough : null,
+            ),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${task.points} pontos · ${_typeLabel(task.type)}'),
+              if ((task.minimumGoalLabel ?? '').isNotEmpty)
+                Text('Meta mínima: ${task.minimumGoalLabel}', style: const TextStyle(fontSize: 12)),
+              if ((task.reason ?? '').isNotEmpty)
+                Text(task.reason!, style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
+            ],
+          ),
+          secondary: PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'up') _moveTaskWithinPeriod(task, -1);
+              if (value == 'down') _moveTaskWithinPeriod(task, 1);
+              if (value == 'edit') _editDailyTask(task);
+              if (value == 'initiative') _setInitiative(task);
+              if (value == 'skip') _setSkipReason(task);
+              if (value == 'delete') _deleteDailyTask(task);
+            },
+            itemBuilder: (_) => [
+              if (canMoveUp) const PopupMenuItem(value: 'up', child: Text('Mover para cima')),
+              if (canMoveDown) const PopupMenuItem(value: 'down', child: Text('Mover para baixo')),
+              const PopupMenuItem(value: 'edit', child: Text('Editar')),
+              const PopupMenuItem(value: 'initiative', child: Text('Como comecei')),
+              const PopupMenuItem(value: 'skip', child: Text('O que aconteceu')),
+              const PopupMenuItem(value: 'delete', child: Text('Remover do dia')),
+            ],
+          ),
+          controlAffinity: ListTileControlAffinity.leading,
+        ),
+        if (task.options.isNotEmpty && !task.isDone)
+          Padding(
+            padding: const EdgeInsets.only(left: 12, bottom: 12),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: task.options.map((option) => ChoiceChip(
+                label: Text(option),
+                selected: task.selectedOption == option,
+                onSelected: (_) => _selectOption(task, option),
+              )).toList(),
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _typeLabel(String type) {
+    switch (type.toLowerCase()) {
+      case 'mandatory': return 'Obrigatória';
+      case 'challenge': return 'Desafio';
+      default: return 'Esperada';
     }
   }
+
 }

@@ -48,6 +48,10 @@ public interface IDailyRoutineService
     Task<DailyRoutine> PauseGameTimerAsync(ObjectId userId, ObjectId actorId, string actorRole);
     Task<DailyRoutine> ResumeGameTimerAsync(ObjectId userId, ObjectId actorId, string actorRole);
 
+    // Debita uma sessao concluida do saldo diario. Adulto ou crianca podem chamar;
+    // o service valida e nunca deixa o saldo ficar negativo.
+    Task<DailyRoutine> ConsumeGameTimerAsync(ObjectId userId, int minutes, ObjectId actorId, string actorRole);
+
     // Ajusta o tempo total (+1h/-1h etc) — restrito a adulto; o controller
     // ja aplica [RequireRole(Adult)], mas o service tambem confere por
     // seguranca (nunca confiar so no frontend/controller).

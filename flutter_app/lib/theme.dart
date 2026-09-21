@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 class PacusTheme {
-  static const _lightPrimary = Color(0xFF176B5B);
-  static const _darkPrimary = Color(0xFF74D7C4);
+  static const _lightPrimary = Color(0xFF007C83);
+  static const _darkPrimary = Color(0xFF62E4E8);
 
   static ThemeData light() => _build(Brightness.light);
   static ThemeData dark() => _build(Brightness.dark);
@@ -13,30 +13,30 @@ class PacusTheme {
       brightness: brightness,
       primary: dark ? _darkPrimary : _lightPrimary,
       onPrimary: dark ? const Color(0xFF06372F) : Colors.white,
-      primaryContainer: dark ? const Color(0xFF144A41) : const Color(0xFFD7F2EA),
-      onPrimaryContainer: dark ? const Color(0xFFC9F6EA) : const Color(0xFF103E35),
-      secondary: dark ? const Color(0xFFFFC978) : const Color(0xFFA95B00),
-      onSecondary: dark ? const Color(0xFF472A00) : Colors.white,
-      secondaryContainer: dark ? const Color(0xFF5A3A0B) : const Color(0xFFFFE6BF),
-      onSecondaryContainer: dark ? const Color(0xFFFFE2B2) : const Color(0xFF4B2B00),
-      tertiary: dark ? const Color(0xFFAEC6FF) : const Color(0xFF3F5F9D),
-      onTertiary: dark ? const Color(0xFF18315F) : Colors.white,
-      tertiaryContainer: dark ? const Color(0xFF263C67) : const Color(0xFFDDE7FF),
-      onTertiaryContainer: dark ? const Color(0xFFDCE6FF) : const Color(0xFF1C335F),
+      primaryContainer: dark ? const Color(0xFF003F43) : const Color(0xFFC8F4F1),
+      onPrimaryContainer: dark ? const Color(0xFFB9F7F4) : const Color(0xFF003C40),
+      secondary: dark ? const Color(0xFFFFA38B) : const Color(0xFFD94F35),
+      onSecondary: dark ? const Color(0xFF552014) : Colors.white,
+      secondaryContainer: dark ? const Color(0xFF5B2B20) : const Color(0xFFFFDDD3),
+      onSecondaryContainer: dark ? const Color(0xFFFFD8CC) : const Color(0xFF5C1D10),
+      tertiary: dark ? const Color(0xFFC7B8FF) : const Color(0xFF6554C0),
+      onTertiary: dark ? const Color(0xFF31256E) : Colors.white,
+      tertiaryContainer: dark ? const Color(0xFF3A316E) : const Color(0xFFE9E2FF),
+      onTertiaryContainer: dark ? const Color(0xFFE8E1FF) : const Color(0xFF30236F),
       error: dark ? const Color(0xFFFFB4AB) : const Color(0xFFB3261E),
       onError: dark ? const Color(0xFF690005) : Colors.white,
       errorContainer: dark ? const Color(0xFF93000A) : const Color(0xFFF9DEDC),
       onErrorContainer: dark ? const Color(0xFFFFDAD6) : const Color(0xFF410E0B),
-      surface: dark ? const Color(0xFF141A19) : const Color(0xFFFBFCFA),
-      onSurface: dark ? const Color(0xFFE6ECE9) : const Color(0xFF1A201E),
-      surfaceContainerLowest: dark ? const Color(0xFF0C1110) : Colors.white,
-      surfaceContainerLow: dark ? const Color(0xFF18201E) : const Color(0xFFF4F7F5),
-      surfaceContainer: dark ? const Color(0xFF1C2522) : const Color(0xFFEDF2EF),
-      surfaceContainerHigh: dark ? const Color(0xFF26302D) : const Color(0xFFE6ECE8),
-      surfaceContainerHighest: dark ? const Color(0xFF303A37) : const Color(0xFFDDE4E0),
-      onSurfaceVariant: dark ? const Color(0xFFBEC9C5) : const Color(0xFF56615D),
-      outline: dark ? const Color(0xFF82908B) : const Color(0xFF78847F),
-      outlineVariant: dark ? const Color(0xFF3D4945) : const Color(0xFFC5CFCA),
+      surface: dark ? const Color(0xFF121719) : const Color(0xFFFFFBF7),
+      onSurface: dark ? const Color(0xFFF1F4F4) : const Color(0xFF182022),
+      surfaceContainerLowest: dark ? const Color(0xFF090D0F) : Colors.white,
+      surfaceContainerLow: dark ? const Color(0xFF171E20) : const Color(0xFFF7F2EC),
+      surfaceContainer: dark ? const Color(0xFF1E272A) : const Color(0xFFF0EAE3),
+      surfaceContainerHigh: dark ? const Color(0xFF283235) : const Color(0xFFEAE3DB),
+      surfaceContainerHighest: dark ? const Color(0xFF333E41) : const Color(0xFFE2D9D0),
+      onSurfaceVariant: dark ? const Color(0xFFC5CFD0) : const Color(0xFF596366),
+      outline: dark ? const Color(0xFF8B9698) : const Color(0xFF717C7F),
+      outlineVariant: dark ? const Color(0xFF414C4F) : const Color(0xFFC5CDCF),
       shadow: Colors.black,
       scrim: Colors.black,
       inverseSurface: dark ? const Color(0xFFE6ECE9) : const Color(0xFF2E3532),
@@ -68,7 +68,7 @@ class PacusTheme {
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
-      scaffoldBackgroundColor: dark ? const Color(0xFF0F1513) : const Color(0xFFF5F8F6),
+      scaffoldBackgroundColor: dark ? const Color(0xFF0B1012) : const Color(0xFFFFF8F1),
       textTheme: text,
       appBarTheme: AppBarTheme(
         elevation: 0,

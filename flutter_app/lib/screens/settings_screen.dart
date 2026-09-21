@@ -155,6 +155,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String type = task?['type']?.toString().toLowerCase() ?? 'expected';
     String period = task?['period']?.toString().toLowerCase() ?? 'morning';
     String recurrence = task?['recurrence']?.toString().toLowerCase() ?? 'daily';
+    final anchorDate = TextEditingController(text: task?['anchorDate']?.toString() ?? '');
+    final intervalDays = TextEditingController(text: (task?['intervalDays'] ?? 2).toString());
+    final selectedDays = <String>{
+      ...((task?['customDays'] as List?) ?? const []).map((e) => e.toString()),
+    };
+    String variantTitle(String day) {
+      for (final raw in (task?['variants'] as List?) ?? const []) {
+        if (raw is Map && raw['dayOfWeek']?.toString().toLowerCase() == day.toLowerCase()) {
+          return raw['title']?.toString() ?? '';
+        }
+      }
+      return '';
+    }
+    final weekdayTitles = <String, TextEditingController>{
+      for (final day in const ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'])
+        day: TextEditingController(text: variantTitle(day)),
+    };
 
     final payload = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -198,11 +215,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   decoration: const InputDecoration(labelText: 'Recorrência'),
                   items: const [
                     DropdownMenuItem(value: 'daily', child: Text('Todos os dias')),
-                    DropdownMenuItem(value: 'weekdays', child: Text('Dias úteis')),
-                    DropdownMenuItem(value: 'weekends', child: Text('Fim de semana')),
+                    DropdownMenuItem(value: 'interval', child: Text('Intervalo de dias')),
+                    DropdownMenuItem(value: 'weekday', child: Text('Dias úteis')),
+                    DropdownMenuItem(value: 'weekend', child: Text('Fim de semana')),
+                    DropdownMenuItem(value: 'custom', child: Text('Dias específicos')),
+                    DropdownMenuItem(value: 'weekday_rotation', child: Text('Atividade diferente por dia útil')),
                   ],
                   onChanged: (v) => setDialog(() => recurrence = v ?? recurrence),
                 ),
+                if (recurrence == 'interval') ...[
+                  const SizedBox(height: 8),
+                  TextField(controller: anchorDate, decoration: const InputDecoration(labelText: 'Data âncora AAAA-MM-DD')),
+                  const SizedBox(height: 8),
+                  TextField(controller: intervalDays, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Intervalo em dias')),
+                ],
+                if (recurrence == 'custom') ...[
+                  const SizedBox(height: 10),
+                  Align(alignment: Alignment.centerLeft, child: Text('Dias da semana', style: const TextStyle(fontWeight: FontWeight.w800))),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: const {
+                      'Monday': 'Seg',
+                      'Tuesday': 'Ter',
+                      'Wednesday': 'Qua',
+                      'Thursday': 'Qui',
+                      'Friday': 'Sex',
+                      'Saturday': 'Sáb',
+                      'Sunday': 'Dom',
+                    }.entries.map((entry) => FilterChip(
+                      label: Text(entry.value),
+                      selected: selectedDays.contains(entry.key),
+                      onSelected: (selected) => setDialog(() {
+                        if (selected) {
+                          selectedDays.add(entry.key);
+                        } else {
+                          selectedDays.remove(entry.key);
+                        }
+                      }),
+                    )).toList(),
+                  ),
+                ],
+                if (recurrence == 'weekday_rotation') ...[
+                  const SizedBox(height: 10),
+                  const Align(alignment: Alignment.centerLeft, child: Text('Atividade por dia útil', style: TextStyle(fontWeight: FontWeight.w800))),
+                  const SizedBox(height: 6),
+                  for (final entry in weekdayTitles.entries) ...[
+                    TextField(
+                      controller: entry.value,
+                      decoration: InputDecoration(labelText: _weekdayLabel(entry.key)),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+                ],
                 const SizedBox(height: 8),
                 TextField(controller: minimum, decoration: const InputDecoration(labelText: 'Meta mínima opcional')),
                 const SizedBox(height: 8),
@@ -222,6 +288,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'period': period,
                 'points': int.tryParse(points.text) ?? 1,
                 'recurrence': recurrence,
+                'customDays': recurrence == 'custom' ? selectedDays.toList() : null,
+                'anchorDate': recurrence == 'interval' && anchorDate.text.trim().isNotEmpty ? anchorDate.text.trim() : null,
+                'intervalDays': recurrence == 'interval' ? (int.tryParse(intervalDays.text) ?? 2) : null,
+                'variants': recurrence == 'weekday_rotation'
+                    ? weekdayTitles.entries
+                        .where((entry) => entry.value.text.trim().isNotEmpty)
+                        .map((entry) => {
+                              'dayOfWeek': entry.key,
+                              'title': entry.value.text.trim(),
+                              'description': null,
+                              'points': null,
+                            })
+                        .toList()
+                    : null,
                 'options': options.text.trim().isEmpty ? null : options.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
                 'reasons': reasons.text.trim().isEmpty ? null : reasons.text.split('|').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
                 'minimumGoalLabel': minimum.text.trim().isEmpty ? null : minimum.text.trim(),
@@ -232,7 +312,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
-    title.dispose(); description.dispose(); points.dispose(); minimum.dispose(); options.dispose(); reasons.dispose();
+    title.dispose(); description.dispose(); points.dispose(); minimum.dispose(); options.dispose(); reasons.dispose(); anchorDate.dispose(); intervalDays.dispose(); for (final controller in weekdayTitles.values) { controller.dispose(); }
     if (payload == null || (payload['title']?.toString() ?? '').isEmpty) return;
     try {
       if (task == null) {
@@ -249,6 +329,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await widget.api.delete('/tasks/' + task['id'].toString());
       await _load();
     } catch (e) { _snack(e.toString()); }
+  }
+
+  String _weekdayLabel(String day) {
+    const labels = {
+      'Monday': 'Segunda-feira',
+      'Tuesday': 'Terça-feira',
+      'Wednesday': 'Quarta-feira',
+      'Thursday': 'Quinta-feira',
+      'Friday': 'Sexta-feira',
+    };
+    return labels[day] ?? day;
   }
 
   @override Widget build(BuildContext context) => Scaffold(

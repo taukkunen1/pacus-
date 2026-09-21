@@ -4,9 +4,11 @@ import '../api.dart';
 import '../models.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.api, required this.onLoggedIn});
+  const LoginScreen({super.key, required this.api, required this.onLoggedIn, required this.themeMode, required this.onThemeChanged});
   final PacusApi api;
   final ValueChanged<AuthSession> onLoggedIn;
+  final ThemeMode themeMode;
+  final ValueChanged<ThemeMode> onThemeChanged;
   @override State<LoginScreen> createState() => _LoginScreenState();
 }
 
@@ -225,7 +227,32 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override Widget build(BuildContext context) => Scaffold(
-    body: Center(
+    body: Stack(
+      children: [
+        Positioned(
+          top: 12,
+          right: 12,
+          child: SafeArea(
+            child: PopupMenuButton<ThemeMode>(
+              tooltip: 'Aparência',
+              initialValue: widget.themeMode,
+              onSelected: widget.onThemeChanged,
+              icon: Icon(
+                widget.themeMode == ThemeMode.dark
+                    ? Icons.dark_mode_outlined
+                    : widget.themeMode == ThemeMode.light
+                        ? Icons.light_mode_outlined
+                        : Icons.brightness_auto_outlined,
+              ),
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: ThemeMode.light, child: Text('Modo diurno')),
+                PopupMenuItem(value: ThemeMode.dark, child: Text('Modo noturno')),
+                PopupMenuItem(value: ThemeMode.system, child: Text('Seguir dispositivo')),
+              ],
+            ),
+          ),
+        ),
+        Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: ConstrainedBox(
@@ -287,6 +314,8 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
+    ),
+      ],
     ),
   );
 }

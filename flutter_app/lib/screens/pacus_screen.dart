@@ -2,10 +2,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../api.dart';
+import '../models.dart';
 
 class PacusScreen extends StatefulWidget {
-  const PacusScreen({super.key, required this.api});
+  const PacusScreen({super.key, required this.api, required this.session});
   final PacusApi api;
+  final AuthSession session;
   @override State<PacusScreen> createState() => _PacusScreenState();
 }
 
@@ -31,6 +33,67 @@ class _PacusScreenState extends State<PacusScreen> with SingleTickerProviderStat
       if (mounted) setState(() { pacus = data; error = null; });
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
+    }
+  }
+
+  Future<void> _editState() async {
+    final size = TextEditingController(text: ((pacus?['size'] as num?)?.toDouble() ?? 0).toString());
+    final days = TextEditingController(text: (pacus?['totalClosedDays'] ?? 0).toString());
+    final hue = TextEditingController(text: pacus?['colorHue']?.toString() ?? '');
+    String stage = pacus?['stage']?.toString().toLowerCase() ?? 'young';
+
+    final payload = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialog) => AlertDialog(
+          title: const Text('Ajustar estado do PACUS'),
+          content: SizedBox(
+            width: 440,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              DropdownButtonFormField<String>(
+                initialValue: stage,
+                decoration: const InputDecoration(labelText: 'Estágio'),
+                items: const [
+                  DropdownMenuItem(value: 'egg', child: Text('Ovo')),
+                  DropdownMenuItem(value: 'cracking', child: Text('Rachando')),
+                  DropdownMenuItem(value: 'hatching', child: Text('Eclodindo')),
+                  DropdownMenuItem(value: 'baby', child: Text('Filhote')),
+                  DropdownMenuItem(value: 'young', child: Text('Jovem')),
+                  DropdownMenuItem(value: 'adult', child: Text('Adulto')),
+                ],
+                onChanged: (v) => setDialog(() => stage = v ?? stage),
+              ),
+              const SizedBox(height: 10),
+              TextField(controller: size, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Tamanho')),
+              const SizedBox(height: 10),
+              TextField(controller: days, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Dias vividos')),
+              const SizedBox(height: 10),
+              TextField(controller: hue, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Cor (0–359, vazio mantém)')),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, {
+                'stage': stage,
+                'size': double.tryParse(size.text),
+                'totalClosedDays': int.tryParse(days.text),
+                if (hue.text.trim().isNotEmpty) 'colorHue': int.tryParse(hue.text),
+              }),
+              child: const Text('Salvar'),
+            ),
+          ],
+        ),
+      ),
+    );
+    size.dispose(); days.dispose(); hue.dispose();
+    if (payload == null) return;
+
+    try {
+      await widget.api.request('/pacus/me/state', method: 'PUT', body: payload);
+      await _load();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -90,6 +153,10 @@ class _PacusScreenState extends State<PacusScreen> with SingleTickerProviderStat
               ),
             ]),
           ),
+          if (widget.session.isAdult) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(onPressed: _editState, icon: const Icon(Icons.tune), label: const Text('Ajustar PACUS')),
+          ],
           const SizedBox(height: 16),
           Row(children: [
             Expanded(child: _stat('Estágio', _stage(pacus?['stage']))),

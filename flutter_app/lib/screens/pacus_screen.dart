@@ -1,4 +1,5 @@
 
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../api.dart';
 
@@ -73,7 +74,7 @@ class _PacusScreenState extends State<PacusScreen> with SingleTickerProviderStat
                         alignment: Alignment(x, .05 + wave * .22),
                         child: Transform.scale(
                           scaleX: swim.status == AnimationStatus.reverse ? -1 : 1,
-                          child: const Text('🐟', style: TextStyle(fontSize: 92)),
+                          child: const SizedBox(width: 150, height: 100, child: CustomPaint(painter: _AxolotlPainter())),
                         ),
                       ),
                     ]);
@@ -84,7 +85,7 @@ class _PacusScreenState extends State<PacusScreen> with SingleTickerProviderStat
                 padding: const EdgeInsets.all(20),
                 child: Column(children: [
                   Text(pacus?['name']?.toString() ?? 'Pacus', style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900)),
-                  Text(_stage(pacus?['stage']), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  Text('Axolote · ' + _stage(pacus?['stage']), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                 ]),
               ),
             ]),
@@ -122,4 +123,96 @@ class _PacusScreenState extends State<PacusScreen> with SingleTickerProviderStat
       ]),
     ),
   );
+}
+
+
+class _AxolotlPainter extends CustomPainter {
+  const _AxolotlPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final body = Paint()..color = const Color(0xFFF4A7B9);
+    final dark = Paint()..color = const Color(0xFF8A4560);
+    final gill = Paint()
+      ..color = const Color(0xFFE66B8C)
+      ..strokeWidth = 6
+      ..strokeCap = StrokeCap.round;
+    final eye = Paint()..color = const Color(0xFF34252B);
+
+    final center = Offset(size.width * .53, size.height * .52);
+    canvas.drawOval(
+      Rect.fromCenter(center: center, width: size.width * .58, height: size.height * .5),
+      body,
+    );
+
+    final head = Offset(size.width * .28, size.height * .50);
+    canvas.drawCircle(head, size.height * .23, body);
+
+    for (final dy in [-.15, 0.0, .15]) {
+      final start = Offset(size.width * .16, size.height * (.50 + dy));
+      final end = Offset(size.width * .03, size.height * (.42 + dy));
+      canvas.drawLine(start, end, gill);
+      canvas.drawCircle(end, 4, gill);
+    }
+
+    for (final dy in [-.15, 0.0, .15]) {
+      final start = Offset(size.width * .18, size.height * (.50 + dy));
+      final end = Offset(size.width * .07, size.height * (.60 + dy));
+      canvas.drawLine(start, end, gill);
+      canvas.drawCircle(end, 4, gill);
+    }
+
+    canvas.drawCircle(Offset(size.width * .22, size.height * .44), 4, eye);
+    canvas.drawCircle(Offset(size.width * .34, size.height * .44), 4, eye);
+
+    final mouth = Path()
+      ..moveTo(size.width * .24, size.height * .57)
+      ..quadraticBezierTo(size.width * .28, size.height * .61, size.width * .33, size.height * .57);
+    canvas.drawPath(
+      mouth,
+      Paint()
+        ..color = dark.color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+
+    final tail = Path()
+      ..moveTo(size.width * .77, size.height * .42)
+      ..quadraticBezierTo(size.width * .98, size.height * .30, size.width * .96, size.height * .56)
+      ..quadraticBezierTo(size.width * .92, size.height * .76, size.width * .76, size.height * .60)
+      ..close();
+    canvas.drawPath(tail, body);
+
+    final leg = Paint()
+      ..color = body.color
+      ..strokeWidth = 8
+      ..strokeCap = StrokeCap.round;
+    for (final x in [.42, .62]) {
+      canvas.drawLine(
+        Offset(size.width * x, size.height * .66),
+        Offset(size.width * (x - .05), size.height * .84),
+        leg,
+      );
+      canvas.drawLine(
+        Offset(size.width * (x + .06), size.height * .66),
+        Offset(size.width * (x + .10), size.height * .84),
+        leg,
+      );
+    }
+
+    final bubble = Paint()
+      ..color = Colors.white.withValues(alpha: .55)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    for (final p in [
+      const Offset(.72, .18),
+      const Offset(.82, .10),
+      const Offset(.88, .26),
+    ]) {
+      canvas.drawCircle(Offset(size.width * p.dx, size.height * p.dy), 5 + math.sin(p.dx * 10).abs() * 3, bubble);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

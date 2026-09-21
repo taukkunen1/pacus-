@@ -116,11 +116,13 @@ class _PacusScreenState extends State<PacusScreen> with SingleTickerProviderStat
             child: Column(children: [
               Container(
                 height: 260,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Color(0xFFBDE8F2), Color(0xFF4FA7B8)],
+                    colors: Theme.of(context).brightness == Brightness.dark
+                        ? const [Color(0xFF17333A), Color(0xFF0D2025)]
+                        : const [Color(0xFFC8EFF5), Color(0xFF65B4C2)],
                   ),
                 ),
                 child: AnimatedBuilder(

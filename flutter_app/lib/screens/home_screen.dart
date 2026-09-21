@@ -624,7 +624,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final totalSeconds = math.max(1, sessionMinutes! * 60);
       final progress = (1 - remaining.inSeconds / totalSeconds).clamp(0.0, 1.0);
       return Card(
-        color: const Color(0xFFE7F4EE),
+        color: Theme.of(context).colorScheme.primaryContainer,
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(children: [
@@ -642,7 +642,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final presets = [15, 30, 45, 60].where((m) => m <= available).toList();
     return Card(
-      color: const Color(0xFFE7F4EE),
+      color: Theme.of(context).colorScheme.primaryContainer,
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -685,7 +685,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final icon = icons[reaction['icon']?.toString()] ?? '✨';
     final message = reaction['message']?.toString().trim() ?? '';
     return Card(
-      color: const Color(0xFFFFF4D8),
+      color: Theme.of(context).colorScheme.secondaryContainer,
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Row(
@@ -746,21 +746,21 @@ class _HomeScreenState extends State<HomeScreen> {
           title: 'Manhã',
           icon: Icons.wb_sunny_outlined,
           tasks: morning,
-          tint: const Color(0xFFFFF3D6),
+          tint: Theme.of(context).colorScheme.secondaryContainer,
         ),
         const SizedBox(height: 14),
         _periodSection(
           title: 'Tarde',
           icon: Icons.light_mode_outlined,
           tasks: afternoon,
-          tint: const Color(0xFFFFE7C7),
+          tint: Theme.of(context).colorScheme.primaryContainer,
         ),
         const SizedBox(height: 14),
         _periodSection(
           title: 'Noite',
           icon: Icons.nightlight_round,
           tasks: evening,
-          tint: const Color(0xFFE8E7FA),
+          tint: Theme.of(context).colorScheme.tertiaryContainer,
         ),
       ],
     );

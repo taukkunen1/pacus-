@@ -4,9 +4,11 @@ import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.api, required this.onLogout});
+  const SettingsScreen({super.key, required this.api, required this.onLogout, required this.themeMode, required this.onThemeChanged});
   final PacusApi api;
   final Future<void> Function() onLogout;
+  final ThemeMode themeMode;
+  final ValueChanged<ThemeMode> onThemeChanged;
   @override State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
@@ -359,6 +361,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           if (error != null) Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
           if (loading && familyCode.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(30), child: CircularProgressIndicator())),
+          const Text('Aparência', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: SegmentedButton<ThemeMode>(
+                segments: const [
+                  ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode_outlined), label: Text('Diurno')),
+                  ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_outlined), label: Text('Noturno')),
+                  ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.brightness_auto_outlined), label: Text('Sistema')),
+                ],
+                selected: {widget.themeMode},
+                onSelectionChanged: (values) => widget.onThemeChanged(values.first),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
           _tile('Código da família', familyCode.isEmpty ? 'Não disponível' : familyCode, Icons.key_outlined),
           const SizedBox(height: 10),
           _tile('Fuso horário', timezone, Icons.public, action: TextButton(onPressed: _changeTimezone, child: const Text('Alterar'))),

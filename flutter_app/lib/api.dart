@@ -70,7 +70,7 @@ class PacusApi {
     }
     if (response.statusCode == 401 && authenticated) await logout();
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      var message = 'Erro na API (' + response.statusCode.toString() + ')';
+      var message = 'Erro na API (${response.statusCode})';
       try {
         final parsed = jsonDecode(utf8.decode(response.bodyBytes));
         if (parsed is Map && parsed['error'] != null) message = parsed['error'].toString();

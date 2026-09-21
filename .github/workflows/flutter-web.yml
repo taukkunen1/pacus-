@@ -1,0 +1,35 @@
+name: Flutter Web CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/flutter-web
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/flutter-web.yml'
+  pull_request:
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/flutter-web.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter --version
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter build web --release --dart-define=PACUS_API_BASE_URL=https://pacus-pacus-api.fly.dev/api/v1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pacus-flutter-web
+          path: flutter_app/build/web

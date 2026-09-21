@@ -8,10 +8,21 @@ class PacusScreen extends StatefulWidget {
   @override State<PacusScreen> createState() => _PacusScreenState();
 }
 
-class _PacusScreenState extends State<PacusScreen> {
+class _PacusScreenState extends State<PacusScreen> with SingleTickerProviderStateMixin {
   Map<String, dynamic>? pacus;
   String? error;
-  @override void initState() { super.initState(); _load(); }
+  late final AnimationController swim;
+
+  @override void initState() {
+    super.initState();
+    swim = AnimationController(vsync: this, duration: const Duration(seconds: 7))..repeat(reverse: true);
+    _load();
+  }
+
+  @override void dispose() {
+    swim.dispose();
+    super.dispose();
+  }
 
   Future<void> _load() async {
     try {
@@ -37,16 +48,46 @@ class _PacusScreenState extends State<PacusScreen> {
         children: [
           if (error != null) Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
           Card(
-            color: const Color(0xFFDDEFEA),
-            child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: Column(children: [
-                const Text('🐟', style: TextStyle(fontSize: 96)),
-                const SizedBox(height: 10),
-                Text(pacus?['name']?.toString() ?? 'Pacus', style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900)),
-                Text(_stage(pacus?['stage']), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-              ]),
-            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(children: [
+              Container(
+                height: 260,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xFFBDE8F2), Color(0xFF4FA7B8)],
+                  ),
+                ),
+                child: AnimatedBuilder(
+                  animation: swim,
+                  builder: (context, _) {
+                    final x = -0.72 + (swim.value * 1.44);
+                    final wave = (swim.value - .5).abs();
+                    return Stack(children: [
+                      const Positioned(left: 20, top: 28, child: Text('○', style: TextStyle(fontSize: 30, color: Colors.white70))),
+                      const Positioned(right: 40, top: 60, child: Text('○', style: TextStyle(fontSize: 20, color: Colors.white60))),
+                      const Positioned(left: 55, bottom: 8, child: Text('🌿', style: TextStyle(fontSize: 54))),
+                      const Positioned(right: 30, bottom: 4, child: Text('🪨', style: TextStyle(fontSize: 48))),
+                      Align(
+                        alignment: Alignment(x, .05 + wave * .22),
+                        child: Transform.scale(
+                          scaleX: swim.status == AnimationStatus.reverse ? -1 : 1,
+                          child: const Text('🐟', style: TextStyle(fontSize: 92)),
+                        ),
+                      ),
+                    ]);
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(children: [
+                  Text(pacus?['name']?.toString() ?? 'Pacus', style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900)),
+                  Text(_stage(pacus?['stage']), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                ]),
+              ),
+            ]),
           ),
           const SizedBox(height: 16),
           Row(children: [

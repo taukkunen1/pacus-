@@ -115,6 +115,16 @@ public class DailyRoutinesController : ControllerBase
         return Ok(routine.ToResponse());
     }
 
+    // Finaliza uma sessao escolhida pela crianca e debita esses minutos do saldo
+    // diario. Sem RequireRole: a propria crianca precisa conseguir concluir a sessao.
+    [HttpPut("today/game-timer/consume")]
+    public async Task<IActionResult> ConsumeGameTimer([FromBody] ConsumeGameTimerRequest request)
+    {
+        var routine = await _dailyRoutineService.ConsumeGameTimerAsync(
+            _currentUser.FamilyId, request.Minutes, _currentUser.UserId, _currentUser.Role.ToString());
+        return Ok(routine.ToResponse());
+    }
+
     // +1h/-1h etc. Restrito ao painel adulto — a crianca recebe 403 direto
     // do RequireRole, nunca chega a bater no service.
     [RequireRole(UserRole.Adult)]

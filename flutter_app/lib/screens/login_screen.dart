@@ -63,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     SegmentedButton<bool>(
                       segments: const [
                         ButtonSegment(value: false, icon: Icon(Icons.person_outline), label: Text('Adulto')),
-                        ButtonSegment(value: true, icon: Icon(Icons.child_care), label: Text('Criança')),
+                        ButtonSegment(value: true, icon: Icon(Icons.child_care), label: Text('Membro')),
                       ],
                       selected: {childMode},
                       onSelectionChanged: busy ? null : (s) => setState(() { childMode = s.first; error = null; }),
@@ -76,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextField(controller: password, obscureText: true,
                         autofillHints: const [AutofillHints.password], decoration: const InputDecoration(labelText: 'Senha')),
                     ] else ...[
-                      TextField(controller: childId, decoration: const InputDecoration(labelText: 'ID da criança')),
+                      TextField(controller: childId, decoration: const InputDecoration(labelText: 'ID do perfil')),
                       const SizedBox(height: 14),
                       TextField(controller: pin, obscureText: true, keyboardType: TextInputType.number,
                         decoration: const InputDecoration(labelText: 'PIN')),
@@ -91,7 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
                       child: busy
                           ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
-                          : Text(childMode ? 'Entrar como criança' : 'Entrar'),
+                          : Text(childMode ? 'Entrar como membro' : 'Entrar'),
                     ),
                   ],
                 ),

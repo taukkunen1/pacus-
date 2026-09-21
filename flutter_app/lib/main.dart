@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'api.dart';
 import 'models.dart';
 import 'screens/app_shell.dart';
 import 'screens/login_screen.dart';
+import 'theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,13 +14,17 @@ void main() {
 
 class PacusApp extends StatefulWidget {
   const PacusApp({super.key});
+
   @override
   State<PacusApp> createState() => _PacusAppState();
 }
 
 class _PacusAppState extends State<PacusApp> {
+  static const _themeKey = 'pacus.theme.mode';
+
   final api = PacusApi();
   AuthSession? session;
+  ThemeMode themeMode = ThemeMode.system;
   bool loading = true;
 
   @override
@@ -27,8 +34,26 @@ class _PacusAppState extends State<PacusApp> {
   }
 
   Future<void> _restore() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedTheme = prefs.getString(_themeKey);
+    themeMode = switch (savedTheme) {
+      'light' => ThemeMode.light,
+      'dark' => ThemeMode.dark,
+      _ => ThemeMode.system,
+    };
     session = await api.restoreSession();
     if (mounted) setState(() => loading = false);
+  }
+
+  Future<void> _setThemeMode(ThemeMode value) async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = switch (value) {
+      ThemeMode.light => 'light',
+      ThemeMode.dark => 'dark',
+      ThemeMode.system => 'system',
+    };
+    await prefs.setString(_themeKey, stored);
+    if (mounted) setState(() => themeMode = value);
   }
 
   Future<void> _logout() async {
@@ -47,39 +72,25 @@ class _PacusAppState extends State<PacusApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'PACUS',
-      theme: ThemeData(
-        useMaterial3: true,
-        fontFamily: 'Arial',
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1F6A55),
-          brightness: Brightness.light,
-          surface: const Color(0xFFF9F6EF),
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF5F1E7),
-        cardTheme: const CardThemeData(
-          elevation: 0,
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(24)),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide.none,
-          ),
-        ),
-      ),
+      theme: PacusTheme.light(),
+      darkTheme: PacusTheme.dark(),
+      themeMode: themeMode,
       home: loading
           ? const _BootScreen()
           : session == null
               ? LoginScreen(
                   api: api,
+                  themeMode: themeMode,
+                  onThemeChanged: _setThemeMode,
                   onLoggedIn: (value) => setState(() => session = value),
                 )
-              : PacusShell(api: api, session: session!, onLogout: _logout),
+              : PacusShell(
+                  api: api,
+                  session: session!,
+                  themeMode: themeMode,
+                  onThemeChanged: _setThemeMode,
+                  onLogout: _logout,
+                ),
     );
   }
 }

@@ -675,6 +675,39 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _receivedReactionCard(Map<String, dynamic> reaction) {
+    const icons = {
+      'heart': '❤️',
+      'clap': '👏',
+      'star': '⭐',
+      'hug': '🤗',
+    };
+    final icon = icons[reaction['icon']?.toString()] ?? '✨';
+    final message = reaction['message']?.toString().trim() ?? '';
+    return Card(
+      color: const Color(0xFFFFF4D8),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(icon, style: const TextStyle(fontSize: 34)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Reconhecimento de hoje', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+                if (message.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(message),
+                ],
+              ]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _reactionCard() => Card(
     child: Padding(
       padding: const EdgeInsets.all(18),
@@ -835,12 +868,4 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  String _periodLabel(String period) {
-    switch (period.toLowerCase()) {
-      case 'morning': return 'Manhã';
-      case 'afternoon': return 'Tarde';
-      case 'evening': return 'Noite';
-      default: return period;
-    }
-  }
 }

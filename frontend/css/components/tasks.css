@@ -396,3 +396,116 @@
 }
 .game-timer__btn:hover { background: rgba(10, 43, 41, 0.2); }
 .game-timer__btn--toggle { padding: var(--space-1) var(--space-3); }
+
+
+/* Sessões de tempo de tela (2026-09-21): carteira diária + sessão escolhida pela criança. */
+.game-timer--wallet,
+.game-timer--session {
+  padding: var(--space-5);
+  border-radius: var(--radius-lg, 20px);
+  text-align: center;
+}
+.game-timer__eyebrow {
+  margin: 0;
+  font-size: var(--step-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.8;
+}
+.game-timer__balance,
+.game-timer__countdown {
+  font-family: var(--font-data);
+  font-size: clamp(3rem, 12vw, 5.8rem);
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  margin: var(--space-2) 0 var(--space-4);
+}
+.game-timer__question {
+  margin: 0 0 var(--space-3);
+  font-size: var(--step-md);
+  font-weight: 700;
+}
+.game-timer__presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.game-timer__preset {
+  min-height: 58px;
+  border: 2px solid rgba(10, 43, 41, 0.18);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--color-tide-deep);
+  font-family: var(--font-display);
+  font-size: var(--step-md);
+  font-weight: 800;
+  cursor: pointer;
+}
+.game-timer__preset:hover,
+.game-timer__preset:focus-visible {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: var(--color-tide-deep);
+}
+.game-timer__custom {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.game-timer__custom input {
+  flex: 1;
+  min-width: 0;
+  min-height: 46px;
+  border: 1.5px solid rgba(10, 43, 41, 0.2);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-3);
+  font: inherit;
+  color: var(--color-tide-deep);
+  background: rgba(255, 255, 255, 0.68);
+}
+.game-timer__btn--start {
+  min-height: 46px;
+  padding-inline: var(--space-4);
+}
+.game-timer__session-note {
+  margin: 0 0 var(--space-3);
+  font-size: var(--step-sm);
+  line-height: 1.45;
+}
+.game-timer__balance-small {
+  margin: var(--space-2) 0 0;
+  font-size: var(--step-xs);
+  opacity: 0.8;
+}
+.game-timer__finished {
+  margin: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: rgba(255,255,255,.4);
+  font-size: var(--step-md);
+  font-weight: 700;
+}
+.game-timer__adult {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid rgba(10, 43, 41, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--step-xs);
+}
+.game-timer__adult-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.game-timer__adult-actions .game-timer__btn {
+  min-height: 40px;
+  padding-inline: var(--space-3);
+}
+@media (max-width: 420px) {
+  .game-timer__presets { grid-template-columns: 1fr; }
+  .game-timer__custom { flex-direction: column; }
+}

@@ -15,11 +15,15 @@ class PacusShell extends StatefulWidget {
     required this.api,
     required this.session,
     required this.onLogout,
+    required this.themeMode,
+    required this.onThemeChanged,
   });
 
   final PacusApi api;
   final AuthSession session;
   final Future<void> Function() onLogout;
+  final ThemeMode themeMode;
+  final ValueChanged<ThemeMode> onThemeChanged;
 
   @override
   State<PacusShell> createState() => _PacusShellState();
@@ -41,7 +45,7 @@ class _PacusShellState extends State<PacusShell> {
             StoreScreen(api: widget.api, session: widget.session)),
         if (widget.session.isAdult)
           _TabSpec('Config', Icons.settings_outlined,
-              SettingsScreen(api: widget.api, onLogout: widget.onLogout)),
+              SettingsScreen(api: widget.api, onLogout: widget.onLogout, themeMode: widget.themeMode, onThemeChanged: widget.onThemeChanged)),
       ];
 
   @override
@@ -57,6 +61,13 @@ class _PacusShellState extends State<PacusShell> {
             body: Row(
               children: [
                 NavigationRail(
+                  leading: Padding(
+                    padding: const EdgeInsets.only(top: 12, bottom: 8),
+                    child: _ThemeMenu(
+                      themeMode: widget.themeMode,
+                      onChanged: widget.onThemeChanged,
+                    ),
+                  ),
                   selectedIndex: index,
                   onDestinationSelected: (value) => setState(() => index = value),
                   labelType: NavigationRailLabelType.all,
@@ -76,7 +87,22 @@ class _PacusShellState extends State<PacusShell> {
         }
 
         return Scaffold(
-          body: items[index].screen,
+          body: Stack(
+            children: [
+              Positioned.fill(child: items[index].screen),
+              Positioned(
+                top: 8,
+                right: 10,
+                child: SafeArea(
+                  child: _ThemeMenu(
+                    themeMode: widget.themeMode,
+                    onChanged: widget.onThemeChanged,
+                    compact: true,
+                  ),
+                ),
+              ),
+            ],
+          ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: index,
             onDestinationSelected: (value) => setState(() => index = value),
@@ -99,4 +125,64 @@ class _TabSpec {
   final String label;
   final IconData icon;
   final Widget screen;
+}
+
+
+class _ThemeMenu extends StatelessWidget {
+  const _ThemeMenu({
+    required this.themeMode,
+    required this.onChanged,
+    this.compact = false,
+  });
+
+  final ThemeMode themeMode;
+  final ValueChanged<ThemeMode> onChanged;
+  final bool compact;
+
+  IconData get _icon => switch (themeMode) {
+        ThemeMode.light => Icons.light_mode_outlined,
+        ThemeMode.dark => Icons.dark_mode_outlined,
+        ThemeMode.system => Icons.brightness_auto_outlined,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: compact ? scheme.surfaceContainerLow.withValues(alpha: .94) : Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: PopupMenuButton<ThemeMode>(
+        tooltip: 'Aparência',
+        initialValue: themeMode,
+        onSelected: onChanged,
+        icon: Icon(_icon),
+        itemBuilder: (_) => const [
+          PopupMenuItem(
+            value: ThemeMode.light,
+            child: ListTile(
+              dense: true,
+              leading: Icon(Icons.light_mode_outlined),
+              title: Text('Modo diurno'),
+            ),
+          ),
+          PopupMenuItem(
+            value: ThemeMode.dark,
+            child: ListTile(
+              dense: true,
+              leading: Icon(Icons.dark_mode_outlined),
+              title: Text('Modo noturno'),
+            ),
+          ),
+          PopupMenuItem(
+            value: ThemeMode.system,
+            child: ListTile(
+              dense: true,
+              leading: Icon(Icons.brightness_auto_outlined),
+              title: Text('Seguir dispositivo'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

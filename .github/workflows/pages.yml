@@ -1,12 +1,13 @@
-name: Deploy PACUS Web
+name: Deploy PACUS Flutter Web
 
 on:
   workflow_dispatch:
   push:
     branches: ["main"]
     paths:
-      - 'frontend/**'
+      - 'flutter_app/**'
       - '.github/workflows/pages.yml'
+      - 'CNAME'
 
 permissions:
   contents: read
@@ -18,16 +19,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build-and-deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter_app
     steps:
       - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter build web --release --dart-define=PACUS_API_BASE_URL=https://pacus-pacus-api.fly.dev/api/v1
+
+      - name: Preserve custom domain
+        run: cp ../CNAME build/web/CNAME
+
       - uses: actions/configure-pages@v5
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: './frontend'
+          path: './flutter_app/build/web'
+
       - id: deployment
         uses: actions/deploy-pages@v4

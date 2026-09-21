@@ -1,0 +1,360 @@
+import 'dart:async';
+import 'dart:math' as math;
+import 'dart:typed_data';
+
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../api.dart';
+import '../models.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key, required this.api, required this.session, required this.onLogout});
+  final PacusApi api;
+  final AuthSession session;
+  final Future<void> Function() onLogout;
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  DailyRoutine? routine;
+  bool loading = true;
+  String? error;
+  Timer? timer;
+  int? sessionMinutes;
+  DateTime? sessionEndsAt;
+  Duration remaining = Duration.zero;
+  bool completing = false;
+
+  String get _sessionKey => 'pacus.flutter.session:${routine?.familyId ?? ''}:${routine?.date ?? ''}';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final value = await widget.api.getToday();
+      routine = value;
+      await _restoreSession();
+      if (mounted) setState(() { loading = false; error = null; });
+    } catch (e) {
+      if (mounted) setState(() { loading = false; error = e.toString(); });
+    }
+  }
+
+  Future<void> _restoreSession() async {
+    if (routine == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_sessionKey);
+    if (raw == null) return;
+    final parts = raw.split('|');
+    if (parts.length != 2) { await prefs.remove(_sessionKey); return; }
+    final minutes = int.tryParse(parts[0]);
+    final millis = int.tryParse(parts[1]);
+    if (minutes == null || millis == null || minutes <= 0) { await prefs.remove(_sessionKey); return; }
+    sessionMinutes = minutes;
+    sessionEndsAt = DateTime.fromMillisecondsSinceEpoch(millis);
+    _startTicker();
+  }
+
+  Future<void> _startSession(int minutes) async {
+    final r = routine;
+    if (r == null || minutes <= 0 || minutes > r.availableGameMinutes) return;
+    final end = DateTime.now().add(Duration(minutes: minutes));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_sessionKey, '$minutes|${end.millisecondsSinceEpoch}');
+    setState(() {
+      sessionMinutes = minutes;
+      sessionEndsAt = end;
+      remaining = Duration(minutes: minutes);
+    });
+    _startTicker();
+  }
+
+  void _startTicker() {
+    timer?.cancel();
+    _tick();
+    timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+  }
+
+  void _tick() {
+    final end = sessionEndsAt;
+    if (end == null) return;
+    final diff = end.difference(DateTime.now());
+    if (diff <= Duration.zero) {
+      remaining = Duration.zero;
+      timer?.cancel();
+      if (mounted) setState(() {});
+      _finishSession();
+      return;
+    }
+    if (mounted) setState(() => remaining = diff);
+  }
+
+  Future<void> _finishSession() async {
+    if (completing || sessionMinutes == null) return;
+    completing = true;
+    try {
+      final updated = await widget.api.consumeGameTimer(sessionMinutes!);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_sessionKey);
+      await _playDuck();
+      if (!mounted) return;
+      setState(() {
+        routine = updated;
+        sessionMinutes = null;
+        sessionEndsAt = null;
+        remaining = Duration.zero;
+      });
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('🦆 Quá quá!'),
+          content: Text('Seu tempo terminou. Restam ${_formatMinutes(updated.availableGameMinutes)} hoje.'),
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Entendi'))],
+        ),
+      );
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    } finally {
+      completing = false;
+    }
+  }
+
+  Future<void> _playDuck() async {
+    final player = AudioPlayer();
+    try {
+      await player.play(BytesSource(_duckWav(), mimeType: 'audio/wav'));
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+    } catch (_) {
+      // O modal visual continua funcionando caso o navegador bloqueie audio.
+    } finally {
+      await player.dispose();
+    }
+  }
+
+  Uint8List _duckWav() {
+    const rate = 22050;
+    const seconds = 0.62;
+    final samples = (rate * seconds).round();
+    final data = ByteData(44 + samples * 2);
+    void ascii(int offset, String s) {
+      for (var i = 0; i < s.length; i++) { data.setUint8(offset + i, s.codeUnitAt(i)); }
+    }
+    ascii(0, 'RIFF'); data.setUint32(4, 36 + samples * 2, Endian.little); ascii(8, 'WAVE');
+    ascii(12, 'fmt '); data.setUint32(16, 16, Endian.little); data.setUint16(20, 1, Endian.little);
+    data.setUint16(22, 1, Endian.little); data.setUint32(24, rate, Endian.little);
+    data.setUint32(28, rate * 2, Endian.little); data.setUint16(32, 2, Endian.little);
+    data.setUint16(34, 16, Endian.little); ascii(36, 'data'); data.setUint32(40, samples * 2, Endian.little);
+    for (var i = 0; i < samples; i++) {
+      final t = i / rate;
+      double burst(double start, double len, double high, double low) {
+        final x = (t - start) / len;
+        if (x < 0 || x > 1) return 0;
+        final env = math.sin(math.pi * x) * (1 - x * .35);
+        final freq = high + (low - high) * x;
+        return math.sin(2 * math.pi * freq * (t - start)) * env;
+      }
+      final v = burst(0, .24, 340, 125) * .72 + burst(.30, .22, 295, 110) * .62;
+      data.setInt16(44 + i * 2, (v.clamp(-1, 1) * 30000).round(), Endian.little);
+    }
+    return data.buffer.asUint8List();
+  }
+
+  Future<void> _adjust(int delta) async {
+    try {
+      final updated = await widget.api.adjustGameTimer(delta);
+      if (mounted) setState(() => routine = updated);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    }
+  }
+
+  Future<void> _toggleTask(DailyTask task) async {
+    try {
+      if (task.isDone) {
+        await widget.api.reopenTask(task.id);
+      } else {
+        await widget.api.completeTask(task.id);
+      }
+      final updated = await widget.api.getToday();
+      if (mounted) setState(() => routine = updated);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    }
+  }
+
+  String _clock(Duration value) {
+    final total = math.max(0, value.inSeconds);
+    final h = total ~/ 3600, m = (total % 3600) ~/ 60, s = total % 60;
+    String two(int n) => n.toString().padLeft(2, '0');
+    return h > 0 ? '${two(h)}:${two(m)}:${two(s)}' : '${two(m)}:${two(s)}';
+  }
+
+  String _formatMinutes(int minutes) {
+    if (minutes >= 60) {
+      final h = minutes ~/ 60, m = minutes % 60;
+      return m == 0 ? '${h}h' : '${h}h ${m}min';
+    }
+    return '${minutes}min';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (routine == null) {
+      return Scaffold(body: Center(child: FilledButton(onPressed: _load, child: Text(error ?? 'Tentar novamente'))));
+    }
+    final r = routine!;
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        title: Text('Olá, ${widget.session.name.isEmpty ? 'PACUS' : widget.session.name}'),
+        actions: [IconButton(onPressed: widget.onLogout, tooltip: 'Sair', icon: const Icon(Icons.logout))],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 40),
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 900),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (error != null) ...[
+                    MaterialBanner(content: Text(error!), actions: [TextButton(onPressed: () => setState(() => error = null), child: const Text('Fechar'))]),
+                    const SizedBox(height: 12),
+                  ],
+                  _progressCard(r),
+                  const SizedBox(height: 16),
+                  if (r.gameTimerEnabled) _timerCard(r),
+                  const SizedBox(height: 20),
+                  _tasksCard(r),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _progressCard(DailyRoutine r) {
+    final progress = r.totalTasks == 0 ? 0.0 : r.doneTasks / r.totalTasks;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(22),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Hoje', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Text('${r.doneTasks} de ${r.totalTasks} tarefas concluídas', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 14),
+          LinearProgressIndicator(value: progress, minHeight: 10, borderRadius: BorderRadius.circular(99)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _timerCard(DailyRoutine r) {
+    final active = sessionMinutes != null && sessionEndsAt != null;
+    final available = r.availableGameMinutes;
+    if (active) {
+      final totalSeconds = math.max(1, sessionMinutes! * 60);
+      final progress = (1 - remaining.inSeconds / totalSeconds).clamp(0.0, 1.0);
+      return Card(
+        color: const Color(0xFFE7F4EE),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(children: [
+            const Text('TEMPO DESTA SESSÃO', style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1)),
+            const SizedBox(height: 12),
+            FittedBox(child: Text(_clock(remaining), style: const TextStyle(fontSize: 66, fontWeight: FontWeight.w900))),
+            const SizedBox(height: 14),
+            LinearProgressIndicator(value: progress, minHeight: 12, borderRadius: BorderRadius.circular(99)),
+            const SizedBox(height: 12),
+            Text('Você escolheu ${_formatMinutes(sessionMinutes!)} • depois restam ${_formatMinutes(math.max(0, available - sessionMinutes!))}'),
+          ]),
+        ),
+      );
+    }
+
+    final presets = [15, 30, 45, 60].where((m) => m <= available).toList();
+    return Card(
+      color: const Color(0xFFE7F4EE),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('TEMPO DISPONÍVEL HOJE', style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1)),
+          const SizedBox(height: 8),
+          FittedBox(alignment: Alignment.centerLeft, fit: BoxFit.scaleDown,
+            child: Text(_formatMinutes(available), style: const TextStyle(fontSize: 58, fontWeight: FontWeight.w900))),
+          const SizedBox(height: 18),
+          Text(available > 0 ? 'Quanto tempo você quer usar agora?' : 'Seu tempo de tela de hoje acabou. 🦆',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          if (presets.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Wrap(spacing: 10, runSpacing: 10, children: presets.map((m) =>
+              FilledButton.tonal(onPressed: () => _startSession(m), child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12), child: Text(_formatMinutes(m)),
+              ))).toList()),
+          ],
+          if (widget.session.isAdult) ...[
+            const Divider(height: 34),
+            const Text('Adulto · adicionar tempo', style: TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              OutlinedButton(onPressed: () => _adjust(15), child: const Text('+15 min')),
+              OutlinedButton(onPressed: () => _adjust(30), child: const Text('+30 min')),
+              OutlinedButton(onPressed: () => _adjust(60), child: const Text('+1 hora')),
+            ]),
+          ],
+        ]),
+      ),
+    );
+  }
+
+  Widget _tasksCard(DailyRoutine r) {
+    final tasks = r.tasks.where((t) => !t.isDeleted).toList()
+      ..sort((a, b) => a.period.compareTo(b.period));
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('Minha rotina', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 10),
+          if (tasks.isEmpty) const Text('Nenhuma tarefa para hoje.')
+          else ...tasks.map((task) => CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            value: task.isDone,
+            onChanged: (_) => _toggleTask(task),
+            title: Text(task.title, style: TextStyle(fontWeight: FontWeight.w700, decoration: task.isDone ? TextDecoration.lineThrough : null)),
+            subtitle: Text('${_periodLabel(task.period)} • ${task.points} pontos'),
+            controlAffinity: ListTileControlAffinity.leading,
+          )),
+        ]),
+      ),
+    );
+  }
+
+  String _periodLabel(String period) {
+    switch (period.toLowerCase()) {
+      case 'morning': return 'Manhã';
+      case 'afternoon': return 'Tarde';
+      case 'evening': return 'Noite';
+      default: return period;
+    }
+  }
+}

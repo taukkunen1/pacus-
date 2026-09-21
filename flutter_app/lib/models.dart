@@ -1,7 +1,7 @@
 class DailyTask {
-  const DailyTask({required this.id, required this.title, required this.period, required this.type, required this.status, required this.points, this.description, this.minimumGoalLabel, this.deletedAt, this.options = const [], this.selectedOption, this.reason});
+  const DailyTask({required this.id, required this.title, required this.period, required this.type, required this.status, required this.points, this.order = 0, this.description, this.minimumGoalLabel, this.deletedAt, this.options = const [], this.selectedOption, this.reason});
   final String id, title, period, type, status;
-  final int points;
+  final int points, order;
   final String? description, minimumGoalLabel, selectedOption, reason;
   final List<String> options;
   final DateTime? deletedAt;
@@ -11,6 +11,7 @@ class DailyTask {
     id: json['id']?.toString() ?? '', title: json['title']?.toString() ?? 'Tarefa',
     period: json['period']?.toString() ?? 'morning', type: json['type']?.toString() ?? 'expected',
     status: json['status']?.toString() ?? 'pending', points: (json['points'] as num?)?.toInt() ?? 0,
+    order: (json['order'] as num?)?.toInt() ?? 0,
     description: json['description']?.toString(), minimumGoalLabel: json['minimumGoalLabel']?.toString(),
     options: ((json['options'] as List?) ?? const []).map((e) => e.toString()).toList(),
     selectedOption: json['selectedOption']?.toString(), reason: json['reason']?.toString(),

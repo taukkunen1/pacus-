@@ -80,7 +80,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _newRecovery() async {
     try {
-      final result = await widget.api.getMapFromPost('/family/recovery-code');
+      final result = Map<String, dynamic>.from(await widget.api.request('/family/recovery-code', method: 'POST') as Map);
       if (!mounted) return;
       await showDialog<void>(
         context: context,

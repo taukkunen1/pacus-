@@ -55,7 +55,7 @@ class PacusApi {
   Future<void> completeTask(String taskId) => request('/daily-tasks/$taskId/complete', method: 'POST').then((_) {});
   Future<void> reopenTask(String taskId) => request('/daily-tasks/$taskId/reopen', method: 'POST').then((_) {});
 
-  Future<dynamic> request(String path, {String method = 'GET', Map<String, dynamic>? body, bool authenticated = true}) async {
+  Future<dynamic> request(String path, {String method = 'GET', Object? body, bool authenticated = true}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = authenticated ? prefs.getString(_tokenKey) : null;
     final headers = <String, String>{'Content-Type': 'application/json', if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token'};

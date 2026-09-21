@@ -24,12 +24,12 @@ class PacusApi {
   }
 
   Future<AuthSession> loginAdult(String email, String password) async {
-    final session = AuthSession.fromJson(await _request('/auth/adult/login', method: 'POST', body: {'email': email.trim(), 'password': password}, authenticated: false));
+    final session = AuthSession.fromJson(await request('/auth/adult/login', method: 'POST', body: {'email': email.trim(), 'password': password}, authenticated: false));
     await _persistSession(session); return session;
   }
 
   Future<AuthSession> loginChild(String userId, String pin) async {
-    final session = AuthSession.fromJson(await _request('/auth/child/login', method: 'POST', body: {'userId': userId.trim(), 'pin': pin.trim()}, authenticated: false));
+    final session = AuthSession.fromJson(await request('/auth/child/login', method: 'POST', body: {'userId': userId.trim(), 'pin': pin.trim()}, authenticated: false));
     await _persistSession(session); return session;
   }
 
@@ -39,23 +39,23 @@ class PacusApi {
   }
 
   Future<DailyRoutine> getToday() async {
-    try { return DailyRoutine.fromJson(await _request('/daily-routines/today')); }
+    try { return DailyRoutine.fromJson(await request('/daily-routines/today')); }
     on ApiException catch (e) {
       if (e.statusCode != 409) rethrow;
-      return DailyRoutine.fromJson(await _request('/daily-routines/today'));
+      return DailyRoutine.fromJson(await request('/daily-routines/today'));
     }
   }
 
   Future<DailyRoutine> consumeGameTimer(int minutes) async => DailyRoutine.fromJson(
-    await _request('/daily-routines/today/game-timer/consume', method: 'PUT', body: {'minutes': minutes}));
+    await request('/daily-routines/today/game-timer/consume', method: 'PUT', body: {'minutes': minutes}));
 
   Future<DailyRoutine> adjustGameTimer(int deltaMinutes) async => DailyRoutine.fromJson(
-    await _request('/daily-routines/today/game-timer/adjust', method: 'PUT', body: {'deltaMinutes': deltaMinutes}));
+    await request('/daily-routines/today/game-timer/adjust', method: 'PUT', body: {'deltaMinutes': deltaMinutes}));
 
-  Future<void> completeTask(String taskId) => _request('/daily-tasks/$taskId/complete', method: 'POST').then((_) {});
-  Future<void> reopenTask(String taskId) => _request('/daily-tasks/$taskId/reopen', method: 'POST').then((_) {});
+  Future<void> completeTask(String taskId) => request('/daily-tasks/$taskId/complete', method: 'POST').then((_) {});
+  Future<void> reopenTask(String taskId) => request('/daily-tasks/$taskId/reopen', method: 'POST').then((_) {});
 
-  Future<Map<String, dynamic>> _request(String path, {String method = 'GET', Map<String, dynamic>? body, bool authenticated = true}) async {
+  Future<dynamic> request(String path, {String method = 'GET', Map<String, dynamic>? body, bool authenticated = true}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = authenticated ? prefs.getString(_tokenKey) : null;
     final headers = <String, String>{'Content-Type': 'application/json', if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token'};
@@ -78,15 +78,29 @@ class PacusApi {
       throw ApiException(message, response.statusCode);
     }
     if (response.statusCode == 204 || response.bodyBytes.isEmpty) return <String, dynamic>{};
-    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-    if (decoded is! Map<String, dynamic>) throw const ApiException('Resposta inesperada da API.');
-    return decoded;
+    return jsonDecode(utf8.decode(response.bodyBytes));
   }
 
   Future<void> _persistSession(AuthSession session) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, session.token); await prefs.setString(_roleKey, session.role);
     await prefs.setString(_userIdKey, session.userId); await prefs.setString(_nameKey, session.name);
+  }
+
+  Future<Map<String, dynamic>> getMap(String path) async =>
+      Map<String, dynamic>.from(await request(path) as Map);
+
+  Future<List<dynamic>> getList(String path) async =>
+      List<dynamic>.from(await request(path) as List);
+
+  Future<Map<String, dynamic>> postMap(String path, Map<String, dynamic> body) async =>
+      Map<String, dynamic>.from(await request(path, method: 'POST', body: body) as Map);
+
+  Future<Map<String, dynamic>> putMap(String path, Map<String, dynamic> body) async =>
+      Map<String, dynamic>.from(await request(path, method: 'PUT', body: body) as Map);
+
+  Future<void> delete(String path) async {
+    await request(path, method: 'DELETE');
   }
 
   void dispose() => _client.close();

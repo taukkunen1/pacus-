@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'api.dart';
 import 'models.dart';
-import 'screens/home_screen.dart';
+import 'screens/app_shell.dart';
 import 'screens/login_screen.dart';
 
 void main() {
@@ -79,7 +79,7 @@ class _PacusAppState extends State<PacusApp> {
                   api: api,
                   onLoggedIn: (value) => setState(() => session = value),
                 )
-              : HomeScreen(api: api, session: session!, onLogout: _logout),
+              : PacusShell(api: api, session: session!, onLogout: _logout),
     );
   }
 }

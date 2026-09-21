@@ -196,6 +196,310 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _setReaction(String icon) async {
+    final controller = TextEditingController();
+    final message = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enviar reconhecimento'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Mensagem opcional'),
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text('Enviar')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (message == null) return;
+    try {
+      final data = await widget.api.request('/daily-routines/today/reaction', method: 'PUT', body: {
+        'icon': icon,
+        'message': message.isEmpty ? null : message,
+      });
+      if (data is Map<String, dynamic>) {
+        final updated = await widget.api.getToday();
+        if (mounted) setState(() => routine = updated);
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    }
+  }
+
+  Future<void> _createDailyTask() async {
+    final title = TextEditingController();
+    final points = TextEditingController(text: '1');
+    String period = 'morning';
+    String type = 'expected';
+    final payload = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialog) => AlertDialog(
+          title: const Text('Nova tarefa de hoje'),
+          content: SizedBox(
+            width: 460,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(controller: title, decoration: const InputDecoration(labelText: 'Título')),
+              const SizedBox(height: 10),
+              TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos')),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: period,
+                decoration: const InputDecoration(labelText: 'Período'),
+                items: const [
+                  DropdownMenuItem(value: 'morning', child: Text('Manhã')),
+                  DropdownMenuItem(value: 'afternoon', child: Text('Tarde')),
+                  DropdownMenuItem(value: 'evening', child: Text('Noite')),
+                ],
+                onChanged: (v) => setDialog(() => period = v ?? period),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: type,
+                decoration: const InputDecoration(labelText: 'Tipo'),
+                items: const [
+                  DropdownMenuItem(value: 'mandatory', child: Text('Obrigatória')),
+                  DropdownMenuItem(value: 'expected', child: Text('Esperada')),
+                  DropdownMenuItem(value: 'challenge', child: Text('Desafio')),
+                ],
+                onChanged: (v) => setDialog(() => type = v ?? type),
+              ),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(context, {
+              'title': title.text.trim(),
+              'description': null,
+              'type': type,
+              'period': period,
+              'points': int.tryParse(points.text) ?? 1,
+            }), child: const Text('Adicionar')),
+          ],
+        ),
+      ),
+    );
+    title.dispose();
+    points.dispose();
+    if (payload == null || (payload['title']?.toString() ?? '').isEmpty) return;
+    try {
+      await widget.api.request('/daily-tasks', method: 'POST', body: payload);
+      final updated = await widget.api.getToday();
+      if (mounted) setState(() => routine = updated);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    }
+  }
+
+  Future<void> _deleteDailyTask(DailyTask task) async {
+    try {
+      await widget.api.delete('/daily-tasks/' + task.id);
+      final updated = await widget.api.getToday();
+      if (mounted) setState(() => routine = updated);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    }
+  }
+
+  Future<void> _selectOption(DailyTask task, String option) async {
+    try {
+      await widget.api.request('/daily-tasks/' + task.id + '/option', method: 'PUT', body: {'selectedOption': option});
+      final updated = await widget.api.getToday();
+      if (mounted) setState(() => routine = updated);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    }
+  }
+
+  Future<void> _editDailyTask(DailyTask task) async {
+    final title = TextEditingController(text: task.title);
+    final description = TextEditingController(text: task.description ?? '');
+    final points = TextEditingController(text: task.points.toString());
+    String period = task.period;
+    String type = task.type;
+    final payload = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialog) => AlertDialog(
+          title: const Text('Editar tarefa de hoje'),
+          content: SizedBox(
+            width: 460,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(controller: title, decoration: const InputDecoration(labelText: 'Título')),
+              const SizedBox(height: 8),
+              TextField(controller: description, decoration: const InputDecoration(labelText: 'Descrição')),
+              const SizedBox(height: 8),
+              TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos')),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: period,
+                decoration: const InputDecoration(labelText: 'Período'),
+                items: const [
+                  DropdownMenuItem(value: 'morning', child: Text('Manhã')),
+                  DropdownMenuItem(value: 'afternoon', child: Text('Tarde')),
+                  DropdownMenuItem(value: 'evening', child: Text('Noite')),
+                ],
+                onChanged: (v) => setDialog(() => period = v ?? period),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: type,
+                decoration: const InputDecoration(labelText: 'Tipo'),
+                items: const [
+                  DropdownMenuItem(value: 'mandatory', child: Text('Obrigatória')),
+                  DropdownMenuItem(value: 'expected', child: Text('Esperada')),
+                  DropdownMenuItem(value: 'challenge', child: Text('Desafio')),
+                ],
+                onChanged: (v) => setDialog(() => type = v ?? type),
+              ),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, {
+                'title': title.text.trim(),
+                'description': description.text.trim().isEmpty ? null : description.text.trim(),
+                'type': type,
+                'period': period,
+                'points': int.tryParse(points.text) ?? task.points,
+                'options': task.options,
+                'reason': task.reason,
+              }),
+              child: const Text('Salvar'),
+            ),
+          ],
+        ),
+      ),
+    );
+    title.dispose(); description.dispose(); points.dispose();
+    if (payload == null) return;
+    try {
+      await widget.api.request('/daily-tasks/' + task.id, method: 'PUT', body: payload);
+      final updated = await widget.api.getToday();
+      if (mounted) setState(() => routine = updated);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    }
+  }
+
+  Future<void> _setInitiative(DailyTask task) async {
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Como você começou?'),
+        children: [
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, 'selfStarted'), child: const Text('🟢 Percebi e comecei por conta própria')),
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, 'promptedByPacus'), child: const Text('🟡 O PACUS me ajudou a lembrar')),
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, 'promptedByAdult'), child: const Text('🔴 Um adulto me lembrou')),
+        ],
+      ),
+    );
+    if (value == null) return;
+    try {
+      await widget.api.request('/daily-tasks/' + task.id + '/initiative', method: 'PUT', body: {'initiative': value});
+      final updated = await widget.api.getToday();
+      if (mounted) setState(() => routine = updated);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    }
+  }
+
+  Future<void> _setSkipReason(DailyTask task) async {
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('O que aconteceu?'),
+        children: [
+          for (final entry in const [
+            ['sleepy', '😴 Estava com sono'],
+            ['preferredOtherActivity', '🎮 Preferi outra atividade'],
+            ['noTime', '⏰ Não deu tempo'],
+            ['notInTheMood', '😐 Não estava com vontade'],
+            ['disliked', '📚 Não gostei'],
+            ['forgot', '🤷 Esqueci'],
+            ['other', '✏️ Outro'],
+          ])
+            SimpleDialogOption(onPressed: () => Navigator.pop(context, entry[0]), child: Text(entry[1])),
+        ],
+      ),
+    );
+    if (value == null) return;
+    try {
+      await widget.api.request('/daily-tasks/' + task.id + '/skip-reason', method: 'PUT', body: {'reason': value, 'note': null});
+      final updated = await widget.api.getToday();
+      if (mounted) setState(() => routine = updated);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    }
+  }
+
+  Future<void> _planEvening(DailyRoutine value) async {
+    final evening = value.tasks.where((t) => !t.isDeleted && !t.isDone && t.period.toLowerCase() == 'evening').toList();
+    if (evening.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Não há tarefas pendentes para a noite.')));
+      return;
+    }
+    final ordered = List<DailyTask>.from(evening);
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialog) => AlertDialog(
+          title: const Text('Como você quer organizar sua noite?'),
+          content: SizedBox(
+            width: 500,
+            height: 360,
+            child: ListView.builder(
+              itemCount: ordered.length,
+              itemBuilder: (_, i) => ListTile(
+                leading: CircleAvatar(child: Text((i + 1).toString())),
+                title: Text(ordered[i].title),
+                trailing: Wrap(
+                  spacing: 2,
+                  children: [
+                    IconButton(
+                      onPressed: i == 0 ? null : () => setDialog(() {
+                        final item = ordered.removeAt(i);
+                        ordered.insert(i - 1, item);
+                      }),
+                      icon: const Icon(Icons.arrow_upward),
+                      tooltip: 'Subir',
+                    ),
+                    IconButton(
+                      onPressed: i == ordered.length - 1 ? null : () => setDialog(() {
+                        final item = ordered.removeAt(i);
+                        ordered.insert(i + 1, item);
+                      }),
+                      icon: const Icon(Icons.arrow_downward),
+                      tooltip: 'Descer',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Salvar ordem')),
+          ],
+        ),
+      ),
+    );
+    if (accepted != true) return;
+    try {
+      await widget.api.request('/daily-routines/today/evening-plan', method: 'PUT', body: {
+        'items': ordered.map((t) => {'taskId': t.id, 'approxLabel': null}).toList(),
+      });
+      final updated = await widget.api.getToday();
+      if (mounted) setState(() => routine = updated);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    }
+  }
+
   String _clock(Duration value) {
     final total = math.max(0, value.inSeconds);
     final h = total ~/ 3600, m = (total % 3600) ~/ 60, s = total % 60;
@@ -239,10 +543,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 12),
                   ],
                   _progressCard(r),
+                  if (widget.session.isAdult) ...[
+                    const SizedBox(height: 16),
+                    _reactionCard(),
+                  ],
                   const SizedBox(height: 16),
                   if (r.gameTimerEnabled) _timerCard(r),
                   const SizedBox(height: 20),
                   _tasksCard(r),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(onPressed: () => _planEvening(r), icon: const Icon(Icons.nightlight_outlined), label: const Text('Planejar minha noite')),
                 ],
               ),
             ),
@@ -326,6 +636,24 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _reactionCard() => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Reconhecimento do dia', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 8),
+        const Text('Envie uma reação positiva para aparecer na rotina de hoje.'),
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, children: [
+          FilledButton.tonal(onPressed: () => _setReaction('heart'), child: const Text('❤️')),
+          FilledButton.tonal(onPressed: () => _setReaction('clap'), child: const Text('👏')),
+          FilledButton.tonal(onPressed: () => _setReaction('star'), child: const Text('⭐')),
+          FilledButton.tonal(onPressed: () => _setReaction('hug'), child: const Text('🤗')),
+        ]),
+      ]),
+    ),
+  );
+
   Widget _tasksCard(DailyRoutine r) {
     final tasks = r.tasks.where((t) => !t.isDeleted).toList()
       ..sort((a, b) => a.period.compareTo(b.period));
@@ -333,16 +661,51 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('Minha rotina', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+          Row(children: [
+            const Expanded(child: Text('Minha rotina', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900))),
+            IconButton(onPressed: _createDailyTask, icon: const Icon(Icons.add_task), tooltip: 'Adicionar tarefa de hoje'),
+          ]),
           const SizedBox(height: 10),
           if (tasks.isEmpty) const Text('Nenhuma tarefa para hoje.')
-          else ...tasks.map((task) => CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            value: task.isDone,
-            onChanged: (_) => _toggleTask(task),
-            title: Text(task.title, style: TextStyle(fontWeight: FontWeight.w700, decoration: task.isDone ? TextDecoration.lineThrough : null)),
-            subtitle: Text('${_periodLabel(task.period)} • ${task.points} pontos'),
-            controlAffinity: ListTileControlAffinity.leading,
+          else ...tasks.map((task) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: task.isDone,
+                onChanged: (_) => _toggleTask(task),
+                title: Text(task.title, style: TextStyle(fontWeight: FontWeight.w700, decoration: task.isDone ? TextDecoration.lineThrough : null)),
+                subtitle: Text(_periodLabel(task.period) + ' • ' + task.points.toString() + ' pontos'),
+                secondary: PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'edit') _editDailyTask(task);
+                    if (value == 'initiative') _setInitiative(task);
+                    if (value == 'skip') _setSkipReason(task);
+                    if (value == 'delete') _deleteDailyTask(task);
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'edit', child: Text('Editar')),
+                    PopupMenuItem(value: 'initiative', child: Text('Como comecei')),
+                    PopupMenuItem(value: 'skip', child: Text('O que aconteceu')),
+                    PopupMenuItem(value: 'delete', child: Text('Remover do dia')),
+                  ],
+                ),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              if (task.options.isNotEmpty && !task.isDone)
+                Padding(
+                  padding: const EdgeInsets.only(left: 12, bottom: 10),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: task.options.map((option) => ChoiceChip(
+                      label: Text(option),
+                      selected: task.selectedOption == option,
+                      onSelected: (_) => _selectOption(task, option),
+                    )).toList(),
+                  ),
+                ),
+            ],
           )),
         ]),
       ),

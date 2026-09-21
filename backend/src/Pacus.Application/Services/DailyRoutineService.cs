@@ -586,6 +586,31 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
+    public async Task<DailyRoutine> ConsumeGameTimerAsync(ObjectId userId, int minutes, ObjectId actorId, string actorRole)
+    {
+        if (minutes <= 0)
+            throw new ValidationException("Os minutos da sessao devem ser maiores que zero.");
+
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
+
+        await SyncGameTimerAsync(routine, userId);
+
+        var remainingMinutes = Math.Max(0, routine.GameTimerMinutes + routine.GameTimerExtraMinutes);
+        if (remainingMinutes <= 0)
+            throw new ValidationException("O tempo de tela de hoje ja acabou.");
+
+        var consumedMinutes = Math.Min(minutes, remainingMinutes);
+        routine.GameTimerExtraMinutes -= consumedMinutes;
+
+        // A nova UX usa o timer antigo apenas como carteira de minutos. Mantemos
+        // pausado para que o saldo nao continue correndo sozinho entre sessoes.
+        routine.GameTimerPausedAt ??= DateTime.UtcNow;
+
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        return routine;
+    }
+
     public async Task<DailyRoutine> AdjustGameTimerAsync(ObjectId userId, int deltaMinutes, ObjectId actorId, string actorRole)
     {
         if (!actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase))
@@ -809,12 +834,12 @@ public class DailyRoutineService : IDailyRoutineService
         if (routine.GameTimerUnlockedAt is not null || !routine.GameTimerEnabled)
             return;
 
-        var morningTasks = routine.Tasks
-            .Where(t => t.DeletedAt is null && t.Period == TaskPeriod.Morning)
-            .ToList();
-
-        if (morningTasks.Count > 0 && morningTasks.All(t => t.Status == TaskItemStatus.Done))
-            routine.GameTimerUnlockedAt = DateTime.UtcNow;
+        // O saldo diario fica disponivel assim que a rotina e carregada. Ele nasce
+        // pausado e so e debitado quando uma sessao escolhida termina, evitando que
+        // as 2h corram so porque a tela foi aberta.
+        var now = DateTime.UtcNow;
+        routine.GameTimerUnlockedAt = now;
+        routine.GameTimerPausedAt = now;
     }
 
     private static UserRole ParseRole(string actorRole) =>

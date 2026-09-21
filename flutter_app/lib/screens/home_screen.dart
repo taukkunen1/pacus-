@@ -27,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int? sessionMinutes;
   DateTime? sessionEndsAt;
   Duration remaining = Duration.zero;
+  bool sessionPaused = false;
   bool completing = false;
 
   String get _sessionKey => 'pacus.flutter.session:${routine?.familyId ?? ''}:${routine?.date ?? ''}';
@@ -60,11 +61,26 @@ class _HomeScreenState extends State<HomeScreen> {
     final raw = prefs.getString(_sessionKey);
     if (raw == null) return;
     final parts = raw.split('|');
-    if (parts.length != 2) { await prefs.remove(_sessionKey); return; }
+    if (parts.length != 2 && parts.length != 4) { await prefs.remove(_sessionKey); return; }
     final minutes = int.tryParse(parts[0]);
     final millis = int.tryParse(parts[1]);
     if (minutes == null || millis == null || minutes <= 0) { await prefs.remove(_sessionKey); return; }
     sessionMinutes = minutes;
+
+    if (parts.length == 4 && parts[2] == '1') {
+      final remainingSeconds = int.tryParse(parts[3]) ?? 0;
+      sessionPaused = true;
+      sessionEndsAt = null;
+      remaining = Duration(seconds: math.max(0, remainingSeconds));
+      if (remaining <= Duration.zero) {
+        await prefs.remove(_sessionKey);
+        sessionMinutes = null;
+        sessionPaused = false;
+      }
+      return;
+    }
+
+    sessionPaused = false;
     sessionEndsAt = DateTime.fromMillisecondsSinceEpoch(millis);
     _startTicker();
   }
@@ -74,11 +90,12 @@ class _HomeScreenState extends State<HomeScreen> {
     if (r == null || minutes <= 0 || minutes > r.availableGameMinutes) return;
     final end = DateTime.now().add(Duration(minutes: minutes));
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_sessionKey, '$minutes|${end.millisecondsSinceEpoch}');
+    await prefs.setString(_sessionKey, '$minutes|${end.millisecondsSinceEpoch}|0|${minutes * 60}');
     setState(() {
       sessionMinutes = minutes;
       sessionEndsAt = end;
       remaining = Duration(minutes: minutes);
+      sessionPaused = false;
     });
     _startTicker();
   }
@@ -103,6 +120,48 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() => remaining = diff);
   }
 
+  Future<void> _pauseSession() async {
+    if (sessionMinutes == null || sessionPaused) return;
+    final end = sessionEndsAt;
+    if (end == null) return;
+
+    final diff = end.difference(DateTime.now());
+    final safeRemaining = diff <= Duration.zero ? Duration.zero : diff;
+    timer?.cancel();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _sessionKey,
+      '${sessionMinutes!}|0|1|${safeRemaining.inSeconds}',
+    );
+
+    if (mounted) {
+      setState(() {
+        sessionPaused = true;
+        sessionEndsAt = null;
+        remaining = safeRemaining;
+      });
+    }
+  }
+
+  Future<void> _resumeSession() async {
+    if (sessionMinutes == null || !sessionPaused || remaining <= Duration.zero) return;
+
+    final end = DateTime.now().add(remaining);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _sessionKey,
+      '${sessionMinutes!}|${end.millisecondsSinceEpoch}|0|${remaining.inSeconds}',
+    );
+
+    if (mounted) {
+      setState(() {
+        sessionPaused = false;
+        sessionEndsAt = end;
+      });
+    }
+    _startTicker();
+  }
   Future<void> _finishSession() async {
     if (completing || sessionMinutes == null) return;
     completing = true;
@@ -117,6 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
         sessionMinutes = null;
         sessionEndsAt = null;
         remaining = Duration.zero;
+        sessionPaused = false;
       });
       await showDialog<void>(
         context: context,
@@ -618,7 +678,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _timerCard(DailyRoutine r) {
-    final active = sessionMinutes != null && sessionEndsAt != null;
+    final active = sessionMinutes != null && (sessionEndsAt != null || sessionPaused);
     final available = r.availableGameMinutes;
     if (active) {
       final totalSeconds = math.max(1, sessionMinutes! * 60);
@@ -634,7 +694,18 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 14),
             LinearProgressIndicator(value: progress, minHeight: 12, borderRadius: BorderRadius.circular(99)),
             const SizedBox(height: 12),
-            Text('Você escolheu ${_formatMinutes(sessionMinutes!)} • depois restam ${_formatMinutes(math.max(0, available - sessionMinutes!))}'),
+            Text(
+              sessionPaused
+                  ? 'Sessão pausada • o tempo não está correndo'
+                  : 'Você escolheu ${_formatMinutes(sessionMinutes!)} • depois restam ${_formatMinutes(math.max(0, available - sessionMinutes!))}',
+              style: TextStyle(fontWeight: sessionPaused ? FontWeight.w800 : FontWeight.w500),
+            ),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: sessionPaused ? _resumeSession : _pauseSession,
+              icon: Icon(sessionPaused ? Icons.play_arrow_rounded : Icons.pause_rounded),
+              label: Text(sessionPaused ? 'Retomar temporizador' : 'Pausar temporizador'),
+            ),
           ]),
         ),
       );

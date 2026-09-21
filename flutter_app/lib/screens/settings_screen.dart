@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -331,6 +332,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) { _snack(e.toString()); }
   }
 
+  Future<void> _openLegal(String path) async {
+    final uri = Uri.parse('https://www.pacus.com.br/' + path);
+    if (!await launchUrl(uri, mode: LaunchMode.platformDefault)) {
+      _snack('Não foi possível abrir a página.');
+    }
+  }
+
   String _weekdayLabel(String day) {
     const labels = {
       'Monday': 'Segunda-feira',
@@ -409,6 +417,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ]),
               ),
             ),
+          const SizedBox(height: 18),
+          const Text('Privacidade e termos', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            OutlinedButton.icon(onPressed: () => _openLegal('privacidade.html'), icon: const Icon(Icons.privacy_tip_outlined), label: const Text('Privacidade')),
+            OutlinedButton.icon(onPressed: () => _openLegal('termos.html'), icon: const Icon(Icons.description_outlined), label: const Text('Termos de Uso')),
+          ]),
           const SizedBox(height: 18),
           FilledButton.tonalIcon(onPressed: _newRecovery, icon: const Icon(Icons.password), label: const Text('Gerar novo código de recuperação')),
           const SizedBox(height: 10),

@@ -51,6 +51,14 @@ export function resumeGameTimer() {
   return apiClient("/daily-routines/today/game-timer/resume", { method: "PUT" });
 }
 
+// Debita do saldo diario uma sessao concluida pela crianca.
+export function consumeGameTimer(minutes) {
+  return apiClient("/daily-routines/today/game-timer/consume", {
+    method: "PUT",
+    body: JSON.stringify({ minutes }),
+  });
+}
+
 // deltaMinutes: positivo soma tempo, negativo remove (ex: -60 pra tirar 1h).
 export function adjustGameTimer(deltaMinutes) {
   return apiClient("/daily-routines/today/game-timer/adjust", {

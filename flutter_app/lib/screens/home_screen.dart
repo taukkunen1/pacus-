@@ -452,18 +452,32 @@ class _HomeScreenState extends State<HomeScreen> {
           content: SizedBox(
             width: 500,
             height: 360,
-            child: ReorderableListView.builder(
+            child: ListView.builder(
               itemCount: ordered.length,
-              onReorder: (oldIndex, newIndex) => setDialog(() {
-                if (newIndex > oldIndex) newIndex -= 1;
-                final item = ordered.removeAt(oldIndex);
-                ordered.insert(newIndex, item);
-              }),
               itemBuilder: (_, i) => ListTile(
-                key: ValueKey(ordered[i].id),
                 leading: CircleAvatar(child: Text((i + 1).toString())),
                 title: Text(ordered[i].title),
-                trailing: const Icon(Icons.drag_handle),
+                trailing: Wrap(
+                  spacing: 2,
+                  children: [
+                    IconButton(
+                      onPressed: i == 0 ? null : () => setDialog(() {
+                        final item = ordered.removeAt(i);
+                        ordered.insert(i - 1, item);
+                      }),
+                      icon: const Icon(Icons.arrow_upward),
+                      tooltip: 'Subir',
+                    ),
+                    IconButton(
+                      onPressed: i == ordered.length - 1 ? null : () => setDialog(() {
+                        final item = ordered.removeAt(i);
+                        ordered.insert(i + 1, item);
+                      }),
+                      icon: const Icon(Icons.arrow_downward),
+                      tooltip: 'Descer',
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

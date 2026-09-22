@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../widgets/pacus_ui.dart';
 
 class TomorrowScreen extends StatefulWidget {
   const TomorrowScreen({
@@ -388,8 +389,13 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 40),
+          padding: EdgeInsets.zero,
           children: [
+            PacusPageFrame(
+              maxWidth: 1040,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
             _introCard(r),
             const SizedBox(height: 16),
             _ideaPicker(),
@@ -420,6 +426,9 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
                   ? 'Salvar meu amanhã'
                   : 'Amanhã planejado'),
             ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -435,9 +444,9 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Monte seu próprio amanhã',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+              style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 6),
             const Text(
@@ -464,9 +473,9 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            Text(
               'Escolha uma ou crie a sua',
-              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 10),
             Wrap(
@@ -597,45 +606,38 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
 
   Widget _periodSection(String title, IconData icon, List<DailyTask> tasks) {
     final scheme = Theme.of(context).colorScheme;
-    return Card(
-      color: title == 'Manhã'
-          ? scheme.secondaryContainer
-          : title == 'Noite'
-              ? scheme.tertiaryContainer
-              : scheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
+    final accent = title == 'Manhã'
+        ? scheme.secondary
+        : title == 'Noite'
+            ? scheme.tertiary
+            : scheme.primary;
+
+    return PacusSectionCard(
+      title: title,
+      icon: icon,
+      accent: accent,
+      trailing: PacusBadge(
+        label: '${tasks.length}',
+        color: accent,
+      ),
+      child: tasks.isEmpty
+          ? const PacusEmptyState(
+              icon: Icons.event_available_outlined,
+              title: 'Sem planos aqui',
+              message: 'Você pode deixar este período livre ou colocar uma ideia sua.',
+            )
+          : Column(
               children: [
-                Icon(icon),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                for (var i = 0; i < tasks.length; i++) ...[
+                  _taskTile(
+                    tasks[i],
+                    canMoveUp: i > 0,
+                    canMoveDown: i < tasks.length - 1,
                   ),
-                ),
-                Text('${tasks.length}'),
+                  if (i < tasks.length - 1) const SizedBox(height: 8),
+                ],
               ],
             ),
-            const SizedBox(height: 10),
-            if (tasks.isEmpty)
-              const Text('Nada planejado aqui ainda.')
-            else
-              for (var i = 0; i < tasks.length; i++) ...[
-                _taskTile(
-                  tasks[i],
-                  canMoveUp: i > 0,
-                  canMoveDown: i < tasks.length - 1,
-                ),
-                if (i < tasks.length - 1) const Divider(),
-              ],
-          ],
-        ),
-      ),
     );
   }
 

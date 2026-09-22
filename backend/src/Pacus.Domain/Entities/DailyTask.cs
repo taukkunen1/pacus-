@@ -59,4 +59,11 @@ public class DailyTask
 
     // Texto livre opcional, so relevante quando SkipReason == Other.
     public string? SkipReasonNote { get; set; }
+
+    // Planejamento de amanhã (PACUS "Meu Amanhã").
+    // plannedBy usa "member" ou "adult" na API, sem expor o termo interno Child.
+    public string? PlannedBy { get; set; }
+    public bool CreatedByMember { get; set; } = false;
+    public string? PlanCue { get; set; }
+    public bool RequiresAdultApproval { get; set; } = false;
 }

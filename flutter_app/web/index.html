@@ -6,16 +6,19 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="PACUS — rotina, autonomia e tempo de tela.">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <meta name="theme-color" content="#102820">
+  <meta name="theme-color" content="#007C83">
   <link rel="canonical" href="https://www.pacus.com.br/">
+  <link rel="icon" type="image/svg+xml" href="pacus-logo.svg">
   <title>PACUS</title>
   <script>
     (function () {
       var targetHost = 'www.pacus.com.br';
+      var host = window.location.hostname.toLowerCase();
       var needsHttps = window.location.protocol !== 'https:';
-      var needsWww = window.location.hostname === 'pacus.com.br';
+      var needsWww = host === 'pacus.com.br';
+      var isGitHubPages = host.endsWith('.github.io');
 
-      if (needsHttps || needsWww) {
+      if (needsWww || isGitHubPages || (host === targetHost && needsHttps)) {
         var next = new URL(window.location.href);
         next.protocol = 'https:';
         next.hostname = targetHost;

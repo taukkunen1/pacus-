@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api.dart';
+import '../brand.dart';
 import '../models.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -620,7 +621,18 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: Text('Olá, ${widget.session.name.isEmpty ? 'PACUS' : widget.session.name}'),
+        title: Row(
+          children: [
+            const PacusBrand(compact: true),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                'Olá, ${widget.session.name.isEmpty ? 'PACUS' : widget.session.name}',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
         actions: [IconButton(onPressed: widget.onLogout, tooltip: 'Sair', icon: const Icon(Icons.logout))],
       ),
       body: RefreshIndicator(

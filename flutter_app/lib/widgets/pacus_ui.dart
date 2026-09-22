@@ -122,10 +122,14 @@ class PacusBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (icon != null) ...[
-            Icon(icon, size: 15, color: effective),
-            const SizedBox(width: 5),
-          ],
+          ...(
+            icon == null
+                ? const <Widget>[]
+                : <Widget>[
+                    Icon(icon, size: 15, color: effective),
+                    const SizedBox(width: 5),
+                  ]
+          ),
           Text(
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(

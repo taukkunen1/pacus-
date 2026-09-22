@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import '../api.dart';
+import '../brand.dart';
 import '../models.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -261,7 +262,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Padding(
               padding: const EdgeInsets.all(28),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                const Text('PACUS', textAlign: TextAlign.center, style: TextStyle(fontSize: 38, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                const Center(child: PacusBrand()),
                 const SizedBox(height: 6),
                 Text('Rotina com autonomia', textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 const SizedBox(height: 28),

@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../api.dart';
 import '../brand.dart';
 import '../models.dart';
+import '../widgets/pacus_ui.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.api, required this.session, required this.onLogout});
@@ -638,10 +639,10 @@ class _HomeScreenState extends State<HomeScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 40),
+          padding: EdgeInsets.zero,
           children: [
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 900),
+            PacusPageFrame(
+              maxWidth: 1040,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -842,33 +843,41 @@ class _HomeScreenState extends State<HomeScreen> {
     final afternoon = tasks.where((t) => t.period.toLowerCase() == 'afternoon').toList();
     final evening = tasks.where((t) => t.period.toLowerCase() == 'evening').toList();
 
+    final scheme = Theme.of(context).colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(children: [
-          const Expanded(child: Text('Minha rotina', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900))),
-          IconButton(onPressed: _createDailyTask, icon: const Icon(Icons.add_task), tooltip: 'Adicionar tarefa de hoje'),
+          Expanded(
+            child: Text('Minha rotina', style: Theme.of(context).textTheme.headlineMedium),
+          ),
+          IconButton(
+            onPressed: _createDailyTask,
+            icon: const Icon(Icons.add_task),
+            tooltip: 'Adicionar tarefa de hoje',
+          ),
         ]),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         _periodSection(
           title: 'Manhã',
           icon: Icons.wb_sunny_outlined,
           tasks: morning,
-          tint: Theme.of(context).colorScheme.secondaryContainer,
+          accent: scheme.secondary,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         _periodSection(
           title: 'Tarde',
           icon: Icons.light_mode_outlined,
           tasks: afternoon,
-          tint: Theme.of(context).colorScheme.primaryContainer,
+          accent: scheme.primary,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         _periodSection(
           title: 'Noite',
           icon: Icons.nightlight_round,
           tasks: evening,
-          tint: Theme.of(context).colorScheme.tertiaryContainer,
+          accent: scheme.tertiary,
         ),
       ],
     );
@@ -878,112 +887,218 @@ class _HomeScreenState extends State<HomeScreen> {
     required String title,
     required IconData icon,
     required List<DailyTask> tasks,
-    required Color tint,
+    required Color accent,
   }) {
     final done = tasks.where((t) => t.isDone).length;
 
-    return Card(
-      color: tint,
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [
-            Icon(icon),
-            const SizedBox(width: 10),
-            Expanded(child: Text(title, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900))),
-            Text('$done/${tasks.length}', style: const TextStyle(fontWeight: FontWeight.w800)),
-          ]),
-          const SizedBox(height: 12),
-          if (tasks.isEmpty)
-            Text('Nenhuma tarefa para ${title.toLowerCase()}.')
-          else
-            for (var i = 0; i < tasks.length; i++) ...[
-              _taskTile(tasks[i], canMoveUp: i > 0, canMoveDown: i < tasks.length - 1),
-              if (i < tasks.length - 1) const Divider(height: 1),
-            ],
-        ]),
+    return PacusSectionCard(
+      title: title,
+      icon: icon,
+      accent: accent,
+      trailing: PacusBadge(
+        label: '$done/${tasks.length}',
+        icon: Icons.check_circle_outline,
+        color: accent,
       ),
+      child: tasks.isEmpty
+          ? PacusEmptyState(
+              icon: Icons.task_alt,
+              title: 'Tudo livre por aqui',
+              message: 'Nenhuma tarefa para ${title.toLowerCase()}.',
+            )
+          : Column(
+              children: [
+                for (var i = 0; i < tasks.length; i++) ...[
+                  _taskTile(
+                    tasks[i],
+                    canMoveUp: i > 0,
+                    canMoveDown: i < tasks.length - 1,
+                    accent: accent,
+                  ),
+                  if (i < tasks.length - 1) const SizedBox(height: 10),
+                ],
+              ],
+            ),
     );
   }
 
-  Widget _taskTile(DailyTask task, {required bool canMoveUp, required bool canMoveDown}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        CheckboxListTile(
-          contentPadding: EdgeInsets.zero,
-          value: task.isDone,
-          onChanged: (_) => _toggleTask(task),
-          title: Text(
-            task.title,
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              decoration: task.isDone ? TextDecoration.lineThrough : null,
-            ),
+  Widget _taskTile(
+    DailyTask task, {
+    required bool canMoveUp,
+    required bool canMoveDown,
+    required Color accent,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final reason = (task.reason ?? '').trim();
+    final description = (task.description ?? '').trim();
+    final showReason = reason.isNotEmpty &&
+        description.toLowerCase() != reason.toLowerCase();
+
+    return Semantics(
+      container: true,
+      checked: task.isDone,
+      label: '${task.title}. ${task.isDone ? 'Concluída' : 'Pendente'}. ${task.points} pontos.',
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          color: task.isDone
+              ? scheme.surfaceContainerHigh.withValues(alpha: .72)
+              : scheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: task.isDone
+                ? scheme.outlineVariant
+                : accent.withValues(alpha: .26),
           ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: [
-                  Text('${task.points} pontos · ${_typeLabel(task.type)}'),
-                  if (task.createdByMember)
-                    const Chip(label: Text('Criado por mim')),
-                ],
-              ),
-              if ((task.description ?? '').trim().isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 3),
-                  child: Text(
-                    task.description!.trim(),
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
-                ),
-              if ((task.planCue ?? '').isNotEmpty)
-                Text('Plano: ${task.planCue}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-              if ((task.minimumGoalLabel ?? '').isNotEmpty)
-                Text('Meta mínima: ${task.minimumGoalLabel}', style: const TextStyle(fontSize: 12)),
-              if ((task.reason ?? '').trim().isNotEmpty &&
-                  (task.description ?? '').trim().toLowerCase() != task.reason!.trim().toLowerCase())
-                Text(task.reason!, style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
-            ],
-          ),
-          secondary: PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'up') _moveTaskWithinPeriod(task, -1);
-              if (value == 'down') _moveTaskWithinPeriod(task, 1);
-              if (value == 'edit') _editDailyTask(task);
-              if (value == 'initiative') _setInitiative(task);
-              if (value == 'skip') _setSkipReason(task);
-              if (value == 'delete') _deleteDailyTask(task);
-            },
-            itemBuilder: (_) => [
-              if (canMoveUp) const PopupMenuItem(value: 'up', child: Text('Mover para cima')),
-              if (canMoveDown) const PopupMenuItem(value: 'down', child: Text('Mover para baixo')),
-              const PopupMenuItem(value: 'edit', child: Text('Editar')),
-              const PopupMenuItem(value: 'initiative', child: Text('Como comecei')),
-              const PopupMenuItem(value: 'skip', child: Text('O que aconteceu')),
-              const PopupMenuItem(value: 'delete', child: Text('Remover do dia')),
-            ],
-          ),
-          controlAffinity: ListTileControlAffinity.leading,
         ),
-        if (task.options.isNotEmpty && !task.isDone)
-          Padding(
-            padding: const EdgeInsets.only(left: 12, bottom: 12),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: task.options.map((option) => ChoiceChip(
-                label: Text(option),
-                selected: task.selectedOption == option,
-                onSelected: (_) => _selectOption(task, option),
-              )).toList(),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 180),
+          opacity: task.isDone ? .72 : 1,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 6, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                CheckboxListTile(
+                  value: task.isDone,
+                  onChanged: (_) => _toggleTask(task),
+                  title: Text(
+                    task.title,
+                    style: textTheme.titleMedium?.copyWith(
+                      decoration: task.isDone ? TextDecoration.lineThrough : null,
+                    ),
+                  ),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Wrap(
+                      spacing: 7,
+                      runSpacing: 7,
+                      children: [
+                        PacusBadge(
+                          label: '${task.points} ${task.points == 1 ? 'ponto' : 'pontos'}',
+                          icon: Icons.stars_outlined,
+                          color: accent,
+                        ),
+                        PacusBadge(
+                          label: _typeLabel(task.type),
+                          color: scheme.onSurfaceVariant,
+                        ),
+                        if (task.createdByMember)
+                          PacusBadge(
+                            label: 'Criado por mim',
+                            icon: Icons.auto_awesome,
+                            color: scheme.tertiary,
+                          ),
+                      ],
+                    ),
+                  ),
+                  secondary: PopupMenuButton<String>(
+                    tooltip: 'Mais opções',
+                    onSelected: (value) {
+                      if (value == 'up') _moveTaskWithinPeriod(task, -1);
+                      if (value == 'down') _moveTaskWithinPeriod(task, 1);
+                      if (value == 'edit') _editDailyTask(task);
+                      if (value == 'initiative') _setInitiative(task);
+                      if (value == 'skip') _setSkipReason(task);
+                      if (value == 'delete') _deleteDailyTask(task);
+                    },
+                    itemBuilder: (_) => [
+                      if (canMoveUp) const PopupMenuItem(value: 'up', child: Text('Mover para cima')),
+                      if (canMoveDown) const PopupMenuItem(value: 'down', child: Text('Mover para baixo')),
+                      const PopupMenuItem(value: 'edit', child: Text('Editar')),
+                      const PopupMenuItem(value: 'initiative', child: Text('Como comecei')),
+                      const PopupMenuItem(value: 'skip', child: Text('O que aconteceu')),
+                      const PopupMenuItem(value: 'delete', child: Text('Remover do dia')),
+                    ],
+                  ),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+                if (description.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(54, 0, 14, 8),
+                    child: Text(
+                      description,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                if ((task.planCue ?? '').trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(54, 0, 14, 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.route_outlined, size: 17, color: accent),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Depois de: ${task.planCue}',
+                            style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if ((task.minimumGoalLabel ?? '').trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(54, 0, 14, 6),
+                    child: Text(
+                      'Meta mínima: ${task.minimumGoalLabel}',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                if (showReason)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(54, 2, 14, 8),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.lightbulb_outline, size: 17, color: scheme.secondary),
+                            const SizedBox(width: 7),
+                            Expanded(
+                              child: Text(
+                                reason,
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (task.options.isNotEmpty && !task.isDone)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(54, 4, 12, 2),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: task.options.map((option) => ChoiceChip(
+                        label: Text(option),
+                        selected: task.selectedOption == option,
+                        onSelected: (_) => _selectOption(task, option),
+                      )).toList(),
+                    ),
+                  ),
+              ],
             ),
           ),
-      ],
+        ),
+      ),
     );
   }
 

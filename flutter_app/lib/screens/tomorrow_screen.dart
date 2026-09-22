@@ -19,6 +19,8 @@ class TomorrowScreen extends StatefulWidget {
 
 class _TomorrowScreenState extends State<TomorrowScreen> {
   DailyRoutine? routine;
+  List<Map<String, dynamic>> permanentTasks = [];
+  List<Map<String, dynamic>> suggestions = [];
   bool loading = true;
   String? error;
 
@@ -32,9 +34,21 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
     setState(() => loading = true);
     try {
       final data = await widget.api.getMap('/daily-routines/tomorrow');
+      var routineItems = <Map<String, dynamic>>[];
+      var smart = <Map<String, dynamic>>[];
+
+      if (!widget.session.isAdult) {
+        final rawRoutine = await widget.api.getList('/autonomy/routine');
+        routineItems = rawRoutine.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        final rawSuggestions = await widget.api.getList('/autonomy/suggestions');
+        smart = rawSuggestions.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+
       if (!mounted) return;
       setState(() {
         routine = DailyRoutine.fromJson(data);
+        permanentTasks = routineItems;
+        suggestions = smart;
         error = null;
         loading = false;
       });
@@ -207,6 +221,127 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
     }
   }
 
+  Future<void> _editPermanentTask(
+    Map<String, dynamic> task, {
+    String? suggestedPeriod,
+  }) async {
+    final title = TextEditingController(text: task['title']?.toString() ?? '');
+    final description = TextEditingController(text: task['description']?.toString() ?? '');
+    final reason = TextEditingController();
+    String period = suggestedPeriod ?? task['period']?.toString().toLowerCase() ?? 'afternoon';
+
+    final payload = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialog) => AlertDialog(
+          title: const Text('Mudar minha rotina'),
+          content: SizedBox(
+            width: 500,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Sua mudança entra na rotina assim que você salvar.',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: title,
+                    decoration: const InputDecoration(labelText: 'Nome da tarefa'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: description,
+                    decoration: const InputDecoration(labelText: 'Como você quer fazer?'),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: period,
+                    decoration: const InputDecoration(labelText: 'Quando?'),
+                    items: const [
+                      DropdownMenuItem(value: 'morning', child: Text('Manhã')),
+                      DropdownMenuItem(value: 'afternoon', child: Text('Tarde')),
+                      DropdownMenuItem(value: 'evening', child: Text('Noite')),
+                    ],
+                    onChanged: (value) => setDialog(() => period = value ?? period),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: reason,
+                    decoration: const InputDecoration(
+                      labelText: 'Por que você quer mudar? (opcional)',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+            FilledButton(
+              onPressed: () {
+                if (title.text.trim().isEmpty) return;
+                Navigator.pop(context, {
+                  'title': title.text.trim(),
+                  'description': description.text.trim().isEmpty ? null : description.text.trim(),
+                  'period': period,
+                  'reason': reason.text.trim().isEmpty ? null : reason.text.trim(),
+                });
+              },
+              child: const Text('Salvar mudança'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    title.dispose();
+    description.dispose();
+    reason.dispose();
+    if (payload == null) return;
+
+    try {
+      await widget.api.request(
+        '/autonomy/routine/' + task['id'].toString(),
+        method: 'PUT',
+        body: payload,
+      );
+      await _load();
+      _snack('Mudança salva na sua rotina.');
+    } catch (e) {
+      _snack(e.toString());
+    }
+  }
+
+  Future<void> _useSuggestion(Map<String, dynamic> suggestion) async {
+    final kind = suggestion['kind']?.toString() ?? '';
+    if (kind == 'own-idea') {
+      final title = suggestion['suggestedTitle']?.toString();
+      if (title != null && title.isNotEmpty) {
+        await _quickIdea(title);
+      }
+      return;
+    }
+
+    if (kind == 'routine-change') {
+      final templateId = suggestion['taskTemplateId']?.toString();
+      if (templateId == null || templateId.isEmpty) return;
+      final task = permanentTasks.cast<Map<String, dynamic>?>().firstWhere(
+        (t) => t?['id']?.toString() == templateId,
+        orElse: () => null,
+      );
+      if (task == null) return;
+      await _editPermanentTask(
+        task,
+        suggestedPeriod: suggestion['suggestedPeriod']?.toString().toLowerCase(),
+      );
+    }
+  }
+
   Future<void> _confirm() async {
     try {
       final data = await widget.api.request(
@@ -258,6 +393,14 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
             _introCard(r),
             const SizedBox(height: 16),
             _ideaPicker(),
+            if (!widget.session.isAdult && suggestions.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              _suggestionsCard(),
+            ],
+            if (!widget.session.isAdult && permanentTasks.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              _permanentRoutineCard(),
+            ],
             const SizedBox(height: 18),
             _periodSection('Manhã', Icons.wb_sunny_outlined,
                 tasks.where((t) => t.period.toLowerCase() == 'morning').toList()),
@@ -359,6 +502,97 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
       onPressed: enabled ? () => _quickIdea(title) : null,
       child: Text(label),
     );
+  }
+
+  Widget _suggestionsCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.auto_awesome),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Ideias do PACUS',
+                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text('São só sugestões. Nada muda até você escolher usar uma delas.'),
+            const SizedBox(height: 10),
+            for (final suggestion in suggestions)
+              Card(
+                child: ListTile(
+                  title: Text(
+                    suggestion['title']?.toString() ?? 'Sugestão',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  subtitle: Text(suggestion['message']?.toString() ?? ''),
+                  trailing: suggestion['kind']?.toString() == 'insight'
+                      ? null
+                      : TextButton(
+                          onPressed: () => _useSuggestion(suggestion),
+                          child: const Text('Usar'),
+                        ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _permanentRoutineCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Minha rotina permanente',
+              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Você pode mudar nome, descrição e horário. A mudança fica salva na rotina.',
+            ),
+            const SizedBox(height: 10),
+            for (final task in permanentTasks)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(child: Icon(Icons.repeat_rounded)),
+                title: Text(
+                  task['title']?.toString() ?? 'Tarefa',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                subtitle: Text(_periodName(task['period']?.toString())),
+                trailing: FilledButton.tonal(
+                  onPressed: () => _editPermanentTask(task),
+                  child: const Text('Mudar'),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _periodName(String? raw) {
+    switch (raw?.toLowerCase()) {
+      case 'morning':
+        return 'Manhã';
+      case 'evening':
+        return 'Noite';
+      default:
+        return 'Tarde';
+    }
   }
 
   Widget _periodSection(String title, IconData icon, List<DailyTask> tasks) {

@@ -55,13 +55,14 @@ class PacusTheme {
         .copyWith(
           displayLarge: TextStyle(fontSize: 56, height: 1.02, fontWeight: FontWeight.w800, letterSpacing: -1.6, color: scheme.onSurface),
           displayMedium: TextStyle(fontSize: 44, height: 1.05, fontWeight: FontWeight.w800, letterSpacing: -1.2, color: scheme.onSurface),
-          headlineLarge: TextStyle(fontSize: 32, height: 1.12, fontWeight: FontWeight.w800, letterSpacing: -.6, color: scheme.onSurface),
-          headlineMedium: TextStyle(fontSize: 26, height: 1.16, fontWeight: FontWeight.w800, letterSpacing: -.35, color: scheme.onSurface),
-          titleLarge: TextStyle(fontSize: 21, height: 1.2, fontWeight: FontWeight.w800, letterSpacing: -.15, color: scheme.onSurface),
-          titleMedium: TextStyle(fontSize: 16, height: 1.3, fontWeight: FontWeight.w700, color: scheme.onSurface),
+          headlineLarge: TextStyle(fontSize: 32, height: 1.18, fontWeight: FontWeight.w800, letterSpacing: -.45, color: scheme.onSurface),
+          headlineMedium: TextStyle(fontSize: 26, height: 1.22, fontWeight: FontWeight.w800, letterSpacing: -.25, color: scheme.onSurface),
+          titleLarge: TextStyle(fontSize: 21, height: 1.28, fontWeight: FontWeight.w750, letterSpacing: -.10, color: scheme.onSurface),
+          titleMedium: TextStyle(fontSize: 17, height: 1.35, fontWeight: FontWeight.w700, color: scheme.onSurface),
           bodyLarge: TextStyle(fontSize: 16, height: 1.45, fontWeight: FontWeight.w400, color: scheme.onSurface),
-          bodyMedium: TextStyle(fontSize: 14, height: 1.45, fontWeight: FontWeight.w400, color: scheme.onSurface),
-          labelLarge: TextStyle(fontSize: 14, height: 1.2, fontWeight: FontWeight.w700, letterSpacing: .1, color: scheme.onSurface),
+          bodyMedium: TextStyle(fontSize: 15, height: 1.5, fontWeight: FontWeight.w400, color: scheme.onSurface),
+          labelLarge: TextStyle(fontSize: 14, height: 1.3, fontWeight: FontWeight.w700, letterSpacing: .05, color: scheme.onSurface),
+          labelMedium: TextStyle(fontSize: 13, height: 1.3, fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant),
         );
 
     return ThemeData(
@@ -84,7 +85,7 @@ class PacusTheme {
         color: scheme.surfaceContainerLow,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(18),
           side: BorderSide(color: scheme.outlineVariant.withValues(alpha: .55)),
         ),
       ),
@@ -147,6 +148,18 @@ class PacusTheme {
         labelStyle: text.labelLarge,
       ),
       dividerTheme: DividerThemeData(color: scheme.outlineVariant.withValues(alpha: .7)),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.all(12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        visualDensity: VisualDensity.standard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        side: BorderSide(color: scheme.outline, width: 1.6),
+      ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: scheme.primary,
         linearTrackColor: scheme.surfaceContainerHighest,

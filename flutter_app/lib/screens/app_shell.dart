@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../brand.dart';
 import '../models.dart';
 import 'history_screen.dart';
 import 'home_screen.dart';
@@ -62,10 +63,17 @@ class _PacusShellState extends State<PacusShell> {
               children: [
                 NavigationRail(
                   leading: Padding(
-                    padding: const EdgeInsets.only(top: 12, bottom: 8),
-                    child: _ThemeMenu(
-                      themeMode: widget.themeMode,
-                      onChanged: widget.onThemeChanged,
+                    padding: const EdgeInsets.only(top: 14, bottom: 12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const PacusBrand(showName: false),
+                        const SizedBox(height: 10),
+                        _ThemeMenu(
+                          themeMode: widget.themeMode,
+                          onChanged: widget.onThemeChanged,
+                        ),
+                      ],
                     ),
                   ),
                   selectedIndex: index,

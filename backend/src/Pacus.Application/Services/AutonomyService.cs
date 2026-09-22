@@ -79,6 +79,118 @@ public class AutonomyService : IAutonomyService
             previousWindowRoutines.Count(r => r.TomorrowPlanConfirmedAt is not null));
     }
 
+    public async Task<List<RoutineSuggestionResponse>> GetRoutineSuggestionsAsync(ObjectId familyId)
+    {
+        var routines = (await _dailyRoutineRepository.GetAllByFamilyAsync(familyId))
+            .Where(r => r.Status != RoutineStatus.Planned)
+            .OrderByDescending(r => r.Date)
+            .Take(30)
+            .ToList();
+
+        var suggestions = new List<RoutineSuggestionResponse>();
+        if (routines.Count == 0)
+            return suggestions;
+
+        var tasks = routines
+            .SelectMany(r => r.Tasks)
+            .Where(t => t.DeletedAt is null)
+            .ToList();
+
+        var ownTasks = tasks.Where(t => t.CreatedByMember).ToList();
+
+        var repeatedOwnIdea = ownTasks
+            .GroupBy(t => t.Title.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() >= 2)
+            .OrderByDescending(g => g.Count())
+            .FirstOrDefault();
+
+        if (repeatedOwnIdea is not null)
+        {
+            var title = repeatedOwnIdea.First().Title;
+            suggestions.Add(new RoutineSuggestionResponse(
+                "repeat-own-" + Slug(title),
+                "own-idea",
+                "Uma ideia que você costuma escolher",
+                $"Você já colocou \"{title}\" em mais de um dia. Quer usar essa ideia de novo?",
+                SuggestedTitle: title));
+        }
+
+        var preferredPeriod = ownTasks
+            .GroupBy(t => t.Period)
+            .OrderByDescending(g => g.Count())
+            .Select(g => (TaskPeriod?)g.Key)
+            .FirstOrDefault();
+
+        var templateStats = tasks
+            .Where(t => !string.IsNullOrWhiteSpace(t.TaskTemplateId))
+            .GroupBy(t => t.TaskTemplateId!)
+            .Where(g => g.Count() >= 3)
+            .Select(g => new
+            {
+                TemplateId = g.Key,
+                Title = g.Last().Title,
+                Period = g.Last().Period,
+                CompletionRate = g.Count(t => t.Status == TaskItemStatus.Done) / (double)g.Count(),
+            })
+            .OrderBy(x => x.CompletionRate)
+            .ToList();
+
+        var difficult = templateStats.FirstOrDefault(x => x.CompletionRate < 0.60);
+        if (difficult is not null && preferredPeriod is not null && preferredPeriod != difficult.Period)
+        {
+            suggestions.Add(new RoutineSuggestionResponse(
+                "move-" + difficult.TemplateId,
+                "routine-change",
+                "Talvez outro horário funcione melhor",
+                $"\"{difficult.Title}\" tem sido difícil de concluir. Você costuma escolher mais coisas {PeriodLabel(preferredPeriod.Value)}. Quer mover essa tarefa?",
+                difficult.TemplateId,
+                preferredPeriod.Value.ToString()));
+        }
+
+        var selfStarted = tasks
+            .Where(t => t.Initiative == TaskInitiativeLevel.SelfStarted)
+            .GroupBy(t => t.Period)
+            .OrderByDescending(g => g.Count())
+            .FirstOrDefault();
+
+        if (selfStarted is not null)
+        {
+            suggestions.Add(new RoutineSuggestionResponse(
+                "self-start-" + selfStarted.Key.ToString().ToLowerInvariant(),
+                "insight",
+                "Seu período mais independente",
+                $"Nos últimos dias você começou mais tarefas por conta própria {PeriodLabel(selfStarted.Key)}."));
+        }
+
+        var lowCompletion = templateStats
+            .Where(x => x.CompletionRate < 0.50)
+            .Skip(difficult is null ? 0 : 1)
+            .FirstOrDefault();
+
+        if (lowCompletion is not null)
+        {
+            suggestions.Add(new RoutineSuggestionResponse(
+                "simplify-" + lowCompletion.TemplateId,
+                "routine-change",
+                "Talvez essa tarefa possa ficar mais simples",
+                $"\"{lowCompletion.Title}\" ficou pendente em vários dias. Você pode editar o nome, a descrição ou o horário para deixá-la mais fácil de começar.",
+                lowCompletion.TemplateId));
+        }
+
+        return suggestions.Take(4).ToList();
+    }
+
+    private static string PeriodLabel(TaskPeriod period) => period switch
+    {
+        TaskPeriod.Morning => "de manhã",
+        TaskPeriod.Afternoon => "à tarde",
+        TaskPeriod.Evening => "à noite",
+        _ => "em outro horário",
+    };
+
+    private static string Slug(string value) =>
+        string.Concat(value.ToLowerInvariant().Select(ch => char.IsLetterOrDigit(ch) ? ch : '-')).Trim('-');
+
     private static int CountByInitiative(
         List<Pacus.Domain.Entities.DailyTask> tasks, TaskInitiativeLevel level) =>
         tasks.Count(t => t.Initiative == level);

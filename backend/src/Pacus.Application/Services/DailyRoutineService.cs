@@ -97,6 +97,9 @@ public class DailyRoutineService : IDailyRoutineService
             .Max() + 1;
 
         var isMember = actorRole.Equals("child", StringComparison.OrdinalIgnoreCase);
+        if (isMember && routine.Tasks.Count(t => t.DeletedAt is null && t.CreatedByMember) >= 3)
+            throw new ValidationException("Escolha no maximo 3 coisas suas para amanha.");
+
         routine.Tasks.Add(new DailyTask
         {
             Id = Guid.NewGuid().ToString(),

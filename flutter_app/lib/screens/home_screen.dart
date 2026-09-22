@@ -196,10 +196,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _playDuck() async {
-    final player = AudioPlayer();
+    final player = AudioPlayer(playerId: 'pacus_timer_alarm');
     try {
-      await player.play(BytesSource(_duckWav(), mimeType: 'audio/wav'));
-      await Future<void>.delayed(const Duration(milliseconds: 700));
+      await player.setVolume(1.0);
+
+      for (var i = 0; i < 3; i++) {
+        await player.stop();
+        await player.play(
+          BytesSource(_duckWav(), mimeType: 'audio/wav'),
+          volume: 1.0,
+        );
+
+        // O alerta sintetizado dura cerca de 620 ms.
+        await Future<void>.delayed(const Duration(milliseconds: 700));
+        await player.stop();
+
+        if (i < 2) {
+          await Future<void>.delayed(const Duration(milliseconds: 180));
+        }
+      }
     } catch (_) {
       // O modal visual continua funcionando caso o navegador bloqueie audio.
     } finally {
@@ -230,7 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return math.sin(2 * math.pi * freq * (t - start)) * env;
       }
       final v = burst(0, .24, 340, 125) * .72 + burst(.30, .22, 295, 110) * .62;
-      data.setInt16(44 + i * 2, (v.clamp(-1, 1) * 30000).round(), Endian.little);
+      data.setInt16(44 + i * 2, (v.clamp(-1, 1) * 32700).round(), Endian.little);
     }
     return data.buffer.asUint8List();
   }

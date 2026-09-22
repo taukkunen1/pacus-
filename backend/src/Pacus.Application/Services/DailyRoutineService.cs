@@ -119,6 +119,7 @@ public class DailyRoutineService : IDailyRoutineService
         });
 
         routine.Stats = BuildStats(routine.Tasks);
+        routine.TomorrowPlanConfirmedAt = null;
         await _dailyRoutineRepository.UpdateAsync(routine);
         return routine;
     }
@@ -153,6 +154,7 @@ public class DailyRoutineService : IDailyRoutineService
         task.UpdatedAt = DateTime.UtcNow;
 
         routine.Stats = BuildStats(routine.Tasks);
+        routine.TomorrowPlanConfirmedAt = null;
         await _dailyRoutineRepository.UpdateAsync(routine);
         return routine;
     }
@@ -176,6 +178,7 @@ public class DailyRoutineService : IDailyRoutineService
         task.DeletedAt = DateTime.UtcNow;
         task.UpdatedAt = DateTime.UtcNow;
         routine.Stats = BuildStats(routine.Tasks);
+        routine.TomorrowPlanConfirmedAt = null;
         await _dailyRoutineRepository.UpdateAsync(routine);
         return routine;
     }
@@ -203,6 +206,7 @@ public class DailyRoutineService : IDailyRoutineService
         }
 
         routine.Tasks = routine.Tasks.OrderBy(t => t.Order).ToList();
+        routine.TomorrowPlanConfirmedAt = null;
         await _dailyRoutineRepository.UpdateAsync(routine);
         return routine;
     }

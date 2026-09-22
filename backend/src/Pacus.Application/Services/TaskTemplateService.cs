@@ -11,12 +11,19 @@ public class TaskTemplateService : ITaskTemplateService
 {
     private readonly ITaskTemplateRepository _taskTemplateRepository;
     private readonly IAuditLogRepository _auditLogRepository;
-    private readonly IDailyRoutineRepository _dailyRoutineRepository;
+    private readonly IDailyRoutineRepository? _dailyRoutineRepository;
+
+    public TaskTemplateService(
+        ITaskTemplateRepository taskTemplateRepository,
+        IAuditLogRepository auditLogRepository)
+        : this(taskTemplateRepository, auditLogRepository, null)
+    {
+    }
 
     public TaskTemplateService(
         ITaskTemplateRepository taskTemplateRepository,
         IAuditLogRepository auditLogRepository,
-        IDailyRoutineRepository dailyRoutineRepository)
+        IDailyRoutineRepository? dailyRoutineRepository)
     {
         _taskTemplateRepository = taskTemplateRepository;
         _auditLogRepository = auditLogRepository;
@@ -144,7 +151,9 @@ public class TaskTemplateService : ITaskTemplateService
 
         // Se ja existe rotina planejada para amanha, a mudanca passa a valer nela
         // imediatamente. O dia atual continua como fotografia do que estava combinado.
-        var routines = await _dailyRoutineRepository.GetAllByFamilyAsync(familyId);
+        var routines = _dailyRoutineRepository is null
+            ? new List<DailyRoutine>()
+            : await _dailyRoutineRepository.GetAllByFamilyAsync(familyId);
         foreach (var routine in routines.Where(r => r.Status == RoutineStatus.Planned))
         {
             var task = routine.Tasks.FirstOrDefault(t =>

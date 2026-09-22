@@ -22,11 +22,6 @@ public interface ITaskTemplateService
         ObjectId actorId,
         MemberRoutineUpdateRequest request);
 
-    Task DeleteByMemberAsync(
-        ObjectId familyId,
-        string id,
-        ObjectId actorId);
-
     Task ActivateAsync(
         ObjectId familyId,
         string id);

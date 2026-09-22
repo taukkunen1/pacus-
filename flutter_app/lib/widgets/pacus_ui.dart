@@ -79,7 +79,7 @@ class PacusSectionCard extends StatelessWidget {
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ),
-                    if (trailing != null) trailing!,
+                    ?trailing,
                   ],
                 ),
                 const SizedBox(height: 14),

@@ -429,7 +429,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Card(
               child: ListTile(
                 title: Text(task['title']?.toString() ?? 'Tarefa', style: const TextStyle(fontWeight: FontWeight.w800)),
-                subtitle: Text((task['period'] ?? '').toString() + ' · ' + (task['points'] ?? 0).toString() + ' PP'),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text((task['period'] ?? '').toString() + ' · ' + (task['points'] ?? 0).toString() + ' PP'),
+                    if (task['lastModifiedByMember'] == true)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 4),
+                        child: Text(
+                          'Alterado pelo membro',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                  ],
+                ),
                 trailing: Wrap(spacing: 4, children: [
                   IconButton(onPressed: () => _editTask(task), icon: const Icon(Icons.edit_outlined)),
                   IconButton(onPressed: () => _deleteTask(task), icon: const Icon(Icons.delete_outline)),

@@ -11,5 +11,6 @@ public interface IAutonomyService
     // utcNow e opcional (default = DateTime.UtcNow), so pra permitir teste
     // deterministico -- mesmo padrao de TimezoneHelper.GetOperationalDate.
     Task<AutonomyWeeklyReportResponse> GetWeeklyReportAsync(ObjectId familyId, string timezone, DateTime? utcNow = null);
+    Task<List<RoutineSuggestionResponse>> GetRoutineSuggestionsAsync(ObjectId familyId);
 }
 

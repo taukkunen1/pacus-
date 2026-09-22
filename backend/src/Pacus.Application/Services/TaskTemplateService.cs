@@ -11,13 +11,23 @@ public class TaskTemplateService : ITaskTemplateService
 {
     private readonly ITaskTemplateRepository _taskTemplateRepository;
     private readonly IAuditLogRepository _auditLogRepository;
+    private readonly IDailyRoutineRepository? _dailyRoutineRepository;
 
     public TaskTemplateService(
         ITaskTemplateRepository taskTemplateRepository,
         IAuditLogRepository auditLogRepository)
+        : this(taskTemplateRepository, auditLogRepository, null)
+    {
+    }
+
+    public TaskTemplateService(
+        ITaskTemplateRepository taskTemplateRepository,
+        IAuditLogRepository auditLogRepository,
+        IDailyRoutineRepository? dailyRoutineRepository)
     {
         _taskTemplateRepository = taskTemplateRepository;
         _auditLogRepository = auditLogRepository;
+        _dailyRoutineRepository = dailyRoutineRepository;
     }
 
     public async Task<TaskTemplate> CreateAsync(
@@ -106,6 +116,70 @@ public class TaskTemplateService : ITaskTemplateService
         template.UpdatedAt = DateTime.UtcNow;
 
         await _taskTemplateRepository.UpdateAsync(template);
+
+        return template;
+    }
+
+    public async Task<TaskTemplate> UpdateByMemberAsync(
+        ObjectId familyId,
+        string id,
+        ObjectId actorId,
+        MemberRoutineUpdateRequest request)
+    {
+        TaskValidation.ValidateTitle(request.Title);
+        TaskValidation.ValidateDescription(request.Description);
+
+        if (!ObjectId.TryParse(id, out var templateId))
+            throw new ValidationException("Id de tarefa invalido.");
+
+        var template = await _taskTemplateRepository.GetByIdAsync(templateId);
+        if (template is null || template.FamilyId != familyId || template.DeletedAt is not null)
+            throw new NotFoundException("Tarefa permanente nao encontrada.");
+
+        if (!Enum.TryParse<TaskPeriod>(request.Period, true, out var period))
+            throw new ValidationException("Periodo invalido.");
+
+        var before = $"{template.Title} | {template.Period}";
+        template.Title = request.Title.Trim();
+        template.Description = request.Description;
+        template.Period = period;
+        template.LastModifiedByMember = true;
+        template.LastMemberChangeAt = DateTime.UtcNow;
+        template.UpdatedAt = DateTime.UtcNow;
+
+        await _taskTemplateRepository.UpdateAsync(template);
+
+        // Se ja existe rotina planejada para amanha, a mudanca passa a valer nela
+        // imediatamente. O dia atual continua como fotografia do que estava combinado.
+        var routines = _dailyRoutineRepository is null
+            ? new List<DailyRoutine>()
+            : await _dailyRoutineRepository.GetAllByFamilyAsync(familyId);
+        foreach (var routine in routines.Where(r => r.Status == RoutineStatus.Planned))
+        {
+            var task = routine.Tasks.FirstOrDefault(t =>
+                t.TaskTemplateId == template.Id.ToString() && t.DeletedAt is null);
+            if (task is null) continue;
+
+            task.Title = template.Title;
+            task.Description = template.Description;
+            task.Period = template.Period;
+            task.UpdatedAt = DateTime.UtcNow;
+            routine.TomorrowPlanConfirmedAt = null;
+            await _dailyRoutineRepository.UpdateAsync(routine);
+        }
+
+        await _auditLogRepository.CreateAsync(new AuditLog
+        {
+            Id = ObjectId.GenerateNewId(),
+            FamilyId = familyId,
+            Action = "task_template.member_updated",
+            EntityType = "TaskTemplate",
+            EntityId = template.Id.ToString(),
+            Details = $"Mudanca do membro: {before} -> {template.Title} | {template.Period}. Motivo: {request.Reason ?? "(nao informado)"}",
+            ActorId = actorId,
+            ActorRole = UserRole.Child,
+            CreatedAt = DateTime.UtcNow,
+        });
 
         return template;
     }

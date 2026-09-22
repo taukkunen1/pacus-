@@ -17,8 +17,9 @@
       var needsHttps = window.location.protocol !== 'https:';
       var needsWww = host === 'pacus.com.br';
       var isGitHubPages = host.endsWith('.github.io');
+      var isLegacyRender = host === 'pacus-1.onrender.com';
 
-      if (needsWww || isGitHubPages || (host === targetHost && needsHttps)) {
+      if (needsWww || isGitHubPages || isLegacyRender || (host === targetHost && needsHttps)) {
         var next = new URL(window.location.href);
         next.protocol = 'https:';
         next.hostname = targetHost;

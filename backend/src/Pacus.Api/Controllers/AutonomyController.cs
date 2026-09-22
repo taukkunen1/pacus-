@@ -17,15 +17,50 @@ public class AutonomyController : ControllerBase
     private readonly IAutonomyService _autonomyService;
     private readonly IFamilyTimezoneService _familyTimezoneService;
     private readonly ICurrentUserService _currentUser;
+    private readonly ITaskTemplateRepository _taskTemplateRepository;
+    private readonly ITaskTemplateService _taskTemplateService;
 
     public AutonomyController(
         IAutonomyService autonomyService,
         IFamilyTimezoneService familyTimezoneService,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        ITaskTemplateRepository taskTemplateRepository,
+        ITaskTemplateService taskTemplateService)
     {
         _autonomyService = autonomyService;
         _familyTimezoneService = familyTimezoneService;
         _currentUser = currentUser;
+        _taskTemplateRepository = taskTemplateRepository;
+        _taskTemplateService = taskTemplateService;
+    }
+
+    [HttpGet("routine")]
+    public async Task<IActionResult> GetPermanentRoutine()
+    {
+        var templates = await _taskTemplateRepository.GetActiveByUserAsync(_currentUser.FamilyId);
+        return Ok(templates);
+    }
+
+    [HttpPut("routine/{id}")]
+    [RequireRole(Pacus.Domain.Enums.UserRole.Child)]
+    public async Task<IActionResult> UpdatePermanentRoutine(
+        string id,
+        [FromBody] Pacus.Application.DTOs.MemberRoutineUpdateRequest request)
+    {
+        var template = await _taskTemplateService.UpdateByMemberAsync(
+            _currentUser.FamilyId,
+            id,
+            _currentUser.UserId,
+            request);
+
+        return Ok(template);
+    }
+
+    [HttpGet("suggestions")]
+    public async Task<IActionResult> GetSuggestions()
+    {
+        var suggestions = await _autonomyService.GetRoutineSuggestionsAsync(_currentUser.FamilyId);
+        return Ok(suggestions);
     }
 
     [HttpGet("weekly")]

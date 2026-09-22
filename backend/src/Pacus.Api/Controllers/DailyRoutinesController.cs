@@ -81,6 +81,59 @@ public class DailyRoutinesController : ControllerBase
         }
     }
 
+    [HttpGet("tomorrow")]
+    public async Task<IActionResult> GetTomorrow()
+    {
+        var timezone = await _familyTimezoneService.GetTimezoneAsync(_currentUser.FamilyId);
+        var routine = await _dailyRoutineService.GetOrCreateTomorrowAsync(_currentUser.FamilyId, timezone);
+        return Ok(routine.ToResponse());
+    }
+
+    [HttpPost("tomorrow/tasks")]
+    public async Task<IActionResult> CreateTomorrowTask([FromBody] TomorrowTaskRequest request)
+    {
+        var timezone = await _familyTimezoneService.GetTimezoneAsync(_currentUser.FamilyId);
+        var routine = await _dailyRoutineService.CreateTomorrowTaskAsync(
+            _currentUser.FamilyId, request, _currentUser.UserId, _currentUser.Role.ToString(), timezone);
+        return Ok(routine.ToResponse());
+    }
+
+    [HttpPut("tomorrow/tasks/{id}")]
+    public async Task<IActionResult> UpdateTomorrowTask(string id, [FromBody] UpdateTomorrowTaskRequest request)
+    {
+        var timezone = await _familyTimezoneService.GetTimezoneAsync(_currentUser.FamilyId);
+        var routine = await _dailyRoutineService.UpdateTomorrowTaskAsync(
+            _currentUser.FamilyId, id, request, _currentUser.UserId, _currentUser.Role.ToString(), timezone);
+        return Ok(routine.ToResponse());
+    }
+
+    [HttpDelete("tomorrow/tasks/{id}")]
+    public async Task<IActionResult> DeleteTomorrowTask(string id)
+    {
+        var timezone = await _familyTimezoneService.GetTimezoneAsync(_currentUser.FamilyId);
+        var routine = await _dailyRoutineService.DeleteTomorrowTaskAsync(
+            _currentUser.FamilyId, id, _currentUser.UserId, _currentUser.Role.ToString(), timezone);
+        return Ok(routine.ToResponse());
+    }
+
+    [HttpPut("tomorrow/order")]
+    public async Task<IActionResult> UpdateTomorrowOrder([FromBody] List<string> orderedTaskIds)
+    {
+        var timezone = await _familyTimezoneService.GetTimezoneAsync(_currentUser.FamilyId);
+        var routine = await _dailyRoutineService.ReorderTomorrowTasksAsync(
+            _currentUser.FamilyId, orderedTaskIds, _currentUser.UserId, _currentUser.Role.ToString(), timezone);
+        return Ok(routine.ToResponse());
+    }
+
+    [HttpPost("tomorrow/confirm")]
+    public async Task<IActionResult> ConfirmTomorrow()
+    {
+        var timezone = await _familyTimezoneService.GetTimezoneAsync(_currentUser.FamilyId);
+        var routine = await _dailyRoutineService.ConfirmTomorrowAsync(
+            _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString(), timezone);
+        return Ok(routine.ToResponse());
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetByDate([FromQuery] string date)
     {

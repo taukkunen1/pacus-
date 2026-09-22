@@ -650,6 +650,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 12),
                   ],
                   _progressCard(r),
+                  if (r.tomorrowPlanConfirmedAt != null) ...[
+                    const SizedBox(height: 12),
+                    _plannedYesterdayCard(),
+                  ],
                   if (r.reaction != null) ...[
                     const SizedBox(height: 16),
                     _receivedReactionCard(r.reaction!),
@@ -665,6 +669,27 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 12),
                   OutlinedButton.icon(onPressed: () => _planEvening(r), icon: const Icon(Icons.nightlight_outlined), label: const Text('Planejar minha noite')),
                 ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _plannedYesterdayCard() {
+    return Card(
+      color: Theme.of(context).colorScheme.primaryContainer,
+      child: const Padding(
+        padding: EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(Icons.auto_awesome),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Você planejou este dia ontem. Veja o que foi criado e organizado por você.',
+                style: TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
           ],
@@ -899,7 +924,17 @@ class _HomeScreenState extends State<HomeScreen> {
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('${task.points} pontos · ${_typeLabel(task.type)}'),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  Text('${task.points} pontos · ${_typeLabel(task.type)}'),
+                  if (task.createdByMember)
+                    const Chip(label: Text('Criado por mim')),
+                ],
+              ),
+              if ((task.planCue ?? '').isNotEmpty)
+                Text('Plano: ${task.planCue}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
               if ((task.minimumGoalLabel ?? '').isNotEmpty)
                 Text('Meta mínima: ${task.minimumGoalLabel}', style: const TextStyle(fontSize: 12)),
               if ((task.reason ?? '').isNotEmpty)

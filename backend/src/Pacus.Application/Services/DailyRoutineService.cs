@@ -44,12 +44,185 @@ public class DailyRoutineService : IDailyRoutineService
         }
         else
         {
+            if (existing.Status == RoutineStatus.Planned)
+            {
+                existing.Status = RoutineStatus.Open;
+                await _dailyRoutineRepository.UpdateAsync(existing);
+            }
+
             if (existing.Status == RoutineStatus.Open)
                 await SyncMissingTemplatesAsync(existing, userId);
+
             routine = existing;
         }
 
         await SyncGameTimerAsync(routine, userId);
+        return routine;
+    }
+
+    public async Task<DailyRoutine> GetOrCreateTomorrowAsync(ObjectId userId, string timezone)
+    {
+        var today = TimezoneHelper.GetOperationalDate(timezone);
+        var tomorrow = TimezoneHelper.NextDate(today);
+        var existing = await _dailyRoutineRepository.GetByUserAndDateAsync(userId, tomorrow);
+
+        if (existing is null)
+            return await CreateRoutineForDateAsync(userId, tomorrow, timezone, RoutineStatus.Planned);
+
+        if (existing.Status == RoutineStatus.Planned)
+            await SyncMissingTemplatesAsync(existing, userId);
+
+        return existing;
+    }
+
+    public async Task<DailyRoutine> CreateTomorrowTaskAsync(
+        ObjectId userId,
+        TomorrowTaskRequest request,
+        ObjectId actorId,
+        string actorRole,
+        string timezone)
+    {
+        TaskValidation.ValidateTitle(request.Title);
+        TaskValidation.ValidateDescription(request.Description);
+        if (!Enum.TryParse<TaskPeriod>(request.Period, true, out var period))
+            throw new ValidationException($"Periodo invalido: {request.Period}");
+
+        await EnsureChildPermissionAsync(userId, actorRole, p => p.CanCreateTasks);
+        var routine = await GetOrCreateTomorrowAsync(userId, timezone);
+
+        var nextOrder = routine.Tasks
+            .Where(t => t.DeletedAt is null)
+            .Select(t => t.Order)
+            .DefaultIfEmpty(0)
+            .Max() + 1;
+
+        var isMember = actorRole.Equals("child", StringComparison.OrdinalIgnoreCase);
+        if (isMember && routine.Tasks.Count(t => t.DeletedAt is null && t.CreatedByMember) >= 3)
+            throw new ValidationException("Escolha no maximo 3 coisas suas para amanha.");
+
+        routine.Tasks.Add(new DailyTask
+        {
+            Id = Guid.NewGuid().ToString(),
+            TaskTemplateId = null,
+            Title = request.Title.Trim(),
+            Description = request.Description,
+            Type = TaskType.Expected,
+            Period = period,
+            Order = nextOrder,
+            Points = 0,
+            Status = TaskItemStatus.Pending,
+            CreatedBy = actorId.ToString(),
+            Origin = isMember ? "child" : "adult",
+            PlannedBy = isMember ? "member" : "adult",
+            CreatedByMember = isMember,
+            PlanCue = string.IsNullOrWhiteSpace(request.PlanCue) ? null : request.PlanCue.Trim(),
+            RequiresAdultApproval = false,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        });
+
+        routine.Stats = BuildStats(routine.Tasks);
+        routine.TomorrowPlanConfirmedAt = null;
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        return routine;
+    }
+
+    public async Task<DailyRoutine> UpdateTomorrowTaskAsync(
+        ObjectId userId,
+        string taskId,
+        UpdateTomorrowTaskRequest request,
+        ObjectId actorId,
+        string actorRole,
+        string timezone)
+    {
+        TaskValidation.ValidateTitle(request.Title);
+        TaskValidation.ValidateDescription(request.Description);
+        if (!Enum.TryParse<TaskPeriod>(request.Period, true, out var period))
+            throw new ValidationException($"Periodo invalido: {request.Period}");
+
+        await EnsureChildPermissionAsync(userId, actorRole, p => p.CanEditTasks);
+        var routine = await GetOrCreateTomorrowAsync(userId, timezone);
+        var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
+            ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada no plano de amanha.");
+
+        var isMember = actorRole.Equals("child", StringComparison.OrdinalIgnoreCase);
+        if (isMember && !task.CreatedByMember)
+            throw new UnauthorizedAccessException("Tarefas combinadas podem ser reorganizadas, mas precisam de um adulto para serem alteradas.");
+
+        task.Title = request.Title.Trim();
+        task.Description = request.Description;
+        task.Period = period;
+        task.PlanCue = string.IsNullOrWhiteSpace(request.PlanCue) ? null : request.PlanCue.Trim();
+        task.PlannedBy = isMember ? "member" : "adult";
+        task.UpdatedAt = DateTime.UtcNow;
+
+        routine.Stats = BuildStats(routine.Tasks);
+        routine.TomorrowPlanConfirmedAt = null;
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        return routine;
+    }
+
+    public async Task<DailyRoutine> DeleteTomorrowTaskAsync(
+        ObjectId userId,
+        string taskId,
+        ObjectId actorId,
+        string actorRole,
+        string timezone)
+    {
+        await EnsureChildPermissionAsync(userId, actorRole, p => p.CanDeleteTasks);
+        var routine = await GetOrCreateTomorrowAsync(userId, timezone);
+        var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
+            ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada no plano de amanha.");
+
+        var isMember = actorRole.Equals("child", StringComparison.OrdinalIgnoreCase);
+        if (isMember && !task.CreatedByMember)
+            throw new UnauthorizedAccessException("Tarefas combinadas nao podem ser removidas por este perfil.");
+
+        task.DeletedAt = DateTime.UtcNow;
+        task.UpdatedAt = DateTime.UtcNow;
+        routine.Stats = BuildStats(routine.Tasks);
+        routine.TomorrowPlanConfirmedAt = null;
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        return routine;
+    }
+
+    public async Task<DailyRoutine> ReorderTomorrowTasksAsync(
+        ObjectId userId,
+        List<string> orderedTaskIds,
+        ObjectId actorId,
+        string actorRole,
+        string timezone)
+    {
+        await EnsureChildPermissionAsync(userId, actorRole, p => p.CanReorderTasks);
+        var routine = await GetOrCreateTomorrowAsync(userId, timezone);
+        var currentIds = routine.Tasks.Where(t => t.DeletedAt is null).Select(t => t.Id).ToHashSet();
+
+        if (!currentIds.SetEquals(orderedTaskIds))
+            throw new ValidationException("A ordenacao precisa conter exatamente as tarefas do plano de amanha.");
+
+        for (var i = 0; i < orderedTaskIds.Count; i++)
+        {
+            var task = routine.Tasks.First(t => t.Id == orderedTaskIds[i]);
+            task.Order = i + 1;
+            task.PlannedBy = actorRole.Equals("child", StringComparison.OrdinalIgnoreCase) ? "member" : "adult";
+            task.UpdatedAt = DateTime.UtcNow;
+        }
+
+        routine.Tasks = routine.Tasks.OrderBy(t => t.Order).ToList();
+        routine.TomorrowPlanConfirmedAt = null;
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        return routine;
+    }
+
+    public async Task<DailyRoutine> ConfirmTomorrowAsync(
+        ObjectId userId,
+        ObjectId actorId,
+        string actorRole,
+        string timezone)
+    {
+        var routine = await GetOrCreateTomorrowAsync(userId, timezone);
+        routine.TomorrowPlanConfirmedAt = DateTime.UtcNow;
+        await _dailyRoutineRepository.UpdateAsync(routine);
         return routine;
     }
 
@@ -105,6 +278,8 @@ public class DailyRoutineService : IDailyRoutineService
                 Origin = "template",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
+                PlannedBy = routine.Status == RoutineStatus.Planned ? "adult" : null,
+                CreatedByMember = false,
             });
         }
 
@@ -123,7 +298,7 @@ public class DailyRoutineService : IDailyRoutineService
         await _dailyRoutineRepository.UpdateAsync(routine);
     }
 
-    public async Task<DailyRoutine> CreateRoutineForDateAsync(ObjectId userId, string date, string timezone)
+    public async Task<DailyRoutine> CreateRoutineForDateAsync(ObjectId userId, string date, string timezone, RoutineStatus initialStatus = RoutineStatus.Open)
     {
         var existing = await _dailyRoutineRepository.GetByUserAndDateAsync(userId, date);
         if (existing is not null) return existing;
@@ -152,6 +327,8 @@ public class DailyRoutineService : IDailyRoutineService
                 Origin = "template",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
+                PlannedBy = initialStatus == RoutineStatus.Planned ? "adult" : null,
+                CreatedByMember = false,
             }).ToList();
 
         var routine = new DailyRoutine
@@ -160,7 +337,7 @@ public class DailyRoutineService : IDailyRoutineService
             FamilyId = userId,
             Date = date,
             Timezone = timezone,
-            Status = RoutineStatus.Open,
+            Status = initialStatus,
             Tasks = tasks,
             Stats = BuildStats(tasks),
             PointsEarned = 0,

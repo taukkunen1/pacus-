@@ -40,6 +40,10 @@ public record AutonomyWeeklyReportResponse(
     // isso sozinho.
     int PreviousSelfStarted,
     int PreviousPromptedByPacus,
-    int PreviousPromptedByAdult
+    int PreviousPromptedByAdult,
+    int MemberCreatedTasks,
+    int PlannedDays,
+    int PreviousMemberCreatedTasks,
+    int PreviousPlannedDays
 );
 

@@ -11,10 +11,10 @@ public class AuthService : IAuthService
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenService _tokenService;
 
-    // Expiracao do token — curta para adulto (sessao administrativa), mais longa para
-    // a crianca (evita pedir PIN toda hora num tablet compartilhado da familia).
-    private static readonly TimeSpan AdultTokenLifetime = TimeSpan.FromHours(12);
-    private static readonly TimeSpan ChildTokenLifetime = TimeSpan.FromDays(7);
+    // Sessão persistente para o app familiar. O Flutter Web guarda o JWT no storage
+    // persistente do domínio canônico; 30 dias evita novo login a cada navegador fechado.
+    private static readonly TimeSpan AdultTokenLifetime = TimeSpan.FromDays(30);
+    private static readonly TimeSpan ChildTokenLifetime = TimeSpan.FromDays(30);
 
     public AuthService(IUserRepository userRepository, IPasswordHasher passwordHasher, ITokenService tokenService)
     {

@@ -9,6 +9,7 @@ import 'pacus_screen.dart';
 import 'points_screen.dart';
 import 'settings_screen.dart';
 import 'store_screen.dart';
+import 'tomorrow_screen.dart';
 
 class PacusShell extends StatefulWidget {
   const PacusShell({
@@ -36,6 +37,8 @@ class _PacusShellState extends State<PacusShell> {
   List<_TabSpec> get tabs => [
         _TabSpec('Hoje', Icons.today_outlined,
             HomeScreen(api: widget.api, session: widget.session, onLogout: widget.onLogout)),
+        _TabSpec('Amanhã', Icons.edit_calendar_outlined,
+            TomorrowScreen(api: widget.api, session: widget.session)),
         _TabSpec('Histórico', Icons.history,
             HistoryScreen(api: widget.api)),
         _TabSpec('Pontos', Icons.stars_outlined,

@@ -116,6 +116,8 @@ class _PointsScreenState extends State<PointsScreen> {
                   Text('Iniciadas por conta própria: ' + (autonomy!['selfStarted'] ?? autonomy!['selfStartedCount'] ?? 0).toString()),
                   Text('Com lembrete do PACUS: ' + (autonomy!['promptedByPacus'] ?? autonomy!['promptedByPacusCount'] ?? 0).toString()),
                   Text('Com lembrete de adulto: ' + (autonomy!['promptedByAdult'] ?? autonomy!['promptedByAdultCount'] ?? 0).toString()),
+                  Text('Criadas por mim: ' + (autonomy!['memberCreatedTasks'] ?? 0).toString()),
+                  Text('Dias planejados: ' + (autonomy!['plannedDays'] ?? 0).toString()),
                 ]),
               ),
             ),

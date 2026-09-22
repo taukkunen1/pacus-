@@ -9,11 +9,17 @@ public interface IDailyRoutineService
 {
     // Garante que a rotina do dia existe; cria a partir dos task_templates ativos se necessario.
     Task<DailyRoutine> GetOrCreateTodayAsync(ObjectId userId, string timezone);
+    Task<DailyRoutine> GetOrCreateTomorrowAsync(ObjectId userId, string timezone);
+    Task<DailyRoutine> CreateTomorrowTaskAsync(ObjectId userId, TomorrowTaskRequest request, ObjectId actorId, string actorRole, string timezone);
+    Task<DailyRoutine> UpdateTomorrowTaskAsync(ObjectId userId, string taskId, UpdateTomorrowTaskRequest request, ObjectId actorId, string actorRole, string timezone);
+    Task<DailyRoutine> DeleteTomorrowTaskAsync(ObjectId userId, string taskId, ObjectId actorId, string actorRole, string timezone);
+    Task<DailyRoutine> ReorderTomorrowTasksAsync(ObjectId userId, List<string> orderedTaskIds, ObjectId actorId, string actorRole, string timezone);
+    Task<DailyRoutine> ConfirmTomorrowAsync(ObjectId userId, ObjectId actorId, string actorRole, string timezone);
 
     // Cria a rotina de uma data especifica (nao necessariamente "hoje") a partir dos
     // task_templates ativos. Usado tanto pelo GetOrCreateTodayAsync quanto pelo
     // fechamento do dia ao avancar por dias em que o usuario nao abriu o app.
-    Task<DailyRoutine> CreateRoutineForDateAsync(ObjectId userId, string date, string timezone);
+    Task<DailyRoutine> CreateRoutineForDateAsync(ObjectId userId, string date, string timezone, RoutineStatus initialStatus = RoutineStatus.Open);
 
     // Toggle de conclusao: gera evento + transacao de pontos (award ou reversal).
     // Pode ser chamado a qualquer momento, mesmo depois de ja concluida — sem restricao de janela de tempo.

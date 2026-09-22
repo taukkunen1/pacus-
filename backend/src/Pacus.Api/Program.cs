@@ -154,6 +154,7 @@ builder.Services.AddScoped<IStoreRepository, StoreRepository>();
 builder.Services.AddScoped<ISettingsRepository, SettingsRepository>();
 builder.Services.AddScoped<IPacusGrowthRepository, PacusGrowthRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+builder.Services.AddScoped<IRoutineChangeProposalRepository, RoutineChangeProposalRepository>();
 
 // Auth
 builder.Services.AddScoped<ICurrentUserService, HttpCurrentUserService>();
@@ -172,6 +173,7 @@ builder.Services.AddScoped<IDataExportService, DataExportService>();
 builder.Services.AddScoped<IAccountDeletionService, AccountDeletionService>();
 builder.Services.AddScoped<IFamilyTimezoneService, FamilyTimezoneService>();
 builder.Services.AddScoped<IAutonomyService, AutonomyService>();
+builder.Services.AddScoped<IRoutineChangeService, RoutineChangeService>();
 
 // Cache em memoria usado por FamilyTimezoneService (revisao de API, 2026-09-11,
 // achado #1) -- singleton por processo, coerente com FamilyTimezoneService sendo

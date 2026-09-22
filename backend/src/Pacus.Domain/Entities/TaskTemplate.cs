@@ -113,4 +113,9 @@ public class TaskTemplate
     // minima definida. Copiado para cada DailyTask gerado (DailyTask.MinimumGoalLabel),
     // igual Reason/Options.
     public string? MinimumGoalLabel { get; set; }
+
+    // Fase de autonomia: mudancas feitas pelo membro entram em vigor imediatamente.
+    // O adulto pode revisar depois no painel, sem fluxo de aprovacao.
+    public bool LastModifiedByMember { get; set; }
+    public DateTime? LastMemberChangeAt { get; set; }
 }

@@ -57,7 +57,7 @@ class PacusTheme {
           displayMedium: TextStyle(fontSize: 44, height: 1.05, fontWeight: FontWeight.w800, letterSpacing: -1.2, color: scheme.onSurface),
           headlineLarge: TextStyle(fontSize: 32, height: 1.18, fontWeight: FontWeight.w800, letterSpacing: -.45, color: scheme.onSurface),
           headlineMedium: TextStyle(fontSize: 26, height: 1.22, fontWeight: FontWeight.w800, letterSpacing: -.25, color: scheme.onSurface),
-          titleLarge: TextStyle(fontSize: 21, height: 1.28, fontWeight: FontWeight.w750, letterSpacing: -.10, color: scheme.onSurface),
+          titleLarge: TextStyle(fontSize: 21, height: 1.28, fontWeight: FontWeight.w700, letterSpacing: -.10, color: scheme.onSurface),
           titleMedium: TextStyle(fontSize: 17, height: 1.35, fontWeight: FontWeight.w700, color: scheme.onSurface),
           bodyLarge: TextStyle(fontSize: 16, height: 1.45, fontWeight: FontWeight.w400, color: scheme.onSurface),
           bodyMedium: TextStyle(fontSize: 15, height: 1.5, fontWeight: FontWeight.w400, color: scheme.onSurface),

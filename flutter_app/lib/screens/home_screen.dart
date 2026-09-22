@@ -933,11 +933,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Chip(label: Text('Criado por mim')),
                 ],
               ),
+              if ((task.description ?? '').trim().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: Text(
+                    task.description!.trim(),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                ),
               if ((task.planCue ?? '').isNotEmpty)
                 Text('Plano: ${task.planCue}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
               if ((task.minimumGoalLabel ?? '').isNotEmpty)
                 Text('Meta mínima: ${task.minimumGoalLabel}', style: const TextStyle(fontSize: 12)),
-              if ((task.reason ?? '').isNotEmpty)
+              if ((task.reason ?? '').trim().isNotEmpty &&
+                  (task.description ?? '').trim().toLowerCase() != task.reason!.trim().toLowerCase())
                 Text(task.reason!, style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
             ],
           ),

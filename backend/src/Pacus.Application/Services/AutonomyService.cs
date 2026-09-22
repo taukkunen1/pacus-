@@ -55,6 +55,14 @@ public class AutonomyService : IAutonomyService
             .Where(t => t.DeletedAt is null)
             .ToList();
 
+        var currentWindowRoutines = routines
+            .Where(r => !TimezoneHelper.IsBefore(r.Date, fromDate))
+            .ToList();
+        var previousWindowRoutines = routines
+            .Where(r => TimezoneHelper.IsBefore(r.Date, fromDate) &&
+                        !TimezoneHelper.IsBefore(r.Date, previousFromDate))
+            .ToList();
+
         return new AutonomyWeeklyReportResponse(
             fromDate,
             today,
@@ -64,7 +72,11 @@ public class AutonomyService : IAutonomyService
             currentWindowTasks.Count(t => t.Initiative is null),
             CountByInitiative(previousWindowTasks, TaskInitiativeLevel.SelfStarted),
             CountByInitiative(previousWindowTasks, TaskInitiativeLevel.PromptedByPacus),
-            CountByInitiative(previousWindowTasks, TaskInitiativeLevel.PromptedByAdult));
+            CountByInitiative(previousWindowTasks, TaskInitiativeLevel.PromptedByAdult),
+            currentWindowTasks.Count(t => t.CreatedByMember),
+            currentWindowRoutines.Count(r => r.TomorrowPlanConfirmedAt is not null),
+            previousWindowTasks.Count(t => t.CreatedByMember),
+            previousWindowRoutines.Count(r => r.TomorrowPlanConfirmedAt is not null));
     }
 
     private static int CountByInitiative(

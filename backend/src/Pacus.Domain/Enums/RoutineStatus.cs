@@ -2,7 +2,8 @@ namespace Pacus.Domain.Enums;
 
 public enum RoutineStatus
 {
-    Planned,
-    Open,
-    Closed
+    // Explicit values preserve existing MongoDB enum integers.
+    Open = 0,
+    Closed = 1,
+    Planned = 2
 }

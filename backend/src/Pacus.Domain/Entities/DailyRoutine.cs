@@ -69,4 +69,8 @@ public class DailyRoutine
     // noite hoje.
     public List<EveningPlanItem> EveningPlan { get; set; } = new();
     public DateTime? EveningPlanSetAt { get; set; }
+
+    // Quando o membro confirma "Meu Amanhã". O campo permanece no dia seguinte,
+    // permitindo mostrar "Você planejou isso ontem" sem criar outra coleção.
+    public DateTime? TomorrowPlanConfirmedAt { get; set; }
 }

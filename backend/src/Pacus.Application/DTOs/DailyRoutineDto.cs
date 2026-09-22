@@ -59,7 +59,11 @@ public record DailyTaskResponse(
     string? MinimumGoalLabel,
     TaskInitiativeLevel? Initiative,
     TaskSkipReason? SkipReason,
-    string? SkipReasonNote
+    string? SkipReasonNote,
+    string? PlannedBy,
+    bool CreatedByMember,
+    string? PlanCue,
+    bool RequiresAdultApproval
 );
 
 public record DailyRoutineResponse(
@@ -82,7 +86,8 @@ public record DailyRoutineResponse(
     int GameTimerMinutes,
     // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md).
     List<EveningPlanItemResponse> EveningPlan,
-    DateTime? EveningPlanSetAt
+    DateTime? EveningPlanSetAt,
+    DateTime? TomorrowPlanConfirmedAt
 );
 
 public static class DailyRoutineMappingExtensions
@@ -109,7 +114,11 @@ public static class DailyRoutineMappingExtensions
         task.MinimumGoalLabel,
         task.Initiative,
         task.SkipReason,
-        task.SkipReasonNote);
+        task.SkipReasonNote,
+        task.PlannedBy,
+        task.CreatedByMember,
+        task.PlanCue,
+        task.RequiresAdultApproval);
 
     public static DailyRoutineResponse ToResponse(this DailyRoutine routine) => new(
         routine.Id.ToString(),
@@ -133,7 +142,8 @@ public static class DailyRoutineMappingExtensions
             .OrderBy(i => i.Order)
             .Select(i => new EveningPlanItemResponse(i.TaskId, i.ApproxLabel, i.Order))
             .ToList(),
-        routine.EveningPlanSetAt);
+        routine.EveningPlanSetAt,
+        routine.TomorrowPlanConfirmedAt);
 
     public static DailyRoutineStatsResponse ToResponse(this DailyRoutineStats stats) => new(
         new TaskTypeStatResponse(stats.Mandatory.Done, stats.Mandatory.Total),

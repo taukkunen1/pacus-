@@ -16,6 +16,17 @@ public interface ITaskTemplateService
         string id,
         CreateTaskRequest request);
 
+    Task<TaskTemplate> UpdateByMemberAsync(
+        ObjectId familyId,
+        string id,
+        ObjectId actorId,
+        MemberRoutineUpdateRequest request);
+
+    Task DeleteByMemberAsync(
+        ObjectId familyId,
+        string id,
+        ObjectId actorId);
+
     Task ActivateAsync(
         ObjectId familyId,
         string id);

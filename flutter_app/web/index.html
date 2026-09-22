@@ -6,9 +6,29 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="PACUS — rotina, autonomia e tempo de tela.">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <meta name="theme-color" content="#102820">
+  <meta name="theme-color" content="#007C83">
+  <link rel="canonical" href="https://www.pacus.com.br/">
+  <link rel="icon" type="image/svg+xml" href="pacus-logo.svg">
   <title>PACUS</title>
   <link rel="manifest" href="manifest.json">
+  <script>
+    (function () {
+      var host = window.location.hostname.toLowerCase();
+      var isPacusApex = host === 'pacus.com.br';
+      var isGitHubPages = host.endsWith('.github.io');
+      var needsHttps = window.location.protocol !== 'https:';
+      var isCanonicalHost = host === 'www.pacus.com.br';
+
+      if (isPacusApex || isGitHubPages || (isCanonicalHost && needsHttps)) {
+        var target =
+          'https://www.pacus.com.br' +
+          window.location.pathname +
+          window.location.search +
+          window.location.hash;
+        window.location.replace(target);
+      }
+    })();
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

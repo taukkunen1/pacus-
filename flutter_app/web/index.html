@@ -7,7 +7,23 @@
   <meta name="description" content="PACUS — rotina, autonomia e tempo de tela.">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <meta name="theme-color" content="#102820">
+  <link rel="canonical" href="https://www.pacus.com.br/">
   <title>PACUS</title>
+  <script>
+    (function () {
+      var targetHost = 'www.pacus.com.br';
+      var needsHttps = window.location.protocol !== 'https:';
+      var needsWww = window.location.hostname === 'pacus.com.br';
+
+      if (needsHttps || needsWww) {
+        var next = new URL(window.location.href);
+        next.protocol = 'https:';
+        next.hostname = targetHost;
+        next.port = '';
+        window.location.replace(next.toString());
+      }
+    })();
+  </script>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>

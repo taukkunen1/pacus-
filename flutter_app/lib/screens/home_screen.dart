@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../api.dart';
 import '../brand.dart';
 import '../models.dart';
+import '../ui/pacus_components.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.api, required this.session, required this.onLogout});
@@ -638,10 +639,9 @@ class _HomeScreenState extends State<HomeScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 40),
+          padding: EdgeInsets.zero,
           children: [
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 900),
+            PacusPageWidth(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -841,34 +841,46 @@ class _HomeScreenState extends State<HomeScreen> {
     final morning = tasks.where((t) => t.period.toLowerCase() == 'morning').toList();
     final afternoon = tasks.where((t) => t.period.toLowerCase() == 'afternoon').toList();
     final evening = tasks.where((t) => t.period.toLowerCase() == 'evening').toList();
+    final theme = Theme.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(children: [
-          const Expanded(child: Text('Minha rotina', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900))),
-          IconButton(onPressed: _createDailyTask, icon: const Icon(Icons.add_task), tooltip: 'Adicionar tarefa de hoje'),
-        ]),
-        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Minha rotina',
+                style: theme.textTheme.headlineMedium,
+              ),
+            ),
+            IconButton(
+              onPressed: _createDailyTask,
+              icon: const Icon(Icons.add_task_rounded),
+              tooltip: 'Adicionar tarefa de hoje',
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         _periodSection(
           title: 'Manhã',
           icon: Icons.wb_sunny_outlined,
           tasks: morning,
-          tint: Theme.of(context).colorScheme.secondaryContainer,
+          accent: const Color(0xFFE59A22),
         ),
         const SizedBox(height: 14),
         _periodSection(
           title: 'Tarde',
           icon: Icons.light_mode_outlined,
           tasks: afternoon,
-          tint: Theme.of(context).colorScheme.primaryContainer,
+          accent: theme.colorScheme.primary,
         ),
         const SizedBox(height: 14),
         _periodSection(
           title: 'Noite',
           icon: Icons.nightlight_round,
           tasks: evening,
-          tint: Theme.of(context).colorScheme.tertiaryContainer,
+          accent: theme.colorScheme.tertiary,
         ),
       ],
     );
@@ -878,111 +890,193 @@ class _HomeScreenState extends State<HomeScreen> {
     required String title,
     required IconData icon,
     required List<DailyTask> tasks,
-    required Color tint,
+    required Color accent,
   }) {
     final done = tasks.where((t) => t.isDone).length;
 
-    return Card(
-      color: tint,
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [
-            Icon(icon),
-            const SizedBox(width: 10),
-            Expanded(child: Text(title, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900))),
-            Text('$done/${tasks.length}', style: const TextStyle(fontWeight: FontWeight.w800)),
-          ]),
-          const SizedBox(height: 12),
-          if (tasks.isEmpty)
-            Text('Nenhuma tarefa para ${title.toLowerCase()}.')
-          else
-            for (var i = 0; i < tasks.length; i++) ...[
-              _taskTile(tasks[i], canMoveUp: i > 0, canMoveDown: i < tasks.length - 1),
-              if (i < tasks.length - 1) const Divider(height: 1),
+    return PacusSectionCard(
+      title: title,
+      icon: icon,
+      accent: accent,
+      subtitle: tasks.isEmpty
+          ? 'Nenhuma tarefa neste período'
+          : '$done de ${tasks.length} concluídas',
+      trailing: PacusBadge(
+        label: '$done/${tasks.length}',
+        emphasis: tasks.isNotEmpty && done == tasks.length,
+      ),
+      child: tasks.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Você pode deixar este período livre ou adicionar uma tarefa.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            )
+          : Column(
+              children: [
+                for (var i = 0; i < tasks.length; i++)
+                  _taskTile(
+                    tasks[i],
+                    canMoveUp: i > 0,
+                    canMoveDown: i < tasks.length - 1,
+                  ),
+              ],
+            ),
+    );
+  }
+
+  Widget _taskTile(
+    DailyTask task, {
+    required bool canMoveUp,
+    required bool canMoveDown,
+  }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final description = (task.description ?? '').trim();
+    final reason = (task.reason ?? '').trim();
+    final showReason = reason.isNotEmpty &&
+        description.toLowerCase() != reason.toLowerCase();
+
+    final actionMenu = PopupMenuButton<String>(
+      tooltip: 'Mais opções',
+      onSelected: (value) {
+        if (value == 'up') _moveTaskWithinPeriod(task, -1);
+        if (value == 'down') _moveTaskWithinPeriod(task, 1);
+        if (value == 'edit') _editDailyTask(task);
+        if (value == 'initiative') _setInitiative(task);
+        if (value == 'skip') _setSkipReason(task);
+        if (value == 'delete') _deleteDailyTask(task);
+      },
+      itemBuilder: (_) => [
+        if (canMoveUp)
+          const PopupMenuItem(value: 'up', child: Text('Mover para cima')),
+        if (canMoveDown)
+          const PopupMenuItem(value: 'down', child: Text('Mover para baixo')),
+        const PopupMenuItem(value: 'edit', child: Text('Editar')),
+        const PopupMenuItem(value: 'initiative', child: Text('Como comecei')),
+        const PopupMenuItem(value: 'skip', child: Text('O que aconteceu')),
+        const PopupMenuItem(value: 'delete', child: Text('Remover do dia')),
+      ],
+    );
+
+    return PacusTaskSurface(
+      done: task.isDone,
+      onToggle: () => _toggleTask(task),
+      actions: actionMenu,
+      title: Text(
+        task.title,
+        style: theme.textTheme.titleMedium?.copyWith(
+          decoration: task.isDone ? TextDecoration.lineThrough : null,
+          color: task.isDone ? scheme.onSurfaceVariant : scheme.onSurface,
+        ),
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: [
+              PacusBadge(
+                label: '${task.points} ${task.points == 1 ? 'ponto' : 'pontos'}',
+                icon: Icons.stars_rounded,
+              ),
+              PacusBadge(label: _typeLabel(task.type)),
+              if (task.createdByMember)
+                const PacusBadge(
+                  label: 'Criado por mim',
+                  icon: Icons.auto_awesome_rounded,
+                  emphasis: true,
+                ),
             ],
-        ]),
+          ),
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 9),
+            Text(
+              description,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurface,
+              ),
+            ),
+          ],
+          if ((task.planCue ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _taskHint(
+              icon: Icons.route_outlined,
+              label: 'Plano',
+              text: task.planCue!.trim(),
+            ),
+          ],
+          if ((task.minimumGoalLabel ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _taskHint(
+              icon: Icons.flag_outlined,
+              label: 'Meta mínima',
+              text: task.minimumGoalLabel!.trim(),
+            ),
+          ],
+          if (showReason) ...[
+            const SizedBox(height: 6),
+            _taskHint(
+              icon: Icons.lightbulb_outline_rounded,
+              label: 'Por quê',
+              text: reason,
+            ),
+          ],
+          if (task.options.isNotEmpty && !task.isDone) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: task.options
+                  .map(
+                    (option) => ChoiceChip(
+                      label: Text(option),
+                      selected: task.selectedOption == option,
+                      onSelected: (_) => _selectOption(task, option),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _taskTile(DailyTask task, {required bool canMoveUp, required bool canMoveDown}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _taskHint({
+    required IconData icon,
+    required String label,
+    required String text,
+  }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        CheckboxListTile(
-          contentPadding: EdgeInsets.zero,
-          value: task.isDone,
-          onChanged: (_) => _toggleTask(task),
-          title: Text(
-            task.title,
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              decoration: task.isDone ? TextDecoration.lineThrough : null,
-            ),
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: [
-                  Text('${task.points} pontos · ${_typeLabel(task.type)}'),
-                  if (task.createdByMember)
-                    const Chip(label: Text('Criado por mim')),
-                ],
+        Icon(icon, size: 17, color: scheme.onSurfaceVariant),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              style: theme.textTheme.bodySmall?.copyWith(
+                height: 1.45,
+                color: scheme.onSurfaceVariant,
               ),
-              if ((task.description ?? '').trim().isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 3),
-                  child: Text(
-                    task.description!.trim(),
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
+              children: [
+                TextSpan(
+                  text: '$label: ',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
-              if ((task.planCue ?? '').isNotEmpty)
-                Text('Plano: ${task.planCue}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-              if ((task.minimumGoalLabel ?? '').isNotEmpty)
-                Text('Meta mínima: ${task.minimumGoalLabel}', style: const TextStyle(fontSize: 12)),
-              if ((task.reason ?? '').trim().isNotEmpty &&
-                  (task.description ?? '').trim().toLowerCase() != task.reason!.trim().toLowerCase())
-                Text(task.reason!, style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
-            ],
-          ),
-          secondary: PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'up') _moveTaskWithinPeriod(task, -1);
-              if (value == 'down') _moveTaskWithinPeriod(task, 1);
-              if (value == 'edit') _editDailyTask(task);
-              if (value == 'initiative') _setInitiative(task);
-              if (value == 'skip') _setSkipReason(task);
-              if (value == 'delete') _deleteDailyTask(task);
-            },
-            itemBuilder: (_) => [
-              if (canMoveUp) const PopupMenuItem(value: 'up', child: Text('Mover para cima')),
-              if (canMoveDown) const PopupMenuItem(value: 'down', child: Text('Mover para baixo')),
-              const PopupMenuItem(value: 'edit', child: Text('Editar')),
-              const PopupMenuItem(value: 'initiative', child: Text('Como comecei')),
-              const PopupMenuItem(value: 'skip', child: Text('O que aconteceu')),
-              const PopupMenuItem(value: 'delete', child: Text('Remover do dia')),
-            ],
-          ),
-          controlAffinity: ListTileControlAffinity.leading,
-        ),
-        if (task.options.isNotEmpty && !task.isDone)
-          Padding(
-            padding: const EdgeInsets.only(left: 12, bottom: 12),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: task.options.map((option) => ChoiceChip(
-                label: Text(option),
-                selected: task.selectedOption == option,
-                onSelected: (_) => _selectOption(task, option),
-              )).toList(),
+                TextSpan(text: text),
+              ],
             ),
           ),
+        ),
       ],
     );
   }

@@ -62,8 +62,8 @@ void main() {
           )),
     );
 
-    expect(
-      () => api.request('/falha'),
+    await expectLater(
+      api.request('/falha'),
       throwsA(
         isA<ApiException>()
             .having((e) => e.message, 'message', 'Mensagem de teste')

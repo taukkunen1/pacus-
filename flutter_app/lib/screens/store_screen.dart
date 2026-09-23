@@ -4,9 +4,15 @@ import '../api.dart';
 import '../models.dart';
 
 class StoreScreen extends StatefulWidget {
-  const StoreScreen({super.key, required this.api, required this.session});
+  const StoreScreen({
+    super.key,
+    required this.api,
+    required this.session,
+    this.onPendingChanged,
+  });
   final PacusApi api;
   final AuthSession session;
+  final ValueChanged<int>? onPendingChanged;
   @override State<StoreScreen> createState() => _StoreScreenState();
 }
 
@@ -26,9 +32,11 @@ class _StoreScreenState extends State<StoreScreen> {
       final points = await widget.api.getMap('/points');
       final rawPending = widget.session.isAdult ? await widget.api.getList('/store/redemptions/pending') : <dynamic>[];
       if (!mounted) return;
+      final pendingItems = rawPending.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      widget.onPendingChanged?.call(pendingItems.length);
       setState(() {
         items = rawItems.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-        pending = rawPending.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        pending = pendingItems;
         balance = (points['balance'] as num?)?.toInt() ?? 0;
         loading = false;
         error = null;

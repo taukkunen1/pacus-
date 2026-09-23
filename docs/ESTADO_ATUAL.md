@@ -71,7 +71,10 @@ Atualizado em 2026-09-23 após a auditoria final da migração para Flutter Web.
 - histórico persistido no MongoDB;
 - atualização periódica;
 - identificação do remetente;
-- isolamento por `FamilyId`.
+- isolamento por `FamilyId`;
+- estado de leitura por usuário;
+- contagem de mensagens não lidas;
+- badge do Chat atualizado em segundo plano.
 
 ### Navegação
 - Hoje;
@@ -82,7 +85,7 @@ Atualizado em 2026-09-23 após a auditoria final da migração para Flutter Web.
 - PACUS;
 - Loja;
 - Config (adulto);
-- badges de tarefas pendentes e resgates aguardando aprovação.
+- badges de tarefas pendentes, mensagens não lidas e resgates aguardando aprovação.
 
 ## CI/CD
 
@@ -122,3 +125,23 @@ A migração Render → Fly.io está encerrada.
 - O antigo serviço do Render foi suspenso.
 - Em produção, o backend aceita CORS exclusivamente de `https://www.pacus.com.br`.
 - Configurações antigas de CORS no provedor não conseguem reabrir origens aposentadas, porque a whitelist de produção é aplicada no código.
+
+
+## Monitoramento de produção
+
+`.github/workflows/production-health.yml` executa a cada 30 minutos e também manualmente:
+- verifica `https://www.pacus.com.br`;
+- verifica `GET /api/v1/health`;
+- exige `status=ok` e `database=connected`;
+- confirma CORS para `https://www.pacus.com.br`;
+- confirma que a origem aposentada `https://pacus-1.onrender.com` continua bloqueada.
+
+## V2 — comunicação e notificações
+
+A V2 foi iniciada em 2026-09-23 pela fundação de notificações internas:
+- mensagens não lidas são calculadas por usuário;
+- leitura é persistida no backend;
+- o Chat mostra badge na navegação;
+- o shell atualiza o badge em segundo plano.
+
+Próximos incrementos planejados: pedidos rápidos, solicitação de tempo extra, centro de notificações e, depois, push web/PWA.

@@ -128,8 +128,8 @@ export async function renderPacus(root, navigate) {
     const labels = {
       egg: "Ovo",
       cracking: "Rachando",
-      hatching: "Eclodindo",
-      baby: "Filhote",
+      hatching: "Eclosão",
+      baby: "Bebê",
       young: "Jovem",
       adult: "Adulto"
     };

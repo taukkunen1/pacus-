@@ -1,4 +1,6 @@
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../api.dart';
 import '../brand.dart';
@@ -20,25 +22,50 @@ class _LoginScreenState extends State<LoginScreen> {
   final pin = TextEditingController();
   bool memberMode = false;
   bool busy = false;
+  bool slowBusy = false;
+  Timer? slowBusyTimer;
   String? error;
   List<Map<String, dynamic>> profiles = [];
   Map<String, dynamic>? selectedProfile;
 
   @override
   void dispose() {
+    slowBusyTimer?.cancel();
     email.dispose(); password.dispose(); familyCode.dispose(); pin.dispose();
     super.dispose();
   }
 
+  void _beginBusy() {
+    slowBusyTimer?.cancel();
+    setState(() {
+      busy = true;
+      slowBusy = false;
+      error = null;
+    });
+    slowBusyTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted && busy) setState(() => slowBusy = true);
+    });
+  }
+
+  void _endBusy() {
+    slowBusyTimer?.cancel();
+    if (mounted) {
+      setState(() {
+        busy = false;
+        slowBusy = false;
+      });
+    }
+  }
+
   Future<void> _loginAdult() async {
-    setState(() { busy = true; error = null; });
+    _beginBusy();
     try {
       final session = await widget.api.loginAdult(email.text, password.text);
       if (mounted) widget.onLoggedIn(session);
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     } finally {
-      if (mounted) setState(() => busy = false);
+      _endBusy();
     }
   }
 
@@ -49,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
     final formatted = code.substring(0, 3) + '-' + code.substring(3);
-    setState(() { busy = true; error = null; });
+    _beginBusy();
     try {
       final raw = await widget.api.request('/family/by-code/' + formatted + '/children', authenticated: false);
       final list = List<dynamic>.from(raw as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -62,7 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     } finally {
-      if (mounted) setState(() => busy = false);
+      _endBusy();
     }
   }
 
@@ -72,14 +99,14 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => error = 'Escolha seu perfil.');
       return;
     }
-    setState(() { busy = true; error = null; });
+    _beginBusy();
     try {
       final session = await widget.api.loginChild(profile['id'].toString(), pin.text);
       if (mounted) widget.onLoggedIn(session);
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     } finally {
-      if (mounted) setState(() => busy = false);
+      _endBusy();
     }
   }
 
@@ -119,7 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
     resetEmail.dispose(); recovery.dispose(); newPassword.dispose();
     if (payload == null) return;
 
-    setState(() { busy = true; error = null; });
+    _beginBusy();
     try {
       final result = Map<String, dynamic>.from(
         await widget.api.request('/auth/adult/reset-password', method: 'POST', body: payload, authenticated: false) as Map,
@@ -141,7 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     } finally {
-      if (mounted) setState(() => busy = false);
+      _endBusy();
     }
   }
 
@@ -201,7 +228,7 @@ class _LoginScreenState extends State<LoginScreen> {
     adultName.dispose(); adultEmail.dispose(); adultPassword.dispose(); memberName.dispose(); memberPin.dispose();
     if (payload == null) return;
 
-    setState(() { busy = true; error = null; });
+    _beginBusy();
     try {
       final result = Map<String, dynamic>.from(await widget.api.request('/bootstrap', method: 'POST', body: payload, authenticated: false) as Map);
       if (!mounted) return;
@@ -223,7 +250,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     } finally {
-      if (mounted) setState(() => busy = false);
+      _endBusy();
     }
   }
 
@@ -309,7 +336,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 14),
                   Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
                 ],
-                if (busy) const Padding(padding: EdgeInsets.only(top: 14), child: Center(child: CircularProgressIndicator())),
+                if (busy) ...[
+                  const Padding(
+                    padding: EdgeInsets.only(top: 14),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  if (slowBusy)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(
+                        'Ainda carregando... o servidor pode estar iniciando depois de um tempo parado. Isso pode levar mais alguns segundos na primeira tentativa.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      ),
+                    ),
+                ],
               ]),
             ),
           ),

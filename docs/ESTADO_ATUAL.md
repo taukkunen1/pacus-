@@ -129,7 +129,7 @@ A migração Render → Fly.io está encerrada.
 
 ## Monitoramento de produção
 
-`.github/workflows/production-health.yml` executa a cada 30 minutos e também manualmente:
+`.github/workflows/production-health.yml` executa a cada 15 minutos e também manualmente:
 - verifica `https://www.pacus.com.br`;
 - verifica `GET /api/v1/health`;
 - exige `status=ok` e `database=connected`;
@@ -144,4 +144,20 @@ A V2 foi iniciada em 2026-09-23 pela fundação de notificações internas:
 - o Chat mostra badge na navegação;
 - o shell atualiza o badge em segundo plano.
 
-Próximos incrementos planejados: pedidos rápidos, solicitação de tempo extra, centro de notificações e, depois, push web/PWA.
+Incrementos já implementados nesta etapa:
+- pedidos rápidos da criança no Chat (`Preciso de ajuda`, `Mudar tarefa`, `+10 min`, `+20 min`);
+- aprovação/rejeição pelo adulto no próprio Chat;
+- pedidos de tempo extra aprovados alteram o game timer real;
+- pedidos pendentes continuam sinalizados no badge mesmo depois da leitura.
+
+Próximos incrementos possíveis: centro de notificações consolidado e, depois, push web/PWA.
+
+
+## Testes Flutter
+
+A suíte Flutter cobre atualmente:
+- parsing e regras derivadas de `DailyTask`/`DailyRoutine`;
+- sessão e papel Adult/Child;
+- mensagens de esforço;
+- formatação e labels do Chat;
+- cliente HTTP: Bearer token, chamadas públicas, erros da API e limpeza de sessão em 401.

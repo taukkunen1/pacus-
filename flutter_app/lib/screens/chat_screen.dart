@@ -84,28 +84,37 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _refreshNewMessages() async {
-    if (_loading || _refreshing || _messages.isEmpty && _error != null) return;
+    if (_loading || _refreshing || (_messages.isEmpty && _error != null)) {
+      return;
+    }
 
     _refreshing = true;
     try {
-      final lastId = _messages.isEmpty ? null : _messages.last['id']?.toString();
-      final path = lastId == null || lastId.isEmpty
-          ? '/chat/messages'
-          : '/chat/messages?afterId=$lastId';
-
       final wasNearBottom = _isNearBottom;
-      final data = await widget.api.getList(path);
-      final existingIds = _messages.map((m) => m['id']?.toString()).toSet();
-      final incoming = data
+      final data = await widget.api.getList('/chat/messages');
+      final refreshed = data
           .whereType<Map>()
           .map((item) => Map<String, dynamic>.from(item))
-          .where((item) => !existingIds.contains(item['id']?.toString()))
           .toList();
 
-      if (!mounted || incoming.isEmpty) return;
+      if (!mounted) return;
+
+      final changed = refreshed.length != _messages.length ||
+          refreshed.asMap().entries.any((entry) {
+            if (entry.key >= _messages.length) return true;
+            final current = _messages[entry.key];
+            final next = entry.value;
+            return current['id']?.toString() != next['id']?.toString() ||
+                current['requestStatus']?.toString() !=
+                    next['requestStatus']?.toString();
+          });
+
+      if (!changed) return;
 
       setState(() {
-        _messages.addAll(incoming);
+        _messages
+          ..clear()
+          ..addAll(refreshed);
         _error = null;
       });
 
@@ -114,8 +123,7 @@ class _ChatScreenState extends State<ChatScreen> {
         await _markReadThroughLastMessage();
       }
     } catch (_) {
-      // Falha de sincronizacao em segundo plano nao apaga o historico nem
-      // interrompe a digitacao. A proxima rodada tenta novamente.
+      // A proxima rodada tenta de novo sem interromper a conversa.
     } finally {
       _refreshing = false;
     }
@@ -138,13 +146,102 @@ class _ChatScreenState extends State<ChatScreen> {
         '/chat/read',
         {'lastMessageId': lastId},
       );
-      widget.onUnreadChanged?.call(
-        (result['unreadCount'] as num?)?.toInt() ?? 0,
-      );
+      widget.onUnreadChanged?.call(_attentionCount(result));
     } catch (_) {
       // A leitura sera tentada de novo no proximo polling/scroll.
     } finally {
       _markingRead = false;
+    }
+  }
+
+  int _attentionCount(Map<String, dynamic> payload) {
+    final unread = (payload['unreadCount'] as num?)?.toInt() ?? 0;
+    final pending = widget.session.isAdult
+        ? (payload['pendingRequests'] as num?)?.toInt() ?? 0
+        : 0;
+    return unread + pending;
+  }
+
+  Future<void> _sendQuickRequest(
+    String type, {
+    int? minutes,
+  }) async {
+    if (_sending) return;
+    setState(() => _sending = true);
+
+    try {
+      final body = <String, dynamic>{'type': type};
+      if (minutes != null) {
+        body['minutes'] = minutes;
+      }
+
+      final sent = await widget.api.postMap(
+        '/chat/requests',
+        body,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        if (!_messages.any(
+          (m) => m['id']?.toString() == sent['id']?.toString(),
+        )) {
+          _messages.add(sent);
+        }
+      });
+      _scrollToBottom();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pedido enviado para o adulto.')),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Nao foi possivel enviar o pedido: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _reviewRequest(
+    Map<String, dynamic> message,
+    bool approve,
+  ) async {
+    final id = message['id']?.toString();
+    if (id == null || id.isEmpty) return;
+
+    try {
+      final updated = await widget.api.putMap(
+        '/chat/requests/$id/' + (approve ? 'approve' : 'reject'),
+        const {},
+      );
+
+      if (!mounted) return;
+      setState(() {
+        final index = _messages.indexWhere(
+          (m) => m['id']?.toString() == updated['id']?.toString(),
+        );
+        if (index >= 0) {
+          _messages[index] = updated;
+        }
+      });
+
+      final summary = await widget.api.getMap('/chat/unread-count');
+      widget.onUnreadChanged?.call(_attentionCount(summary));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(approve ? 'Pedido aprovado.' : 'Pedido recusado.'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Nao foi possivel revisar o pedido: $e')),
+        );
+      }
     }
   }
 
@@ -272,12 +369,67 @@ class _ChatScreenState extends State<ChatScreen> {
                           final message = _messages[index];
                           final mine = message['senderId']?.toString() ==
                               widget.session.userId;
+                          if (message['kind']?.toString() == 'request') {
+                            return _RequestBubble(
+                              message: message,
+                              mine: mine,
+                              canReview: widget.session.isAdult &&
+                                  message['requestStatus']?.toString() == 'pending',
+                              onApprove: () => _reviewRequest(message, true),
+                              onReject: () => _reviewRequest(message, false),
+                            );
+                          }
                           return _MessageBubble(
                             message: message,
                             mine: mine,
                           );
                         },
                       ),
+              ),
+            if (!widget.session.isAdult)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ActionChip(
+                      avatar: const Icon(Icons.help_outline, size: 18),
+                      label: const Text('Preciso de ajuda'),
+                      onPressed: _sending
+                          ? null
+                          : () => _sendQuickRequest('help'),
+                    ),
+                    ActionChip(
+                      avatar: const Icon(Icons.swap_horiz, size: 18),
+                      label: const Text('Mudar tarefa'),
+                      onPressed: _sending
+                          ? null
+                          : () => _sendQuickRequest('change_task'),
+                    ),
+                    ActionChip(
+                      avatar: const Icon(Icons.timer_outlined, size: 18),
+                      label: const Text('+10 min'),
+                      onPressed: _sending
+                          ? null
+                          : () => _sendQuickRequest(
+                                'extra_time',
+                                minutes: 10,
+                              ),
+                    ),
+                    ActionChip(
+                      avatar: const Icon(Icons.timer_outlined, size: 18),
+                      label: const Text('+20 min'),
+                      onPressed: _sending
+                          ? null
+                          : () => _sendQuickRequest(
+                                'extra_time',
+                                minutes: 20,
+                              ),
+                    ),
+                  ],
+                ),
               ),
             Container(
               decoration: BoxDecoration(
@@ -392,4 +544,95 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 
+}
+
+
+class _RequestBubble extends StatelessWidget {
+  const _RequestBubble({
+    required this.message,
+    required this.mine,
+    required this.canReview,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  final Map<String, dynamic> message;
+  final bool mine;
+  final bool canReview;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final type = message['requestType']?.toString();
+    final status = message['requestStatus']?.toString();
+    final minutes = (message['requestedMinutes'] as num?)?.toInt();
+    final sender = message['senderName']?.toString() ?? 'Membro';
+
+    final statusIcon = switch (status) {
+      'approved' => Icons.check_circle_outline,
+      'rejected' => Icons.cancel_outlined,
+      _ => Icons.schedule_outlined,
+    };
+
+    return Align(
+      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(statusIcon, color: scheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        chatRequestTitle(type, minutes: minutes),
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    Chip(
+                      visualDensity: VisualDensity.compact,
+                      label: Text(chatRequestStatusLabel(status)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  sender + ': ' + (message['text']?.toString() ?? ''),
+                  style: TextStyle(color: scheme.onSurfaceVariant),
+                ),
+                if (canReview) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: onReject,
+                          child: const Text('Recusar'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: onApprove,
+                          child: const Text('Aprovar'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

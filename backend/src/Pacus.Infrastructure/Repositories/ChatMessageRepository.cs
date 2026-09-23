@@ -63,7 +63,8 @@ public class ChatMessageRepository : IChatMessageRepository
     {
         var filter =
             Builders<ChatMessage>.Filter.Eq(m => m.FamilyId, familyId) &
-            Builders<ChatMessage>.Filter.Ne(m => m.SenderId, userId);
+            Builders<ChatMessage>.Filter.Ne(m => m.SenderId, userId) &
+            Builders<ChatMessage>.Filter.Ne(m => m.Kind, "request");
 
         if (afterId.HasValue)
         {
@@ -73,6 +74,40 @@ public class ChatMessageRepository : IChatMessageRepository
         }
 
         return _context.ChatMessages.CountDocumentsAsync(filter);
+    }
+
+    public Task<long> CountPendingRequestsAsync(ObjectId familyId) =>
+        _context.ChatMessages.CountDocumentsAsync(
+            m => m.FamilyId == familyId &&
+                 m.Kind == "request" &&
+                 m.RequestStatus == "pending");
+
+    public async Task<ChatMessage?> TryTransitionRequestAsync(
+        ObjectId familyId,
+        ObjectId messageId,
+        string expectedStatus,
+        string newStatus,
+        ObjectId? reviewedBy = null,
+        DateTime? reviewedAt = null)
+    {
+        var filter =
+            Builders<ChatMessage>.Filter.Eq(m => m.FamilyId, familyId) &
+            Builders<ChatMessage>.Filter.Eq(m => m.Id, messageId) &
+            Builders<ChatMessage>.Filter.Eq(m => m.Kind, "request") &
+            Builders<ChatMessage>.Filter.Eq(m => m.RequestStatus, expectedStatus);
+
+        var update = Builders<ChatMessage>.Update
+            .Set(m => m.RequestStatus, newStatus)
+            .Set(m => m.ReviewedBy, reviewedBy)
+            .Set(m => m.ReviewedAt, reviewedAt);
+
+        return await _context.ChatMessages.FindOneAndUpdateAsync(
+            filter,
+            update,
+            new FindOneAndUpdateOptions<ChatMessage>
+            {
+                ReturnDocument = ReturnDocument.After
+            });
     }
 
     public Task<List<ChatMessage>> GetAllByFamilyAsync(ObjectId familyId) =>

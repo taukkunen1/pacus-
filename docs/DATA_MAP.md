@@ -330,7 +330,7 @@ Log de auditoria para ações administrativas sensíveis, criado no item A5 — 
 - **Origem:** gerado pelo sistema, nunca editável via API.
 - **Quem acessa:** só server-side hoje (`AuditLogRepository`) — sem endpoint de leitura no frontend ainda (natural candidato a um painel futuro "atividade recente da família").
 - **Base legal:** legítimo interesse (art. 7º, IX) — prevenção a fraude/abuso e responsabilização, ponderado como não conflitante com os interesses da criança (o log registra ações administrativas, não comportamento da criança).
-- **Retenção:** proposta — reter por período fixo (ex. 12 meses) mesmo após a ação que originou o log deixar de existir (ex. o `TaskTemplate` foi soft-deleted, mas o log da exclusão continua); reavaliar prazo definitivo no D2 (RIPD).
+- **Retenção:** definida em até 12 meses após a exclusão da conta, com anonimização imediata do vínculo pessoal e purga definitiva por TTL.
 - **Destino em exclusão:** decisão B3 concluída — os logs são anonimizados, recebem `purgeAt` e são retidos por até 12 meses; um índice TTL realiza a exclusão definitiva depois desse prazo.
 - **Controles de segurança:** nunca alterado pelo fluxo normal da aplicação (só `CreateAsync`, sem update/delete no repositório).
 
@@ -347,9 +347,14 @@ Histórico do chat privado da família — cada mensagem é um documento, visív
 | `senderName` | string | Nome do remetente congelado no momento do envio. |
 | `senderRole` | enum | Papel do remetente (`Adult` ou `Child`) no momento do envio. |
 | `text` | string | Conteúdo da mensagem, obrigatório e limitado a 2.000 caracteres. |
+| `kind` | string | `message` ou `request`. |
+| `requestType` | string? | Pedido rápido: `help`, `change_task` ou `extra_time`. |
+| `requestStatus` | string? | `pending`, `processing`, `approved` ou `rejected`. |
+| `requestedMinutes` | int? | Minutos solicitados quando o pedido é de tempo extra. |
+| `reviewedBy` / `reviewedAt` | ObjectId? / DateTime? | Adulto que revisou e instante da decisão. |
 | `createdAt` | DateTime | Data/hora UTC do envio. |
 
-- **Finalidade:** permitir comunicação textual privada entre os membros da mesma família dentro do PACUS.
+- **Finalidade:** permitir comunicação textual privada e pedidos rápidos ligados à rotina entre os membros da mesma família dentro do PACUS.
 - **Categoria do titular:** ambos — adulto e criança podem enviar e receber mensagens.
 - **Origem:** texto informado diretamente pelo membro autenticado; remetente, família e timestamp são definidos no backend e não pelo cliente.
 - **Quem acessa:** `ChatController`, `ChatMessageRepository` e a tela Flutter `ChatScreen`. A resposta ao frontend não expõe `familyId`.

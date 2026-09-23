@@ -25,4 +25,19 @@ void main() {
     expect(formatChatTimestamp('not-a-date'), '');
     expect(formatChatTimestamp(null), '');
   });
+
+  test('labels quick requests', () {
+    expect(chatRequestTitle('help'), 'Preciso de ajuda');
+    expect(chatRequestTitle('change_task'), 'Quero mudar uma tarefa');
+    expect(
+      chatRequestTitle('extra_time', minutes: 20),
+      '+20 min de tempo de tela',
+    );
+  });
+
+  test('labels request status', () {
+    expect(chatRequestStatusLabel('pending'), 'Aguardando');
+    expect(chatRequestStatusLabel('approved'), 'Aprovado');
+    expect(chatRequestStatusLabel('rejected'), 'Recusado');
+  });
 }

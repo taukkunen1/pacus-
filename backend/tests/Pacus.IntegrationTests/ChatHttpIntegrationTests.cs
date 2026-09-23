@@ -196,6 +196,103 @@ public class ChatHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Chat_ChildCanCreateQuickRequest_AndAdultSeesPending()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var adultClient = factory.CreateClient();
+        using var childClient = factory.CreateClient();
+
+        var family = await BootstrapAsync(adultClient);
+        await LoginAdultAsync(adultClient, family);
+        await LoginChildAsync(childClient, family);
+
+        var created = await childClient.PostAsJsonAsync(
+            "/api/v1/chat/requests",
+            new { type = "help" });
+
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+
+        var body = await created.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("request", body.GetProperty("kind").GetString());
+        Assert.Equal("help", body.GetProperty("requestType").GetString());
+        Assert.Equal("pending", body.GetProperty("requestStatus").GetString());
+
+        var adultSummary = await adultClient.GetFromJsonAsync<JsonElement>(
+            "/api/v1/chat/unread-count");
+
+        Assert.Equal(0, adultSummary.GetProperty("unreadCount").GetInt64());
+        Assert.Equal(1, adultSummary.GetProperty("pendingRequests").GetInt64());
+    }
+
+    [Fact]
+    public async Task Chat_AdultCannotCreateChildQuickRequest()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/chat/requests",
+            new { type = "help" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Chat_ApproveExtraTimeRequest_AppliesMinutesOnce()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var adultClient = factory.CreateClient();
+        using var childClient = factory.CreateClient();
+
+        var family = await BootstrapAsync(adultClient);
+        await LoginAdultAsync(adultClient, family);
+        await LoginChildAsync(childClient, family);
+
+        var before = await adultClient.GetFromJsonAsync<JsonElement>(
+            "/api/v1/daily-routines/today");
+        var beforeMinutes =
+            before.GetProperty("gameTimerMinutes").GetInt32() +
+            before.GetProperty("gameTimerExtraMinutes").GetInt32();
+
+        var created = await childClient.PostAsJsonAsync(
+            "/api/v1/chat/requests",
+            new { type = "extra_time", minutes = 10 });
+
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        var requestBody = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var requestId = requestBody.GetProperty("id").GetString();
+
+        var approve = await adultClient.PutAsJsonAsync(
+            $"/api/v1/chat/requests/{requestId}/approve",
+            new { });
+
+        Assert.Equal(HttpStatusCode.OK, approve.StatusCode);
+        var approved = await approve.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("approved", approved.GetProperty("requestStatus").GetString());
+
+        var after = await adultClient.GetFromJsonAsync<JsonElement>(
+            "/api/v1/daily-routines/today");
+        var afterMinutes =
+            after.GetProperty("gameTimerMinutes").GetInt32() +
+            after.GetProperty("gameTimerExtraMinutes").GetInt32();
+
+        Assert.Equal(beforeMinutes + 10, afterMinutes);
+
+        var childSummary = await childClient.GetFromJsonAsync<JsonElement>(
+            "/api/v1/chat/unread-count");
+        Assert.Equal(1, childSummary.GetProperty("unreadCount").GetInt64());
+
+        var secondApprove = await adultClient.PutAsJsonAsync(
+            $"/api/v1/chat/requests/{requestId}/approve",
+            new { });
+
+        Assert.Equal(HttpStatusCode.Conflict, secondApprove.StatusCode);
+    }
+
     private static async Task LoginAdultAsync(HttpClient client, TestFamily family)
     {
         var response = await client.PostAsJsonAsync(

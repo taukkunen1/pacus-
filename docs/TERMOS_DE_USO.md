@@ -1,8 +1,8 @@
 # Termos de Uso do PACUS
 
-**Última atualização: 29 de agosto de 2026**
+**Última atualização: 23 de setembro de 2026**
 
-> ⚠️ **Rascunho — item B4 do checklist de segurança e LGPD.** Documento gerado a partir do funcionamento real do app (ver `README.md` e código-fonte). **Não foi revisado por um advogado.** Seções marcadas com 🔲 precisam de uma decisão sua antes de publicar.
+> **Nota de revisão jurídica:** estes termos refletem o funcionamento atual do PACUS e estão publicados no produto, mas não foram revisados por advogado.
 
 ## 1. Aceite
 
@@ -15,10 +15,11 @@ Estes termos são aceitos pelo **adulto responsável**, em nome próprio e da(s)
 O PACUS é um aplicativo de acompanhamento de rotina para famílias. Cada dia começa às 00:00 no fuso horário configurado. As principais funcionalidades:
 
 - **Tarefas**: o adulto configura tarefas permanentes (`mandatory`, `expected`, `challenge`), cada uma valendo de 1 a 10 Pacus Points (ou -1 a -10 como penalidade). Tarefas do dia atual podem ser ajustadas pela criança, conforme as permissões definidas pelo adulto.
-- **Pacus Points**: pontos ganhos ao concluir tarefas (1 Pacus Point = R$ 0,06, um valor de referência interno da família — o PACUS não processa nenhum pagamento real).
+- **Pacus Points**: pontos ganhos ao concluir tarefas (o valor de referência de 1 Pacus Point é configurável pelo adulto responsável, como parâmetro interno da família — o PACUS não processa nenhum pagamento real).
 - **Histórico**: o histórico de dias encerrados é preservado e pode ser consultado.
 - **PACUS (o bichinho)**: cresce uma vez por dia encerrado, independentemente da conclusão das tarefas.
 - **Loja de recompensas**: o adulto cadastra itens resgatáveis com Pacus Points; a criança solicita o resgate, e o adulto aprova ou rejeita.
+- **Chat familiar**: membros autenticados da mesma família podem trocar mensagens privadas dentro do PACUS.
 
 ## 3. Contas e responsabilidade do adulto
 
@@ -37,7 +38,7 @@ Você concorda em não:
 
 ## 5. Pacus Points não têm valor monetário real
 
-O valor de referência de 1 Pacus Point = R$ 0,06 é um **parâmetro interno de uso da família**, decidido pelo próprio adulto responsável ao configurar as tarefas — não é uma moeda, não pode ser sacada, convertida em dinheiro real através do app, transferida entre famílias, nem representa qualquer obrigação financeira do PACUS (a empresa/responsável pelo app) para com o usuário. Qualquer recompensa em dinheiro real é um acordo exclusivamente entre o adulto e a criança dentro da própria família, fora do escopo do aplicativo.
+O valor de referência de 1 Pacus Point é um **parâmetro interno e configurável da família**, definido pelo adulto responsável nas Configurações — não é uma moeda, não pode ser sacada, convertida em dinheiro real através do app, transferida entre famílias, nem representa qualquer obrigação financeira do PACUS (a empresa/responsável pelo app) para com o usuário. Qualquer recompensa em dinheiro real é um acordo exclusivamente entre o adulto e a criança dentro da própria família, fora do escopo do aplicativo.
 
 ## 6. Disponibilidade do serviço
 
@@ -60,7 +61,7 @@ Na máxima extensão permitida pela lei, o PACUS e seu responsável não serão 
 
 ## 10. Alterações nestes termos
 
-Podemos atualizar estes termos periodicamente. A data no topo do documento indica a versão mais recente. 🔲 *(mesma decisão pendente da Política de Privacidade: como notificar usuários existentes sobre mudanças relevantes.)*
+Podemos atualizar estes termos periodicamente. A data no topo do documento indica a versão vigente; alterações relevantes serão refletidas no texto publicado e nas regras do produto aplicáveis a partir da nova versão.
 
 ## 11. Lei aplicável
 

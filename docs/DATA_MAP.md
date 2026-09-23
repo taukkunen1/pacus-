@@ -378,7 +378,7 @@ Marcador de leitura do chat por membro da família. Não guarda conteúdo novo d
 - **Base legal:** execução de contrato (art. 7º, V); para perfil infantil, consentimento do responsável conforme art. 14, §1º.
 - **Retenção:** enquanto a conta da família existir.
 - **Destino em exclusão:** hard delete.
-- **Controles de segurança:** JWT obrigatório, isolamento por `FamilyId`, o usuário só atualiza o próprio marcador; índice único `{ familyId, userId }`.
+- **Controles de segurança:** JWT obrigatório, isolamento por `FamilyId`, o usuário só atualiza o próprio marcador; o documento usa `_id = userId`, aproveitando a unicidade nativa da chave primária do MongoDB. O índice `{ familyId, userId }` é apenas otimização de consulta.
 
 ---
 

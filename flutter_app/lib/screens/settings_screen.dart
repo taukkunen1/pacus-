@@ -17,6 +17,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String timezone = '';
   bool timerEnabled = false;
   int timerMinutes = 120;
+  double pointToBrlRate = 0.06;
   List<Map<String, dynamic>> members = [];
   List<Map<String, dynamic>> growth = [];
   List<Map<String, dynamic>> tasks = [];
@@ -31,6 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final code = await widget.api.getMap('/family/code');
       final tz = await widget.api.getMap('/family/timezone');
       final timer = await widget.api.getMap('/settings/game-timer');
+      final pointValue = await widget.api.getMap('/settings/point-value');
       final rawMembers = await widget.api.getList('/family/children');
       final rawGrowth = await widget.api.getList('/settings/growth-stages');
       final rawTasks = await widget.api.getList('/tasks');
@@ -40,6 +42,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         timezone = tz['timezone']?.toString() ?? '';
         timerEnabled = timer['enabled'] == true;
         timerMinutes = (timer['minutes'] as num?)?.toInt() ?? 120;
+        pointToBrlRate = (pointValue['rate'] as num?)?.toDouble() ?? 0.06;
         members = rawMembers.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         growth = rawGrowth.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         tasks = rawTasks.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -126,6 +129,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       await widget.api.request('/settings/game-timer', method: 'PUT', body: {'enabled': enabled, 'minutes': minutes});
       await _load();
+    } catch (e) { _snack(e.toString()); }
+  }
+
+  Future<void> _changePointValue() async {
+    final current = pointToBrlRate.toStringAsFixed(2).replaceAll('.', ',');
+    final value = await _ask(
+      'Valor do PACUS',
+      'Valor de 1 PP em reais',
+      initial: current,
+      type: const TextInputType.numberWithOptions(decimal: true),
+    );
+    if (value == null || value.isEmpty) return;
+
+    final rate = double.tryParse(value.replaceAll(',', '.'));
+    if (rate == null || rate < 0.01 || rate > 100) {
+      _snack('Informe um valor entre R\$ 0,01 e R\$ 100,00.');
+      return;
+    }
+
+    try {
+      await widget.api.request('/settings/point-value', method: 'PUT', body: {'rate': rate});
+      await _load();
+      _snack('Valor do PACUS atualizado.');
     } catch (e) { _snack(e.toString()); }
   }
 
@@ -381,6 +407,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _tile('Código da família', familyCode.isEmpty ? 'Não disponível' : familyCode, Icons.key_outlined),
           const SizedBox(height: 10),
           _tile('Fuso horário', timezone, Icons.public, action: TextButton(onPressed: _changeTimezone, child: const Text('Alterar'))),
+          const SizedBox(height: 10),
+          _tile(
+            'Valor do PACUS',
+            '1 PP = R\$ ' + pointToBrlRate.toStringAsFixed(2).replaceAll('.', ','),
+            Icons.payments_outlined,
+            action: TextButton(onPressed: _changePointValue, child: const Text('Alterar')),
+          ),
           const SizedBox(height: 10),
           Card(
             child: SwitchListTile(

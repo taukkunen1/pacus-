@@ -58,6 +58,7 @@ public class AccountHttpIntegrationTests : IClassFixture<MongoIntegrationFixture
         {
             "users", "pacus", "habitats", "settings", "daily_routines",
             "task_templates", "point_transactions", "store_items", "redemptions",
+            "chat_messages", "chat_read_states",
         })
         {
             var collection = database.GetCollection<MongoDB.Bson.BsonDocument>(collectionName);

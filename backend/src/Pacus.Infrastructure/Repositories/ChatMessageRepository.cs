@@ -63,7 +63,8 @@ public class ChatMessageRepository : IChatMessageRepository
     {
         var filter =
             Builders<ChatMessage>.Filter.Eq(m => m.FamilyId, familyId) &
-            Builders<ChatMessage>.Filter.Ne(m => m.SenderId, userId);
+            Builders<ChatMessage>.Filter.Ne(m => m.SenderId, userId) &
+            Builders<ChatMessage>.Filter.Ne(m => m.Kind, "request");
 
         if (afterId.HasValue)
         {

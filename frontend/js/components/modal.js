@@ -1497,8 +1497,8 @@ export function promptReactionForm({ current = null } = {}) {
 const PACUS_STAGE_OPTIONS = [
   { value: "egg", label: "Ovo" },
   { value: "cracking", label: "Rachando" },
-  { value: "hatching", label: "Eclodindo" },
-  { value: "baby", label: "Filhote" },
+  { value: "hatching", label: "Eclosão" },
+  { value: "baby", label: "Bebê" },
   { value: "young", label: "Jovem" },
   { value: "adult", label: "Adulto" }
 ];

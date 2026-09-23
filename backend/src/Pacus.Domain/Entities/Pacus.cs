@@ -15,7 +15,7 @@ public class Pacus
     public int TotalClosedDays { get; set; }
 
     // Matiz (0-359) que sobrescreve a cor derivada do id (ver
-    // frontend/js/pacus/color.js getBirthHue) -- null significa "usar a cor
+    // Flutter PACUS renderer) -- null significa "usar a cor
     // derivada automaticamente", o comportamento padrao desde sempre. So
     // existe pra o painel do adulto poder corrigir/escolher a cor manualmente
     // (ver Pacus.Api.Controllers.PacusController.UpdateState).

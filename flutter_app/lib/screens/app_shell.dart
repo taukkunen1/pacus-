@@ -65,7 +65,11 @@ class _PacusShellState extends State<PacusShell> {
     try {
       try {
         final chat = await widget.api.getMap('/chat/unread-count');
-        final value = (chat['unreadCount'] as num?)?.toInt() ?? 0;
+        final unread = (chat['unreadCount'] as num?)?.toInt() ?? 0;
+        final pendingRequests = widget.session.isAdult
+            ? (chat['pendingRequests'] as num?)?.toInt() ?? 0
+            : 0;
+        final value = unread + pendingRequests;
         if (mounted && chatUnread != value) {
           setState(() => chatUnread = value);
         }

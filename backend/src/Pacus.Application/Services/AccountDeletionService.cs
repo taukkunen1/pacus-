@@ -7,8 +7,8 @@ namespace Pacus.Application.Services;
 
 // Exclusao de conta (checklist de seguranca e LGPD, item B3): apaga todos os dados
 // da familia, seguindo a estrategia por collection definida no mapa de dados (B1,
-// ver docs/DATA_MAP.md, "Resumo -- retencao e exclusao por collection"). Para 11 das
-// 12 collections, hard delete. audit_logs e a excecao: preservado por 12 meses, mas
+// ver docs/DATA_MAP.md, "Resumo -- retencao e exclusao por collection"). Para 12 das
+// 13 collections, hard delete. audit_logs e a excecao: preservado por 12 meses, mas
 // anonimizado (perde o vinculo com a pessoa) -- legitimo interesse em manter um
 // historico de responsabilizacao por acoes administrativas sensiveis (art. 7, IX),
 // equilibrado com a minimizacao de dados exigida pela LGPD.
@@ -26,7 +26,8 @@ public class AccountDeletionService : IAccountDeletionService
     private readonly IPacusGrowthRepository _pacusGrowthRepository;
     private readonly ITaskEventRepository _taskEventRepository;
     private readonly IStoreRepository _storeRepository;
-    private readonly IAuditLogRepository _auditLogRepository;\n    private readonly IChatMessageRepository _chatMessageRepository;
+    private readonly IAuditLogRepository _auditLogRepository;
+    private readonly IChatMessageRepository _chatMessageRepository;
 
     public AccountDeletionService(
         IUserRepository userRepository,
@@ -39,7 +40,8 @@ public class AccountDeletionService : IAccountDeletionService
         IPacusGrowthRepository pacusGrowthRepository,
         ITaskEventRepository taskEventRepository,
         IStoreRepository storeRepository,
-        IAuditLogRepository auditLogRepository)
+        IAuditLogRepository auditLogRepository,
+        IChatMessageRepository chatMessageRepository)
     {
         _userRepository = userRepository;
         _pacusRepository = pacusRepository;
@@ -52,6 +54,7 @@ public class AccountDeletionService : IAccountDeletionService
         _taskEventRepository = taskEventRepository;
         _storeRepository = storeRepository;
         _auditLogRepository = auditLogRepository;
+        _chatMessageRepository = chatMessageRepository;
     }
 
     public async Task DeleteAccountAsync(ObjectId familyId, ObjectId requestedBy)
@@ -84,7 +87,8 @@ public class AccountDeletionService : IAccountDeletionService
         await _pacusGrowthRepository.DeleteAllByFamilyAsync(familyId);
         await _taskEventRepository.DeleteAllByFamilyAsync(familyId);
         await _storeRepository.DeleteAllRedemptionsByFamilyAsync(familyId);
-        await _storeRepository.DeleteAllItemsByFamilyAsync(familyId);\n        await _chatMessageRepository.DeleteAllByFamilyAsync(familyId);
+        await _storeRepository.DeleteAllItemsByFamilyAsync(familyId);
+        await _chatMessageRepository.DeleteAllByFamilyAsync(familyId);
         await _settingsRepository.DeleteByFamilyIdAsync(familyId);
         await _habitatRepository.DeleteByFamilyIdAsync(familyId);
         await _pacusRepository.DeleteByFamilyIdAsync(familyId);

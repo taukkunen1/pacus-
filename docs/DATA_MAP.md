@@ -375,7 +375,8 @@ Histórico do chat privado da família — cada mensagem é um documento, visív
 | `settings` | Enquanto a conta existir | Hard delete |
 | `store_items` | Enquanto a conta existir | Hard delete |
 | `redemptions` | Indefinida (histórico) | Hard delete |
-| `audit_logs` | 12 meses após a exclusão, com anonimização | Anonimizado e retido pelo período definido |\n| `chat_messages` | Enquanto a conta existir | Hard delete |
+| `audit_logs` | 12 meses após a exclusão, com anonimização | Anonimizado e retido pelo período definido |
+| `chat_messages` | Enquanto a conta existir | Hard delete |
 
 Esta tabela é o ponto de partida direto para o **B3** (endpoint de exclusão de conta): a estratégia é, para 12 das 13 collections, excluir todos os documentos com o `FamilyId` da conta encerrada; `audit_logs` é a exceção, anonimizada e retida pelo período definido.
 

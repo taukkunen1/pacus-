@@ -17,14 +17,14 @@ const STAGES = [
   },
   {
     key: "hatching",
-    label: "Eclodindo",
+    label: "Eclosão",
     caption: "Quase la — o PACUS esta eclodindo!",
     isEgg: true,
     sizeScale: 0.7
   },
   {
     key: "baby",
-    label: "Filhote",
+    label: "Bebê",
     caption: "Pacus esta por aqui em algum lugar 👀",
     isEgg: false,
     sizeScale: 0.6

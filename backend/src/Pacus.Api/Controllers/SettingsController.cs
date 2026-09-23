@@ -61,6 +61,61 @@ public class SettingsController : ControllerBase
         return Ok(new { settings.GameTimerEnabled, settings.GameTimerMinutes });
     }
 
+    // Valor de referencia de 1 PP em reais. A leitura e autenticada e a alteracao
+    // fica restrita ao adulto responsavel pela familia.
+    [HttpGet("point-value")]
+    public async Task<IActionResult> GetPointValue()
+    {
+        var settings = await _settingsRepository.GetByUserIdAsync(_currentUser.FamilyId);
+        var rate = settings?.PointToBrlRate ?? Settings.DefaultPointToBrlRate;
+
+        // Cura somente o default historico nunca escolhido pelo adulto. Depois que
+        // PointToBrlRateConfigured=true, R$ 0,05 passa a ser uma escolha legitima.
+        if (settings is not null
+            && !settings.PointToBrlRateConfigured
+            && Math.Abs(settings.PointToBrlRate - Settings.LegacyDefaultPointToBrlRate) < 0.000001)
+        {
+            settings.PointToBrlRate = Settings.DefaultPointToBrlRate;
+            settings.UpdatedAt = DateTime.UtcNow;
+            await _settingsRepository.UpsertAsync(settings);
+            rate = settings.PointToBrlRate;
+        }
+
+        return Ok(new { rate });
+    }
+
+    [RequireRole(UserRole.Adult)]
+    [HttpPut("point-value")]
+    public async Task<IActionResult> UpdatePointValue([FromBody] UpdatePointToBrlRateRequest request)
+    {
+        if (double.IsNaN(request.Rate)
+            || double.IsInfinity(request.Rate)
+            || request.Rate < 0.01
+            || request.Rate > 100)
+        {
+            return BadRequest(new
+            {
+                error = "O valor de 1 PP deve estar entre R$ 0,01 e R$ 100,00."
+            });
+        }
+
+        var settings = await _settingsRepository.GetByUserIdAsync(_currentUser.FamilyId)
+            ?? new Settings
+            {
+                Id = ObjectId.GenerateNewId(),
+                FamilyId = _currentUser.FamilyId,
+                CreatedAt = DateTime.UtcNow,
+            };
+
+        settings.PointToBrlRate = Math.Round(request.Rate, 2, MidpointRounding.AwayFromZero);
+        settings.PointToBrlRateConfigured = true;
+        settings.UpdatedAt = DateTime.UtcNow;
+
+        await _settingsRepository.UpsertAsync(settings);
+
+        return Ok(new { rate = settings.PointToBrlRate });
+    }
+
     // Calendario de estagios do PACUS (ex.: Egg 2026-08-26 -> Adult 2026-09-26), usado por
     // DayClosingService.DetermineStage. Antes so dava pra configurar direto no Mongo/API crua
     // (foi como corrigimos o estagio/tamanho manualmente); agora tem endpoint dedicado.

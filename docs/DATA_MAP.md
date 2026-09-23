@@ -367,6 +367,7 @@ Marcador de leitura do chat por membro da família. Não guarda conteúdo novo d
 | `_id` | ObjectId | Identificador interno. |
 | `familyId` | ObjectId | Família à qual o marcador pertence. |
 | `userId` | ObjectId | Usuário dono do marcador de leitura. |
+| `lastReadMessageId` | ObjectId | Cursor exato da última mensagem marcada como lida. |
 | `lastReadAt` | DateTime | Horário da última mensagem marcada como lida. |
 | `updatedAt` | DateTime | Última atualização do marcador. |
 

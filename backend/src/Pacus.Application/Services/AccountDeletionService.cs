@@ -7,8 +7,8 @@ namespace Pacus.Application.Services;
 
 // Exclusao de conta (checklist de seguranca e LGPD, item B3): apaga todos os dados
 // da familia, seguindo a estrategia por collection definida no mapa de dados (B1,
-// ver docs/DATA_MAP.md, "Resumo -- retencao e exclusao por collection"). Para 12 das
-// 13 collections, hard delete. audit_logs e a excecao: preservado por 12 meses, mas
+// ver docs/DATA_MAP.md, "Resumo -- retencao e exclusao por collection"). Para todas as collections familiares,
+// exceto audit_logs, aplica hard delete. audit_logs e a excecao: preservado por 12 meses, mas
 // anonimizado (perde o vinculo com a pessoa) -- legitimo interesse em manter um
 // historico de responsabilizacao por acoes administrativas sensiveis (art. 7, IX),
 // equilibrado com a minimizacao de dados exigida pela LGPD.
@@ -81,7 +81,7 @@ public class AccountDeletionService : IAccountDeletionService
         });
 
         // audit_logs: excecao da regra -- anonimiza em vez de apagar (ver comentario
-        // da classe). As outras 12 collections seguem hard delete direto.
+        // da classe). As demais collections familiares seguem hard delete direto.
         await _auditLogRepository.AnonymizeByFamilyAsync(familyId, now.Add(AuditLogRetentionAfterDeletion));
 
         await _dailyRoutineRepository.DeleteAllByFamilyAsync(familyId);

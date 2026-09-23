@@ -92,3 +92,11 @@ A migração de hospedagem foi encerrada tecnicamente:
 - o backend aplica uma whitelist de produção independente da variável externa: somente `https://www.pacus.com.br` é aceito via CORS;
 - origens antigas como `pacus-1.onrender.com` e `taukkunen1.github.io` não são aceitas em produção;
 - referências operacionais ao Render foram removidas do código ativo; menções anteriores permanecem apenas no histórico deste documento.
+
+
+## Hardening de produção — 2026-09-23
+
+- os PRs obsoletos da migração Flutter foram encerrados para evitar merges acidentais;
+- o Flutter possui suíte própria de testes para modelos, mensagens de esforço, utilitários de Chat e cliente HTTP;
+- o workflow `.github/workflows/production-health.yml` monitora frontend, API, MongoDB e CORS a cada 15 minutos;
+- a Comunicação V2 passou a incluir pedidos rápidos e revisão pelo adulto, mantendo isolamento por família e autorização por papel.

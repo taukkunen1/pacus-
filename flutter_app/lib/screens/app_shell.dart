@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api.dart';
@@ -34,6 +36,46 @@ class PacusShell extends StatefulWidget {
 
 class _PacusShellState extends State<PacusShell> {
   int index = 0;
+  Timer? badgeTimer;
+  Map<String, int> badges = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshBadges();
+    badgeTimer = Timer.periodic(const Duration(seconds: 20), (_) => _refreshBadges());
+  }
+
+  @override
+  void dispose() {
+    badgeTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshBadges() async {
+    try {
+      if (widget.session.isAdult) {
+        final pending = await widget.api.getList('/store/redemptions/pending');
+        if (mounted) setState(() => badges = {'Loja': pending.length});
+      } else {
+        final today = await widget.api.getToday();
+        final pending = today.tasks.where((task) => !task.isDeleted && !task.isDone).length;
+        if (mounted) setState(() => badges = {'Hoje': pending});
+      }
+    } catch (_) {}
+  }
+
+  void _selectIndex(int value) {
+    setState(() => index = value);
+    _refreshBadges();
+  }
+
+  Widget _navIcon(_TabSpec tab) {
+    final count = badges[tab.label] ?? 0;
+    final icon = Icon(tab.icon);
+    if (count <= 0) return icon;
+    return Badge(label: Text(count > 99 ? '99+' : count.toString()), child: icon);
+  }
 
   List<_TabSpec> get tabs => [
         _TabSpec('Hoje', Icons.today_outlined,
@@ -83,12 +125,12 @@ class _PacusShellState extends State<PacusShell> {
                     ),
                   ),
                   selectedIndex: index,
-                  onDestinationSelected: (value) => setState(() => index = value),
+                  onDestinationSelected: _selectIndex,
                   labelType: NavigationRailLabelType.all,
                   destinations: [
                     for (final tab in items)
                       NavigationRailDestination(
-                        icon: Icon(tab.icon),
+                        icon: _navIcon(tab),
                         label: Text(tab.label),
                       ),
                   ],
@@ -120,11 +162,11 @@ class _PacusShellState extends State<PacusShell> {
           bottomNavigationBar: NavigationBar(
             labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
             selectedIndex: index,
-            onDestinationSelected: (value) => setState(() => index = value),
+            onDestinationSelected: _selectIndex,
             destinations: [
               for (final tab in items)
                 NavigationDestination(
-                  icon: Icon(tab.icon),
+                  icon: _navIcon(tab),
                   label: tab.label,
                 ),
             ],

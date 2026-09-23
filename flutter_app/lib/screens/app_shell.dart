@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api.dart';
@@ -36,26 +38,59 @@ class _PacusShellState extends State<PacusShell> {
   int index = 0;
   int todayPending = 0;
   int storePending = 0;
+  int chatUnread = 0;
+  bool refreshingBadges = false;
+  Timer? badgeTimer;
 
   @override
   void initState() {
     super.initState();
     _refreshBadges();
+    badgeTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _refreshBadges(),
+    );
+  }
+
+  @override
+  void dispose() {
+    badgeTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _refreshBadges() async {
+    if (refreshingBadges) return;
+    refreshingBadges = true;
+
     try {
-      if (widget.session.isAdult) {
-        final pending = await widget.api.getList('/store/redemptions/pending');
-        if (mounted) setState(() => storePending = pending.length);
-      } else {
-        final today = await widget.api.getToday();
-        if (mounted) {
-          setState(() => todayPending = (today.totalTasks - today.doneTasks).clamp(0, 999).toInt());
+      try {
+        final chat = await widget.api.getMap('/chat/unread-count');
+        final value = (chat['unreadCount'] as num?)?.toInt() ?? 0;
+        if (mounted && chatUnread != value) {
+          setState(() => chatUnread = value);
         }
+      } catch (_) {
+        // Falha do badge de chat nao bloqueia a navegacao.
       }
-    } catch (_) {
-      // Badge e informativo; falha aqui nao deve bloquear a navegacao.
+
+      try {
+        if (widget.session.isAdult) {
+          final pending = await widget.api.getList('/store/redemptions/pending');
+          if (mounted && storePending != pending.length) {
+            setState(() => storePending = pending.length);
+          }
+        } else {
+          final today = await widget.api.getToday();
+          final pending = (today.totalTasks - today.doneTasks).clamp(0, 999).toInt();
+          if (mounted && todayPending != pending) {
+            setState(() => todayPending = pending);
+          }
+        }
+      } catch (_) {
+        // Badges operacionais sao informativos e nao bloqueiam o app.
+      }
+    } finally {
+      refreshingBadges = false;
     }
   }
 
@@ -80,8 +115,20 @@ class _PacusShellState extends State<PacusShell> {
         ),
         _TabSpec('Amanhã', Icons.edit_calendar_outlined,
             TomorrowScreen(api: widget.api, session: widget.session)),
-        _TabSpec('Chat', Icons.chat_bubble_outline,
-            ChatScreen(api: widget.api, session: widget.session)),
+        _TabSpec(
+          'Chat',
+          Icons.chat_bubble_outline,
+          ChatScreen(
+            api: widget.api,
+            session: widget.session,
+            onUnreadChanged: (value) {
+              if (mounted && chatUnread != value) {
+                setState(() => chatUnread = value);
+              }
+            },
+          ),
+          badge: chatUnread,
+        ),
         _TabSpec('Histórico', Icons.history,
             HistoryScreen(api: widget.api)),
         _TabSpec('Pontos', Icons.stars_outlined,

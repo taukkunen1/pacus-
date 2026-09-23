@@ -4,16 +4,19 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../ui/chat_utils.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({
     super.key,
     required this.api,
     required this.session,
+    this.onUnreadChanged,
   });
 
   final PacusApi api;
   final AuthSession session;
+  final ValueChanged<int>? onUnreadChanged;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -29,11 +32,13 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _loading = true;
   bool _refreshing = false;
   bool _sending = false;
+  bool _markingRead = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_handleScroll);
     _loadInitial();
     _pollTimer = Timer.periodic(
       const Duration(seconds: 2),
@@ -44,6 +49,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _scrollController.removeListener(_handleScroll);
     _messageController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
@@ -67,6 +73,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _error = null;
       });
       _scrollToBottom();
+      await _markReadThroughLastMessage();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -102,12 +109,42 @@ class _ChatScreenState extends State<ChatScreen> {
         _error = null;
       });
 
-      if (wasNearBottom) _scrollToBottom();
+      if (wasNearBottom) {
+        _scrollToBottom();
+        await _markReadThroughLastMessage();
+      }
     } catch (_) {
       // Falha de sincronizacao em segundo plano nao apaga o historico nem
       // interrompe a digitacao. A proxima rodada tenta novamente.
     } finally {
       _refreshing = false;
+    }
+  }
+
+  void _handleScroll() {
+    if (_isNearBottom && _messages.isNotEmpty) {
+      unawaited(_markReadThroughLastMessage());
+    }
+  }
+
+  Future<void> _markReadThroughLastMessage() async {
+    if (_markingRead || _messages.isEmpty) return;
+    final lastId = _messages.last['id']?.toString();
+    if (lastId == null || lastId.isEmpty) return;
+
+    _markingRead = true;
+    try {
+      final result = await widget.api.putMap(
+        '/chat/read',
+        {'lastMessageId': lastId},
+      );
+      widget.onUnreadChanged?.call(
+        (result['unreadCount'] as num?)?.toInt() ?? 0,
+      );
+    } catch (_) {
+      // A leitura sera tentada de novo no proximo polling/scroll.
+    } finally {
+      _markingRead = false;
     }
   }
 
@@ -302,7 +339,7 @@ class _MessageBubble extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final senderName = message['senderName']?.toString().trim();
     final text = message['text']?.toString() ?? '';
-    final timestamp = _formatTimestamp(message['createdAt']?.toString());
+    final timestamp = formatChatTimestamp(message['createdAt']?.toString());
 
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
@@ -355,23 +392,4 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 
-  static String _formatTimestamp(String? raw) {
-    final parsed = raw == null ? null : DateTime.tryParse(raw);
-    if (parsed == null) return '';
-
-    final local = parsed.toLocal();
-    final now = DateTime.now();
-    final sameDay = local.year == now.year &&
-        local.month == now.month &&
-        local.day == now.day;
-
-    final hour = local.hour.toString().padLeft(2, '0');
-    final minute = local.minute.toString().padLeft(2, '0');
-
-    if (sameDay) return '$hour:$minute';
-
-    final day = local.day.toString().padLeft(2, '0');
-    final month = local.month.toString().padLeft(2, '0');
-    return '$day/$month $hour:$minute';
-  }
 }

@@ -125,6 +125,77 @@ public class ChatHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
         Assert.Equal(HttpStatusCode.BadRequest, oversized.StatusCode);
     }
 
+    [Fact]
+    public async Task Chat_UnreadCount_ShouldTrackReadStatePerUser()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var adultClient = factory.CreateClient();
+        using var childClient = factory.CreateClient();
+
+        var family = await BootstrapAsync(adultClient);
+        await LoginAdultAsync(adultClient, family);
+        await LoginChildAsync(childClient, family);
+
+        var sent = await adultClient.PostAsJsonAsync(
+            "/api/v1/chat/messages",
+            new { text = "Mensagem nao lida" });
+
+        Assert.Equal(HttpStatusCode.OK, sent.StatusCode);
+        var sentBody = await sent.Content.ReadFromJsonAsync<JsonElement>();
+        var messageId = sentBody.GetProperty("id").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(messageId));
+
+        var childUnread = await childClient.GetFromJsonAsync<JsonElement>(
+            "/api/v1/chat/unread-count");
+        Assert.Equal(1, childUnread.GetProperty("unreadCount").GetInt64());
+
+        var adultUnread = await adultClient.GetFromJsonAsync<JsonElement>(
+            "/api/v1/chat/unread-count");
+        Assert.Equal(0, adultUnread.GetProperty("unreadCount").GetInt64());
+
+        var markRead = await childClient.PutAsJsonAsync(
+            "/api/v1/chat/read",
+            new { lastMessageId = messageId });
+
+        Assert.Equal(HttpStatusCode.OK, markRead.StatusCode);
+        var readBody = await markRead.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(0, readBody.GetProperty("unreadCount").GetInt64());
+
+        await adultClient.PostAsJsonAsync(
+            "/api/v1/chat/messages",
+            new { text = "Nova mensagem" });
+
+        childUnread = await childClient.GetFromJsonAsync<JsonElement>(
+            "/api/v1/chat/unread-count");
+        Assert.Equal(1, childUnread.GetProperty("unreadCount").GetInt64());
+    }
+
+    [Fact]
+    public async Task Chat_MarkRead_ShouldNotAcceptMessageFromAnotherFamily()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var firstClient = factory.CreateClient();
+        using var secondClient = factory.CreateClient();
+
+        var firstFamily = await BootstrapAsync(firstClient);
+        var secondFamily = await BootstrapAsync(secondClient);
+
+        await LoginAdultAsync(firstClient, firstFamily);
+        await LoginAdultAsync(secondClient, secondFamily);
+
+        var sent = await firstClient.PostAsJsonAsync(
+            "/api/v1/chat/messages",
+            new { text = "Privada A" });
+        var sentBody = await sent.Content.ReadFromJsonAsync<JsonElement>();
+        var messageId = sentBody.GetProperty("id").GetString();
+
+        var response = await secondClient.PutAsJsonAsync(
+            "/api/v1/chat/read",
+            new { lastMessageId = messageId });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private static async Task LoginAdultAsync(HttpClient client, TestFamily family)
     {
         var response = await client.PostAsJsonAsync(

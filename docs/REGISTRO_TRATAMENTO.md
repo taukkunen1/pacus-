@@ -105,35 +105,45 @@ Cada fluxo tem:
 - **Retenção e eliminação:** indefinida (histórico de resgates); hard delete na exclusão de conta (B3). `redemptions.itemTitle`/`cost` são cópias congeladas no momento do pedido, preservadas mesmo se o item for depois alterado ou desativado.
 - **Medidas de segurança:** isolamento por `FamilyId` (a checagem de posse do item cobre inclusive a criança tentando usar id de outra família — item C2), aprovação/rejeição restrita ao adulto (`[RequireRole(UserRole.Adult)]`), cada decisão gera log de auditoria (item A5), baixa de estoque atômica com a aprovação.
 
-## 7. Exclusão de conta
+## 7. Comunicação familiar (chat)
+
+- **Finalidade:** permitir troca de mensagens privadas entre membros autenticados da mesma família e indicar mensagens ainda não lidas.
+- **Categorias de dados:** texto da mensagem, remetente, papel do remetente, data/hora e marcador de última leitura por usuário. Ver `docs/DATA_MAP.md`, seções 13 (`chat_messages`) e 14 (`chat_read_states`).
+- **Collections envolvidas:** `chat_messages`, `chat_read_states`.
+- **Titulares:** adulto e criança.
+- **Base legal:** execução de contrato (art. 7º, V) e, para criança, consentimento do responsável conforme art. 14, §1º.
+- **Acesso:** exclusivamente membros autenticados da mesma família; isolamento pelo `FamilyId` do token.
+- **Retenção e eliminação:** enquanto a conta existir; hard delete na exclusão da família.
+
+## 8. Exclusão de conta
 
 **Descrição:** o adulto solicita a exclusão permanente da conta da família, mediante confirmação de senha.
 
 - **Categorias de titulares:** ambos (a exclusão apaga os dados de toda a família).
-- **Categorias de dados:** todos os tratados nos fluxos 1-6, mais os logs de auditoria (fluxo 9).
+- **Categorias de dados:** todos os tratados nos fluxos 1-7, mais os logs de auditoria (fluxo 10).
 - **Finalidade:** dar ao titular o exercício efetivo do direito de eliminação (LGPD, art. 18, VI).
 - **Base legal:** cumprimento de obrigação legal (art. 7º, II) — é o próprio exercício de um direito do titular previsto na LGPD.
-- **Collections envolvidas:** todas as 12 (11 com hard delete; `audit_logs` é anonimizado, não apagado — ver fluxo 9).
+- **Collections envolvidas:** todas as 14 (13 com hard delete; `audit_logs` é anonimizado, não apagado — ver fluxo 10).
 - **Quem opera:** `AccountController`/`AccountDeletionService` (item B3).
 - **Compartilhamento com terceiros:** nenhum.
 - **Retenção e eliminação:** a própria operação É a eliminação. É irreversível e não tem prazo de retenção posterior, exceto os logs de auditoria anonimizados (12 meses, ver fluxo 9).
 - **Medidas de segurança:** restrito ao adulto (`[RequireRole(UserRole.Adult)]`), exige confirmação da senha atual (reautenticação contra sessão esquecida/token vazado), a própria exclusão gera uma entrada de auditoria (já anonimizada).
 
-## 8. Exportação de dados *(adicional — não estava na lista original do checklist, mas é uma operação de tratamento)*
+## 9. Exportação de dados *(adicional — não estava na lista original do checklist, mas é uma operação de tratamento)*
 
 **Descrição:** o adulto baixa uma cópia de todos os dados da família em formato JSON.
 
 - **Categorias de titulares:** ambos (o arquivo inclui dados de adulto e criança).
-- **Categorias de dados:** todas as 12 collections, exceto `passwordHash`/`pinHash` (nunca incluídos).
+- **Categorias de dados:** todas as 14 collections, exceto `passwordHash`/`pinHash` (nunca incluídos).
 - **Finalidade:** dar ao titular o exercício efetivo do direito de portabilidade/acesso (LGPD, art. 18, II e V).
 - **Base legal:** cumprimento de obrigação legal (art. 7º, II).
-- **Collections envolvidas:** todas as 12 (leitura apenas — nenhum dado é alterado por este fluxo).
+- **Collections envolvidas:** todas as 14 (leitura apenas — nenhum dado é alterado por este fluxo).
 - **Quem opera:** `ExportController`/`DataExportService` (item B2).
 - **Compartilhamento com terceiros:** nenhum — o arquivo é gerado e entregue diretamente ao adulto que fez a requisição, via download HTTP.
 - **Retenção e eliminação:** não aplicável — o backend não guarda cópia do arquivo gerado; ele existe só na resposta HTTP.
 - **Medidas de segurança:** restrito ao adulto (`[RequireRole(UserRole.Adult)]`), projeção dedicada que nunca inclui hash de senha/PIN, isolamento por `FamilyId`.
 
-## 9. Logs de auditoria e segurança *(adicional — não estava na lista original do checklist, mas é uma operação de tratamento)*
+## 10. Logs de auditoria e segurança *(adicional — não estava na lista original do checklist, mas é uma operação de tratamento)*
 
 **Descrição:** registro de ações administrativas sensíveis (exclusão de tarefa, aprovação/rejeição de resgate, ajuste manual de pontos, exclusão de conta) e limite de tentativas em formulários de autenticação.
 
@@ -144,7 +154,7 @@ Cada fluxo tem:
 - **Collections envolvidas:** `audit_logs`. O rate limiting de login (item A1) atua em memória/infraestrutura, sem persistir dados pessoais em uma collection própria.
 - **Quem opera:** `AuditLogRepository`, chamado a partir de `TaskTemplateService`, `StoreService`, `PointsController`, `AccountDeletionService`.
 - **Compartilhamento com terceiros:** nenhum.
-- **Retenção e eliminação:** enquanto a conta estiver ativa, os logs permanecem vinculados ao autor. Na exclusão de conta (B3), são **anonimizados** (perdem o vínculo com a pessoa) e purgados automaticamente 12 meses depois via índice TTL do MongoDB — não são apagados imediatamente, ao contrário das outras 11 collections, porque preservar o registro da ação (sem o vínculo pessoal) por um tempo após a exclusão é o que sustenta a finalidade de responsabilização.
+- **Retenção e eliminação:** enquanto a conta estiver ativa, os logs permanecem vinculados ao autor. Na exclusão de conta (B3), são **anonimizados** (perdem o vínculo com a pessoa) e purgados automaticamente 12 meses depois via índice TTL do MongoDB — não são apagados imediatamente, ao contrário das outras 13 collections, porque preservar o registro da ação (sem o vínculo pessoal) por um tempo após a exclusão é o que sustenta a finalidade de responsabilização.
 - **Medidas de segurança:** nunca exposto na UI normal do app (só via exportação, fluxo 8); nunca editado ou removido pelo fluxo normal da aplicação, só pela rotina de exclusão de conta.
 
 ---

@@ -90,4 +90,7 @@ public class MongoDbContext
 
     public IMongoCollection<ChatMessage> ChatMessages =>
         _database.GetCollection<ChatMessage>("chat_messages");
+
+    public IMongoCollection<ChatReadState> ChatReadStates =>
+        _database.GetCollection<ChatReadState>("chat_read_states");
 }

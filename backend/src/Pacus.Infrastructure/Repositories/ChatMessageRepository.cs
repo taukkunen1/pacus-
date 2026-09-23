@@ -49,6 +49,32 @@ public class ChatMessageRepository : IChatMessageRepository
         return latest;
     }
 
+    public Task<ChatMessage?> GetByIdForFamilyAsync(
+        ObjectId familyId,
+        ObjectId messageId) =>
+        _context.ChatMessages
+            .Find(m => m.FamilyId == familyId && m.Id == messageId)
+            .FirstOrDefaultAsync();
+
+    public Task<long> CountUnreadAsync(
+        ObjectId familyId,
+        ObjectId userId,
+        ObjectId? afterId)
+    {
+        var filter =
+            Builders<ChatMessage>.Filter.Eq(m => m.FamilyId, familyId) &
+            Builders<ChatMessage>.Filter.Ne(m => m.SenderId, userId);
+
+        if (afterId.HasValue)
+        {
+            filter &= Builders<ChatMessage>.Filter.Gt(
+                m => m.Id,
+                afterId.Value);
+        }
+
+        return _context.ChatMessages.CountDocumentsAsync(filter);
+    }
+
     public Task<List<ChatMessage>> GetAllByFamilyAsync(ObjectId familyId) =>
         _context.ChatMessages
             .Find(m => m.FamilyId == familyId)

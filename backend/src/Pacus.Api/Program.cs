@@ -156,6 +156,7 @@ builder.Services.AddScoped<ISettingsRepository, SettingsRepository>();
 builder.Services.AddScoped<IPacusGrowthRepository, PacusGrowthRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 builder.Services.AddScoped<IChatMessageRepository, ChatMessageRepository>();
+builder.Services.AddScoped<IChatReadStateRepository, ChatReadStateRepository>();
 
 // Auth
 builder.Services.AddScoped<ICurrentUserService, HttpCurrentUserService>();

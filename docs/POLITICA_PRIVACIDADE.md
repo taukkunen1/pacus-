@@ -1,8 +1,8 @@
 # Política de Privacidade do PACUS
 
-**Última atualização: 29 de agosto de 2026**
+**Última atualização: 23 de setembro de 2026**
 
-> ⚠️ **Rascunho — item B4 do checklist de segurança e LGPD.** Este documento foi redigido com base no código-fonte real do PACUS (ver `docs/DATA_MAP.md`) e cobre o que a aplicação efetivamente faz hoje. Ele **não foi revisado por um advogado**. Antes de publicar, revise especialmente as seções marcadas com 🔲 (dados que faltam preencher) e considere validar o texto com um profissional, principalmente as partes sobre dados de crianças (art. 14 da LGPD).
+> **Nota de revisão jurídica:** esta política reflete o funcionamento atual do PACUS e está publicada no produto, mas não foi revisada por advogado. Recomenda-se revisão jurídica periódica, especialmente por envolver dados de crianças.
 
 ## 1. Quem somos
 
@@ -38,6 +38,7 @@ O PACUS coleta apenas o necessário para o app funcionar — não usamos os dado
 - Estado de crescimento do PACUS (o bichinho virtual) e o "habitat" (customizações visuais) da família.
 - Itens da lojinha de recompensas cadastrados pelo adulto e os resgates feitos pela criança.
 - Configurações da conta (preferências salvas pela família).
+- Mensagens trocadas no chat familiar e marcadores de leitura usados para calcular mensagens não lidas.
 
 *Finalidade:* fazer o app funcionar — é o próprio propósito do PACUS (acompanhar rotina, calcular pontos, mostrar o crescimento do bichinho).
 *Base legal:* execução do contrato (art. 7º, V).
@@ -67,7 +68,7 @@ Os dados de uso (tarefas, histórico, pontos, resgates, crescimento do PACUS) s�
 
 Você pode excluir permanentemente a conta da sua família a qualquer momento, direto no app (área de configurações do adulto), mediante confirmação da sua senha. Ao confirmar a exclusão:
 
-- **Todos os dados de uso da família são apagados de forma definitiva e irreversível** — perfis, tarefas, histórico diário, pontos, estado do PACUS, habitat, configurações, itens de loja e resgates.
+- **Todos os dados de uso da família são apagados de forma definitiva e irreversível** — perfis, tarefas, histórico diário, pontos, estado do PACUS, habitat, configurações, itens de loja, resgates, mensagens do chat e marcadores de leitura.
 - **Os logs de auditoria são uma exceção:** em vez de apagados imediatamente, eles são *anonimizados* — perdem o vínculo com quem praticou a ação, mas o registro da ação em si (o quê, quando) é preservado por até 12 meses, e então apagado automaticamente. Isso existe para que possamos investigar fraude ou abuso ocorrido pouco antes de uma exclusão de conta, sem manter dado pessoal além do necessário.
 
 Não há como desfazer uma exclusão de conta.
@@ -102,11 +103,11 @@ Aplicamos medidas técnicas para proteger seus dados, entre elas:
 - Log de auditoria para ações administrativas sensíveis.
 - Comunicação com o servidor via HTTPS.
 
-Nenhum sistema é 100% imune a incidentes. Caso ocorra um incidente de segurança que afete seus dados, seguiremos nosso plano de resposta a incidentes 🔲 *(referência ao item D3 do checklist interno, ainda a ser implementado)* e cumpriremos as obrigações de notificação previstas na LGPD.
+Nenhum sistema é 100% imune a incidentes. Caso ocorra um incidente de segurança que afete seus dados, seguiremos o plano de resposta a incidentes já documentado em `docs/PLANO_RESPOSTA_INCIDENTES.md` e cumpriremos as obrigações de comunicação aplicáveis.
 
 ## 10. Alterações nesta política
 
-Podemos atualizar esta política periodicamente. Quando isso acontecer, atualizaremos a data no topo do documento 🔲 *(decisão de produto pendente: se e como notificar usuários existentes de mudanças relevantes — hoje não há mecanismo de notificação no app)*.
+Podemos atualizar esta política periodicamente. A data no topo identifica a versão vigente. Mudanças que alterem de forma relevante o tratamento de dados serão refletidas nesta política e, quando a base legal exigir novo consentimento, o tratamento correspondente dependerá desse novo consentimento.
 
 ## 11. Contato
 

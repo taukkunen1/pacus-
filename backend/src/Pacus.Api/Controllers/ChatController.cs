@@ -14,15 +14,18 @@ public class ChatController : ControllerBase
     private const int MaxMessageLength = 2000;
 
     private readonly IChatMessageRepository _chatRepository;
+    private readonly IChatReadStateRepository _readStateRepository;
     private readonly IUserRepository _userRepository;
     private readonly ICurrentUserService _currentUser;
 
     public ChatController(
         IChatMessageRepository chatRepository,
+        IChatReadStateRepository readStateRepository,
         IUserRepository userRepository,
         ICurrentUserService currentUser)
     {
         _chatRepository = chatRepository;
+        _readStateRepository = readStateRepository;
         _userRepository = userRepository;
         _currentUser = currentUser;
     }
@@ -45,6 +48,47 @@ public class ChatController : ControllerBase
             parsedAfterId);
 
         return Ok(messages.Select(ToResponse));
+    }
+
+    [HttpGet("unread-count")]
+    public async Task<IActionResult> GetUnreadCount()
+    {
+        var readState = await _readStateRepository.GetAsync(
+            _currentUser.FamilyId,
+            _currentUser.UserId);
+
+        var count = await _chatRepository.CountUnreadAsync(
+            _currentUser.FamilyId,
+            _currentUser.UserId,
+            readState?.LastReadAt);
+
+        return Ok(new { unreadCount = count });
+    }
+
+    [HttpPut("read")]
+    public async Task<IActionResult> MarkRead([FromBody] MarkChatReadRequest request)
+    {
+        if (!ObjectId.TryParse(request.LastMessageId, out var messageId))
+            return BadRequest(new { error = "lastMessageId invalido." });
+
+        var message = await _chatRepository.GetByIdForFamilyAsync(
+            _currentUser.FamilyId,
+            messageId);
+
+        if (message is null)
+            return NotFound(new { error = "Mensagem nao encontrada." });
+
+        await _readStateRepository.UpsertAsync(
+            _currentUser.FamilyId,
+            _currentUser.UserId,
+            message.CreatedAt);
+
+        var count = await _chatRepository.CountUnreadAsync(
+            _currentUser.FamilyId,
+            _currentUser.UserId,
+            message.CreatedAt);
+
+        return Ok(new { unreadCount = count });
     }
 
     [HttpPost("messages")]
@@ -90,6 +134,7 @@ public class ChatController : ControllerBase
 }
 
 public record SendChatMessageRequest(string? Text);
+public record MarkChatReadRequest(string? LastMessageId);
 
 public record ChatMessageResponse(
     string Id,

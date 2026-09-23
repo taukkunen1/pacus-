@@ -1,3 +1,11 @@
+# Atualização — migração Flutter encerrada (2026-09-23)
+
+O cliente oficial do PACUS é **Flutter Web**, em `flutter_app/`, publicado em `www.pacus.com.br`.
+A auditoria final de paridade com o antigo cliente HTML/CSS/JS foi concluída e o diretório legado `frontend/` foi removido.
+O relatório da auditoria está em `docs/FLUTTER_MIGRATION_AUDIT.md`.
+
+O CI atual valida backend e Flutter (`flutter analyze` + `flutter test`), enquanto os workflows Flutter Web validam o build release e fazem o deploy do GitHub Pages.
+
 # PACUS — Estado atual do projeto
 
 Verificado diretamente no código-fonte. A auditoria original foi feita em `feature/next-migration` em 2026-09-01; em 2026-09-04 essa branch está integralmente contida em `main`, que é a branch atual do projeto. Cada afirmação abaixo foi conferida lendo o arquivo citado, não apenas assumida a partir do README ou de commits antigos.
@@ -22,9 +30,9 @@ Ambas as pendências acima ("Ação sugerida" original) já foram corrigidas nes
 ## Estrutura do projeto
 
 - **Backend** — ASP.NET Core 10 (`net10.0`), Clean Architecture em 4 projetos: `Pacus.Domain` (entidades/enums), `Pacus.Application` (services/DTOs/interfaces), `Pacus.Infrastructure` (Mongo/repositórios/auth), `Pacus.Api` (controllers). MongoDB via driver oficial, sem ORM.
-- **Frontend** — HTML/CSS/JS vanilla, sem framework nem bundler, organizado em `components/`, `screens/`, `api/`, `state/`, `utils/`. Telas principais: `home.js` (rotina de hoje), `pacus.js` (habitat + tarefas permanentes).
+- **Frontend** — Flutter Web em `flutter_app/`, com telas de Hoje, Amanhã, Chat, Histórico, Pontos, PACUS, Loja e Configurações. O cliente HTML/CSS/JS foi removido em 2026-09-23 após auditoria final de paridade.
 - **Testes** — suíte de integração em xUnit no backend (`*.HttpIntegrationTests.cs`), cobrindo isolamento por família, permissões por papel (adulto/criança) e os fluxos de LGPD (exportação, exclusão de conta).
-- **CI** (`.github/workflows/ci.yml`) — dois jobs: `backend` (`dotnet build` + `dotnet test`) e `frontend` (`node --check` em todo `.js` de `frontend/js`, só sintaxe).
+- **CI** (`.github/workflows/ci.yml`) — dois jobs: `backend` (`dotnet build` + `dotnet test`) e `flutter` (`flutter analyze` + `flutter test`). O build web release também é validado pelos workflows dedicados de Flutter.
 
 ## Branches (estado verificado em 2026-09-04)
 

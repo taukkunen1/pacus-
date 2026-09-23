@@ -249,6 +249,7 @@ public class ChatController : ControllerBase
             if (approved is null)
                 return Conflict(new { error = "Nao foi possivel concluir a aprovacao." });
 
+            await CreateReviewNotificationAsync(approved, approved: true);
             return Ok(ToResponse(approved));
         }
         catch
@@ -285,7 +286,41 @@ public class ChatController : ControllerBase
             });
         }
 
+        await CreateReviewNotificationAsync(rejected, approved: false);
         return Ok(ToResponse(rejected));
+    }
+
+    private async Task CreateReviewNotificationAsync(
+        ChatMessage request,
+        bool approved)
+    {
+        var reviewer = await GetCurrentSenderAsync();
+        if (reviewer is null)
+            return;
+
+        var requestLabel = request.RequestType switch
+        {
+            "help" => "pedido de ajuda",
+            "change_task" => "pedido para conversar sobre uma tarefa",
+            "extra_time" => $"pedido de +{request.RequestedMinutes ?? 0} min",
+            _ => "pedido"
+        };
+
+        var message = new ChatMessage
+        {
+            Id = ObjectId.GenerateNewId(),
+            FamilyId = _currentUser.FamilyId,
+            SenderId = reviewer.Id,
+            SenderName = reviewer.Name,
+            SenderRole = reviewer.Role,
+            Text = approved
+                ? $"Aprovado: {requestLabel}."
+                : $"Recusado: {requestLabel}.",
+            Kind = "message",
+            CreatedAt = DateTime.UtcNow,
+        };
+
+        await _chatRepository.CreateAsync(message);
     }
 
     private async Task<User?> GetCurrentSenderAsync()

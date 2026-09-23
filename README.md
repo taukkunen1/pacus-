@@ -6,9 +6,9 @@ Na prática, hoje isso é um app de rotina com histórico diário, tarefas dinâ
 
 ## Arquitetura
 
-Frontend Web (HTML/CSS/JS) -> ASP.NET Core 10 / C# -> MongoDB Atlas
+Flutter Web -> ASP.NET Core 10 / C# -> MongoDB Atlas
 
-Flutter será um cliente futuro da mesma API.
+O frontend oficial do PACUS é `flutter_app/`; o frontend HTML/CSS/JS legado foi aposentado após a auditoria final de migração.
 
 ## Regras centrais
 - Cada dia começa às 00:00 no timezone do usuário.
@@ -37,12 +37,15 @@ Toda família nova já recebe o item padrão **"1 hora de tela" = 100 Pacus Poin
 3. Execute `dotnet run --project backend/src/Pacus.Api`.
 4. Health: `GET /api/v1/health`.
 
-### Frontend
-Sirva `frontend/` por um servidor HTTP, por exemplo `python -m http.server 5500 --directory frontend`, e configure `window.PACUS_API_BASE_URL` em `frontend/index.html` se necessário.
+### Frontend Flutter
+1. Entre em `flutter_app/`.
+2. Execute `flutter pub get`.
+3. Desenvolvimento: `flutter run -d chrome --dart-define=PACUS_API_BASE_URL=http://localhost:5000/api/v1` (ajuste a porta da API se necessário).
+4. Produção web: `flutter build web --release --dart-define=PACUS_API_BASE_URL=https://pacus-pacus-api.fly.dev/api/v1`.
 
 ## CI/CD
-`.github/workflows/ci.yml` testa backend e sintaxe JavaScript.
-`.github/workflows/pages.yml` prepara deploy do frontend no GitHub Pages.
+`.github/workflows/ci.yml` valida backend e Flutter (`analyze`, `test` e `build web`).
+`.github/workflows/pages.yml` compila e publica o Flutter Web no GitHub Pages com o domínio `www.pacus.com.br`.
 
 ## Deploy da API
 `backend/Dockerfile` gera uma imagem ASP.NET Core 10. `deploy/docker-compose.yml` documenta a execução com MongoDB Atlas externo. Hospedada em produção no Fly.io (`pacus-pacus-api.fly.dev`, região `iad`); migrada do Render em 2026-09-09 — ver `docs/ESTADO_ATUAL.md` para o histórico da migração.
@@ -51,4 +54,4 @@ Sirva `frontend/` por um servidor HTTP, por exemplo `python -m http.server 5500 
 Nunca commitar senha do MongoDB, JWT secret ou connection strings reais. Checklist completo de segurança/LGPD em `docs/SECURITY_LGPD_CHECKLIST.md`.
 
 ## Estado atual do projeto
-Ver `docs/ESTADO_ATUAL.md` — verificação regra por regra do que está implementado, estrutura do projeto, status do checklist de segurança/LGPD e diferenças entre as branches `main` e `feature/next-migration`.
+Ver `docs/ESTADO_ATUAL.md` para o retrato atual e `docs/FLUTTER_MIGRATION_AUDIT.md` para a auditoria final da migração.

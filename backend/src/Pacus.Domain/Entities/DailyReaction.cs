@@ -7,7 +7,7 @@ namespace Pacus.Domain.Entities;
 // um elogio automatico do sistema. Um por DailyRoutine (granularidade "por dia" —
 // reagir de novo no mesmo dia substitui a reacao anterior, nao acumula). So o adulto
 // registra (ver IDailyRoutineService.SetReactionAsync); a crianca so le, atraves do
-// PACUS (ver frontend/js/pacus/habitat.js).
+// PACUS (ver flutter_app/lib/screens/home_screen.dart).
 public class DailyReaction
 {
     // Chave semantica de um icone pre-definido (ex.: "heart", "clap", "star", "hug") —

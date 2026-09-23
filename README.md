@@ -37,8 +37,16 @@ Toda família nova já recebe o item padrão **"1 hora de tela" = 100 Pacus Poin
 3. Execute `dotnet run --project backend/src/Pacus.Api`.
 4. Health: `GET /api/v1/health`.
 
-### Frontend
-Sirva `frontend/` por um servidor HTTP, por exemplo `python -m http.server 5500 --directory frontend`, e configure `window.PACUS_API_BASE_URL` em `frontend/index.html` se necessário.
+### Frontend Flutter Web
+O cliente oficial está em `flutter_app/`. Para desenvolvimento local:
+
+```bash
+cd flutter_app
+flutter pub get
+flutter run -d chrome --dart-define=PACUS_API_BASE_URL=http://localhost:5000/api/v1
+```
+
+Produção é compilada pelo GitHub Actions a partir de `flutter_app/` e publicada em `www.pacus.com.br`. O frontend HTML/CSS/JS legado foi aposentado após a auditoria final de paridade em 2026-09-23.
 
 ## CI/CD
 `.github/workflows/ci.yml` testa backend e sintaxe JavaScript.

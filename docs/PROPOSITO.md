@@ -64,7 +64,7 @@ produto parecer ir nessa direção.
 - Elogio/reforço no app (toasts, mensagens do PACUS) deve ser de **esforço e estratégia**
   ("você conseguiu", "você tentou de um jeito novo"), nunca de traço/resultado ("você é
   o melhor", "nota 10") — pesquisa de Dweck & Mueller (1998) sobre mindset de
-  crescimento. Ver `frontend/js/utils/effort-messages.js`.
+  crescimento. Ver `flutter_app/lib/ui/effort_messages.dart`.
 - Ao pontuar uma tarefa nova, cuidado com o **efeito de supergratificação**
   (overjustification — Lepper, Greene & Nisbett 1973): recompensar demais uma atividade
   que a criança já faria por prazer próprio (ex.: uma tarefa criativa) pode reduzir o
@@ -77,6 +77,6 @@ produto parecer ir nessa direção.
 - A **terceira necessidade da Teoria da Autodeterminação** (relatedness — vínculo com
   outra pessoa, não só autonomia e competência) tem uma feature dedicada desde
   2026-09-01: a reação pessoal do adulto sobre o dia (`DailyRoutine.Reaction`, ver
-  `pacus/habitat.js`). É vínculo, não recompensa — por isso não gera Pacus Points e não
+  `flutter_app/lib/screens/home_screen.dart`). É vínculo, não recompensa — por isso não gera Pacus Points e não
   é obrigatória. Hoje só numa direção (adulto → criança); abrir para os dois lados é
   uma extensão natural, não decidida ainda.

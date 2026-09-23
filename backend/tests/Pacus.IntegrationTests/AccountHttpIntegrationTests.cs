@@ -39,6 +39,17 @@ public class AccountHttpIntegrationTests : IClassFixture<MongoIntegrationFixture
                 points = 2
             });
 
+        var chatResponse = await client.PostAsJsonAsync(
+            "/api/v1/chat/messages",
+            new { text = "Mensagem que deve ser excluida" });
+        var chatMessage = await chatResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var chatMessageId = chatMessage.GetProperty("id").GetString();
+
+        var markRead = await client.PutAsJsonAsync(
+            "/api/v1/chat/read",
+            new { lastMessageId = chatMessageId });
+        Assert.Equal(HttpStatusCode.OK, markRead.StatusCode);
+
         var response = await client.SendAsync(BuildDeleteRequest(family.AdultPassword));
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);

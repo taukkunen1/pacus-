@@ -1,6 +1,6 @@
 # PACUS — Mapa de Dados
 
-Documento de referência para conformidade com a LGPD (Lei 13.709/2018), gerado a partir do código-fonte real do backend inicialmente em `feature/next-migration` (checklist de segurança e LGPD, item B1) e posteriormente integrado em `main`. Cobre as 12 collections do MongoDB usadas pela aplicação — as 11 previstas originalmente no checklist mais `audit_logs`, criada no item A5.
+Documento de referência para conformidade com a LGPD (Lei 13.709/2018), gerado a partir do código-fonte real do backend inicialmente em `feature/next-migration` (checklist de segurança e LGPD, item B1) e posteriormente integrado em `main`. Cobre as 13 collections do MongoDB usadas pela aplicação — as 11 previstas originalmente no checklist, `audit_logs` criada no item A5 e `chat_messages` adicionada para comunicação privada entre membros da família.
 
 Este documento é a base para os itens seguintes do checklist: B2 (exportação de dados), B3 (exclusão de conta), D1 (registro de operações de tratamento) e D2 (RIPD).
 
@@ -334,6 +334,30 @@ Log de auditoria para ações administrativas sensíveis, criado no item A5 — 
 - **Destino em exclusão:** **decisão pendente para o B3** — duas opções: (a) hard delete junto com a família (mais simples, mas perde a trilha caso a exclusão em si precise ser auditada); (b) reter por um período fixo pós-exclusão com `familyId`/`actorId` anonimizados (pseudonimização), preservando só o fato de que a ação ocorreu. Recomendação: opção (b) para ações que envolvem valores financeiros internos (ajuste de pontos), opção (a) para o restante — a decidir em B3.
 - **Controles de segurança:** nunca alterado pelo fluxo normal da aplicação (só `CreateAsync`, sem update/delete no repositório).
 
+
+## 13. `chat_messages`
+
+Histórico do chat privado da família — cada mensagem é um documento, visível apenas para membros autenticados da mesma família.
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `_id` | ObjectId | Identificador da mensagem; também é usado como cursor incremental no polling. |
+| `familyId` | ObjectId | Família à qual a mensagem pertence. |
+| `senderId` | ObjectId | Usuário autenticado que enviou a mensagem. |
+| `senderName` | string | Nome do remetente congelado no momento do envio. |
+| `senderRole` | enum | Papel do remetente (`Adult` ou `Child`) no momento do envio. |
+| `text` | string | Conteúdo da mensagem, obrigatório e limitado a 2.000 caracteres. |
+| `createdAt` | DateTime | Data/hora UTC do envio. |
+
+- **Finalidade:** permitir comunicação textual privada entre os membros da mesma família dentro do PACUS.
+- **Categoria do titular:** ambos — adulto e criança podem enviar e receber mensagens.
+- **Origem:** texto informado diretamente pelo membro autenticado; remetente, família e timestamp são definidos no backend e não pelo cliente.
+- **Quem acessa:** `ChatController`, `ChatMessageRepository` e a tela Flutter `ChatScreen`. A resposta ao frontend não expõe `familyId`.
+- **Base legal:** execução de contrato (art. 7º, V) para o adulto; para dados da criança, consentimento específico do responsável conforme art. 14, §1º, seguindo o aceite já registrado no cadastro da família.
+- **Retenção:** histórico mantido enquanto a conta da família existir.
+- **Destino em exclusão:** hard delete de todas as mensagens da família.
+- **Controles de segurança:** JWT obrigatório; leitura e escrita sempre filtradas pelo `FamilyId` obtido do token; o cliente não escolhe `familyId`, `senderId`, nome ou papel do remetente; mensagens vazias e acima de 2.000 caracteres são recusadas; testes de integração cobrem autenticação e isolamento entre famílias.
+
 ---
 
 ## Resumo — retenção e exclusão por collection
@@ -351,9 +375,9 @@ Log de auditoria para ações administrativas sensíveis, criado no item A5 — 
 | `settings` | Enquanto a conta existir | Hard delete |
 | `store_items` | Enquanto a conta existir | Hard delete |
 | `redemptions` | Indefinida (histórico) | Hard delete |
-| `audit_logs` | Proposta: 12 meses após a ação, mesmo pós-exclusão | A decidir no B3 (ver seção 12) |
+| `audit_logs` | 12 meses após a exclusão, com anonimização | Anonimizado e retido pelo período definido |\n| `chat_messages` | Enquanto a conta existir | Hard delete |
 
-Esta tabela é o ponto de partida direto para o **B3** (endpoint de exclusão de conta): a estratégia é, para 11 das 12 collections, excluir todos os documentos com o `FamilyId` da conta encerrada; `audit_logs` precisa de uma decisão de produto sobre reter (anonimizado) ou excluir junto.
+Esta tabela é o ponto de partida direto para o **B3** (endpoint de exclusão de conta): a estratégia é, para 12 das 13 collections, excluir todos os documentos com o `FamilyId` da conta encerrada; `audit_logs` é a exceção, anonimizada e retida pelo período definido.
 
 ## Achados e recomendações desta auditoria (para revisão)
 

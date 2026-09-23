@@ -24,6 +24,7 @@ public class DataExportService : IDataExportService
     private readonly IStoreRepository _storeRepository;
     private readonly IAuditLogRepository _auditLogRepository;
     private readonly IChatMessageRepository _chatMessageRepository;
+    private readonly IChatReadStateRepository _chatReadStateRepository;
 
     public DataExportService(
         IUserRepository userRepository,
@@ -37,7 +38,8 @@ public class DataExportService : IDataExportService
         ITaskEventRepository taskEventRepository,
         IStoreRepository storeRepository,
         IAuditLogRepository auditLogRepository,
-        IChatMessageRepository chatMessageRepository)
+        IChatMessageRepository chatMessageRepository,
+        IChatReadStateRepository chatReadStateRepository)
     {
         _userRepository = userRepository;
         _pacusRepository = pacusRepository;
@@ -51,6 +53,7 @@ public class DataExportService : IDataExportService
         _storeRepository = storeRepository;
         _auditLogRepository = auditLogRepository;
         _chatMessageRepository = chatMessageRepository;
+        _chatReadStateRepository = chatReadStateRepository;
     }
 
     public async Task<FamilyDataExport> ExportFamilyDataAsync(ObjectId familyId)
@@ -68,6 +71,7 @@ public class DataExportService : IDataExportService
         var redemptions = await _storeRepository.GetAllRedemptionsByFamilyAsync(familyId);
         var auditLogs = await _auditLogRepository.GetAllByFamilyAsync(familyId);
         var chatMessages = await _chatMessageRepository.GetAllByFamilyAsync(familyId);
+        var chatReadStates = await _chatReadStateRepository.GetAllByFamilyAsync(familyId);
 
         var members = users
             .Select(u => new FamilyMemberExport(
@@ -95,6 +99,7 @@ public class DataExportService : IDataExportService
             storeItems,
             redemptions,
             chatMessages,
+            chatReadStates,
             auditLogs);
     }
 }

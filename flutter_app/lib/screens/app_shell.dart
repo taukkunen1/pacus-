@@ -51,7 +51,7 @@ class _PacusShellState extends State<PacusShell> {
       } else {
         final today = await widget.api.getToday();
         if (mounted) {
-          setState(() => todayPending = (today.totalTasks - today.doneTasks).clamp(0, 999));
+          setState(() => todayPending = (today.totalTasks - today.doneTasks).clamp(0, 999).toInt());
         }
       }
     } catch (_) {

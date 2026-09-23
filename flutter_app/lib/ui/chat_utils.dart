@@ -17,3 +17,32 @@ String formatChatTimestamp(String? raw, {DateTime? now}) {
   final month = local.month.toString().padLeft(2, '0');
   return '$day/$month $hour:$minute';
 }
+
+
+String chatRequestTitle(String? type, {int? minutes}) {
+  switch (type) {
+    case 'help':
+      return 'Preciso de ajuda';
+    case 'change_task':
+      return 'Quero mudar uma tarefa';
+    case 'extra_time':
+      return minutes == null
+          ? 'Pedido de tempo extra'
+          : '+$minutes min de tempo de tela';
+    default:
+      return 'Pedido';
+  }
+}
+
+String chatRequestStatusLabel(String? status) {
+  switch (status) {
+    case 'approved':
+      return 'Aprovado';
+    case 'rejected':
+      return 'Recusado';
+    case 'processing':
+      return 'Processando';
+    default:
+      return 'Aguardando';
+  }
+}

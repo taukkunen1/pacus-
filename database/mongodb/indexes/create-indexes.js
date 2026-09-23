@@ -65,9 +65,12 @@ db.pacus_growth.createIndex({ pacusId: 1, createdAt: -1 });
 db.settings.createIndex({ userId: 1 }, { unique: true });
 
 db.chat_messages.createIndex({ familyId: 1, createdAt: 1 });
+// Otimizacao de consulta/exportacao. A unicidade do estado de leitura nao depende
+// deste indice: ChatReadStateRepository usa _id=userId, aproveitando a chave
+// primaria unica nativa do MongoDB.
 db.chat_read_states.createIndex(
   { familyId: 1, userId: 1 },
-  { unique: true, name: "one_chat_read_state_per_user" }
+  { name: "chat_read_state_lookup" }
 );
 
 db.audit_logs.createIndex({ familyId: 1, createdAt: -1 });

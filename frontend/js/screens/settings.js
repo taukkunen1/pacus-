@@ -301,8 +301,8 @@ export async function renderSettings(root, navigate) {
     const stageLabels = {
       egg: "Ovo",
       cracking: "Rachando",
-      hatching: "Eclodindo",
-      baby: "Filhote",
+      hatching: "Eclosão",
+      baby: "Bebê",
       young: "Jovem",
       adult: "Adulto"
     };
@@ -365,8 +365,8 @@ export async function renderSettings(root, navigate) {
     const labels = {
       egg: "Ovo",
       cracking: "Rachando",
-      hatching: "Eclodindo",
-      baby: "Filhote",
+      hatching: "Eclosão",
+      baby: "Bebê",
       young: "Jovem",
       adult: "Adulto"
     };

@@ -73,6 +73,83 @@ public class SettingsHttpIntegrationTests : IClassFixture<MongoIntegrationFixtur
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task PointValue_Default_ShouldReturnCurrentDefault()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var response = await client.GetAsync("/api/v1/settings/point-value");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(0.06, body.GetProperty("rate").GetDouble(), 2);
+    }
+
+    [Fact]
+    public async Task PointValue_AdultCanUpdate_AndExplicitLegacyValueIsPreserved()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var update = await client.PutAsJsonAsync(
+            "/api/v1/settings/point-value",
+            new { rate = 0.05 });
+
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+
+        // Passa pelo PointsController, onde 0.05 historicamente era migrado
+        // automaticamente para 0.06. Como agora foi escolha explicita, deve ficar.
+        var points = await client.GetAsync("/api/v1/points");
+        Assert.Equal(HttpStatusCode.OK, points.StatusCode);
+
+        var response = await client.GetAsync("/api/v1/settings/point-value");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(0.05, body.GetProperty("rate").GetDouble(), 2);
+    }
+
+    [Fact]
+    public async Task PointValue_Update_ShouldBeForbiddenForChild()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginChildAsync(client, family);
+
+        var response = await client.PutAsJsonAsync(
+            "/api/v1/settings/point-value",
+            new { rate = 0.10 });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(100.01)]
+    public async Task PointValue_InvalidRate_ShouldReturnBadRequest(double rate)
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var response = await client.PutAsJsonAsync(
+            "/api/v1/settings/point-value",
+            new { rate });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     // Isolamento por familia (checklist de seguranca, item A2). Sem id de
     // rota -- e sempre "as settings da familia do token" -- garantia
     // estrutural, mas provada aqui via HTTP.

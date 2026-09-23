@@ -20,6 +20,7 @@ public class ChatReadStateRepository : IChatReadStateRepository
     public async Task UpsertAsync(
         ObjectId familyId,
         ObjectId userId,
+        ObjectId lastReadMessageId,
         DateTime lastReadAt)
     {
         var filter =
@@ -30,6 +31,7 @@ public class ChatReadStateRepository : IChatReadStateRepository
             .SetOnInsert(s => s.Id, ObjectId.GenerateNewId())
             .SetOnInsert(s => s.FamilyId, familyId)
             .SetOnInsert(s => s.UserId, userId)
+            .Max(s => s.LastReadMessageId, lastReadMessageId)
             .Max(s => s.LastReadAt, lastReadAt)
             .Set(s => s.UpdatedAt, DateTime.UtcNow);
 

@@ -12,7 +12,7 @@ public class CorsOriginPolicyTests
             configuredOrigins:
                 "https://pacus-1.onrender.com,https://taukkunen1.github.io,http://localhost:5500");
 
-        Assert.Equal([CorsOriginPolicy.OfficialOrigin], origins);
+        Assert.Equal(new[] { CorsOriginPolicy.OfficialOrigin }, origins);
     }
 
     [Fact]
@@ -24,7 +24,7 @@ public class CorsOriginPolicyTests
                 "http://localhost:5500,http://localhost:3000");
 
         Assert.Equal(
-            ["http://localhost:5500", "http://localhost:3000"],
+            new[] { "http://localhost:5500", "http://localhost:3000" },
             origins);
     }
 
@@ -36,7 +36,7 @@ public class CorsOriginPolicyTests
             configuredOrigins: null);
 
         Assert.Equal(
-            [CorsOriginPolicy.DevelopmentFallbackOrigin],
+            new[] { CorsOriginPolicy.DevelopmentFallbackOrigin },
             origins);
     }
 }

@@ -9,19 +9,27 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../api.dart';
 import '../brand.dart';
 import '../models.dart';
+import '../ui/effort_messages.dart';
 import '../ui/pacus_components.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.api, required this.session, required this.onLogout});
+  const HomeScreen({
+    super.key,
+    required this.api,
+    required this.session,
+    required this.onLogout,
+    this.onPendingChanged,
+  });
   final PacusApi api;
   final AuthSession session;
   final Future<void> Function() onLogout;
+  final ValueChanged<int>? onPendingChanged;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   DailyRoutine? routine;
   bool loading = true;
   String? error;
@@ -31,29 +39,98 @@ class _HomeScreenState extends State<HomeScreen> {
   Duration remaining = Duration.zero;
   bool sessionPaused = false;
   bool completing = false;
+  bool slowLoading = false;
+  Timer? slowLoadTimer;
+  Timer? dayBoundaryTimer;
+  late String lastDayKey;
 
   String get _sessionKey => 'pacus.flutter.session:${routine?.familyId ?? ''}:${routine?.date ?? ''}';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    lastDayKey = _dayKey();
+    _scheduleNextDayBoundary();
     _load();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     timer?.cancel();
+    slowLoadTimer?.cancel();
+    dayBoundaryTimer?.cancel();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkDayBoundary();
+    }
+  }
+
+  String _dayKey() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month}-${now.day}';
+  }
+
+  void _checkDayBoundary() {
+    final key = _dayKey();
+    if (key == lastDayKey) return;
+    lastDayKey = key;
+    _load();
+  }
+
+  void _scheduleNextDayBoundary() {
+    dayBoundaryTimer?.cancel();
+    final now = DateTime.now();
+    final next = DateTime(now.year, now.month, now.day + 1)
+        .add(const Duration(seconds: 5));
+    dayBoundaryTimer = Timer(next.difference(now), () {
+      _checkDayBoundary();
+      _scheduleNextDayBoundary();
+    });
+  }
+
   Future<void> _load() async {
+    if (mounted && routine == null) {
+      setState(() {
+        loading = true;
+        slowLoading = false;
+      });
+    }
+
+    slowLoadTimer?.cancel();
+    slowLoadTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted && loading) setState(() => slowLoading = true);
+    });
+
     try {
       final value = await widget.api.getToday();
       routine = value;
       await _restoreSession();
-      if (mounted) setState(() { loading = false; error = null; });
+      widget.onPendingChanged?.call(
+        widget.session.isAdult ? 0 : math.max(0, value.totalTasks - value.doneTasks),
+      );
+      if (mounted) {
+        setState(() {
+          loading = false;
+          slowLoading = false;
+          error = null;
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() { loading = false; error = e.toString(); });
+      if (mounted) {
+        setState(() {
+          loading = false;
+          slowLoading = false;
+          error = e.toString();
+        });
+      }
+    } finally {
+      slowLoadTimer?.cancel();
     }
   }
 
@@ -260,6 +337,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _toggleTask(DailyTask task) async {
+    final completingTask = !task.isDone;
     try {
       if (task.isDone) {
         await widget.api.reopenTask(task.id);
@@ -267,7 +345,17 @@ class _HomeScreenState extends State<HomeScreen> {
         await widget.api.completeTask(task.id);
       }
       final updated = await widget.api.getToday();
-      if (mounted) setState(() => routine = updated);
+      widget.onPendingChanged?.call(
+        widget.session.isAdult ? 0 : math.max(0, updated.totalTasks - updated.doneTasks),
+      );
+      if (!mounted) return;
+      setState(() => routine = updated);
+
+      if (completingTask && !widget.session.isAdult) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(pickEffortMessage(task, updated.tasks))),
+        );
+      }
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     }
@@ -629,7 +717,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (loading) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              if (slowLoading) ...[
+                const SizedBox(height: 16),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 28),
+                  child: Text(
+                    'Ainda carregando... o servidor pode estar iniciando depois de um tempo parado.',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
     if (routine == null) {
       return Scaffold(body: Center(child: FilledButton(onPressed: _load, child: Text(error ?? 'Tentar novamente'))));
     }

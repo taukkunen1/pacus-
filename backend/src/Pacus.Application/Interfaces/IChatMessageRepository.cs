@@ -10,6 +10,11 @@ public interface IChatMessageRepository
         ObjectId familyId,
         ObjectId? afterId = null,
         int limit = 100);
+    Task<ChatMessage?> GetByIdForFamilyAsync(ObjectId familyId, ObjectId messageId);
+    Task<long> CountUnreadAsync(
+        ObjectId familyId,
+        ObjectId userId,
+        DateTime? after);
     Task<List<ChatMessage>> GetAllByFamilyAsync(ObjectId familyId);
     Task DeleteAllByFamilyAsync(ObjectId familyId);
 }

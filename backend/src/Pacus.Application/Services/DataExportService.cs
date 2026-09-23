@@ -6,7 +6,7 @@ using PacusEntity = Pacus.Domain.Entities.Pacus;
 
 namespace Pacus.Application.Services;
 
-// Reune os dados das 13 collections da familia num unico objeto (LGPD, item
+// Reune os dados das collections da familia num unico objeto (LGPD, item
 // B2 -- portabilidade de dados). Le direto dos repositorios "GetAllByFamilyAsync"
 // (sem os filtros de "so ativo"/"so recente" que a UI normal usa), pra garantir
 // que a exportacao e realmente completa -- ver docs/DATA_MAP.md.

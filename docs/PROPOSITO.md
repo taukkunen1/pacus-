@@ -64,7 +64,7 @@ produto parecer ir nessa direção.
 - Elogio/reforço no app (toasts, mensagens do PACUS) deve ser de **esforço e estratégia**
   ("você conseguiu", "você tentou de um jeito novo"), nunca de traço/resultado ("você é
   o melhor", "nota 10") — pesquisa de Dweck & Mueller (1998) sobre mindset de
-  crescimento. Ver `frontend/js/utils/effort-messages.js`.
+  crescimento. Ver `flutter_app/lib/utils/effort_messages.dart`.
 - Ao pontuar uma tarefa nova, cuidado com o **efeito de supergratificação**
   (overjustification — Lepper, Greene & Nisbett 1973): recompensar demais uma atividade
   que a criança já faria por prazer próprio (ex.: uma tarefa criativa) pode reduzir o

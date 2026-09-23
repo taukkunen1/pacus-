@@ -153,7 +153,7 @@ builder.Services.AddScoped<ITaskEventRepository, TaskEventRepository>();
 builder.Services.AddScoped<IStoreRepository, StoreRepository>();
 builder.Services.AddScoped<ISettingsRepository, SettingsRepository>();
 builder.Services.AddScoped<IPacusGrowthRepository, PacusGrowthRepository>();
-builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();\nbuilder.Services.AddScoped<IChatMessageRepository, ChatMessageRepository>();
 
 // Auth
 builder.Services.AddScoped<ICurrentUserService, HttpCurrentUserService>();

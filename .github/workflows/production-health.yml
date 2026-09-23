@@ -2,6 +2,10 @@ name: PACUS Production Health
 
 on:
   workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/production-health.yml"
   schedule:
     - cron: "*/30 * * * *"
 

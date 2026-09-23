@@ -30,7 +30,11 @@ void main() {
 
     expect(
       pickEffortMessage(justDone, all, random: Random(1)),
-      contains('Dia'),
+      anyOf(
+        'Você cuidou do dia inteiro sozinho!',
+        'Dia completo — isso é consistência!',
+        'Você deu conta de tudo hoje!',
+      ),
     );
   });
 

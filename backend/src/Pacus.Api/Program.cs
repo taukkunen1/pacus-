@@ -9,6 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using MongoDB.Bson;
 using Pacus.Api.Auth;
 using Pacus.Api.Middleware;
+using Pacus.Api.Security;
 using Pacus.Application.Interfaces;
 using Pacus.Application.Services;
 using Pacus.Infrastructure.Auth;
@@ -97,7 +98,7 @@ builder.Services.AddAuthorization();
 // Rate limiting -- protege login (adulto/crianca) e criacao de familia contra
 // forca bruta. PIN da crianca tem so 4 digitos (10.000 combinacoes), entao sem
 // limite de tentativas da pra forcar bruta sem nenhum bloqueio. Particionado por
-// IP (X-Forwarded-For quando atras de proxy/Render, senao RemoteIpAddress).
+// IP (X-Forwarded-For quando atras de proxy reverso/Fly.io, senao RemoteIpAddress).
 // Auditoria de seguranca, Fase A item A1.
 builder.Services.AddRateLimiter(options =>
 {
@@ -232,20 +233,22 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 // CORS
+// Em producao, somente o dominio oficial pode chamar a API pelo navegador.
+// CORS_ALLOWED_ORIGINS continua util em Development para frontends locais,
+// mas nao pode reabrir origens antigas em producao.
 builder.Services.AddCors(options =>
 {
-    var origins =
+    var configuredOrigins =
         Environment.GetEnvironmentVariable(
             "CORS_ALLOWED_ORIGINS")
-        ?? builder.Configuration["Cors:AllowedOrigins"]
-        ?? "http://localhost:5500";
+        ?? builder.Configuration["Cors:AllowedOrigins"];
+
+    var origins = CorsOriginPolicy.Resolve(
+        builder.Environment.IsDevelopment(),
+        configuredOrigins);
 
     options.AddDefaultPolicy(policy =>
-        policy.WithOrigins(
-                origins.Split(
-                    ',',
-                    StringSplitOptions.RemoveEmptyEntries |
-                    StringSplitOptions.TrimEntries))
+        policy.WithOrigins(origins)
             .AllowAnyHeader()
             .AllowAnyMethod());
 });
@@ -270,7 +273,7 @@ app.UseCors();
 // (PacusApiFactory) sobem o app em ambiente Development e fazem varias
 // chamadas de bootstrap/login em sequencia no mesmo host; com o limiter
 // ativo ali os testes comecariam a tomar 429 sem nenhuma relacao com o que
-// estao validando. Em producao (Render) o ambiente nao e Development, entao
+// estao validando. Em producao (Fly.io) o ambiente nao e Development, entao
 // o limite continua valendo de verdade.
 if (!app.Environment.IsDevelopment())
 {
@@ -283,7 +286,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// X-Forwarded-For vem primeiro porque em producao (Render) a API fica atras de
+// X-Forwarded-For vem primeiro porque em producao (Fly.io) a API fica atras de
 // proxy reverso -- sem isso, todo cliente apareceria com o mesmo IP do proxy e o
 // rate limit ficaria compartilhado entre todo mundo (ou bloquearia todo mundo
 // junto). RemoteIpAddress e o fallback pra execucao local/direta.

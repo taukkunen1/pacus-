@@ -97,9 +97,18 @@ public class DayClosingService : IDayClosingService
         var sizeBefore = pacus.Size;
 
         var settings = await _settingsRepository.GetByUserIdAsync(routine.FamilyId);
-        var newStage = DetermineStage(settings?.GrowthStages, routine.Date, stageBefore);
 
-        pacus.TotalClosedDays += 1;
+        // O ciclo padrao do PACUS e relativo ao proprio nascimento/progresso da familia:
+        // cada dia fechado soma 1 dia vivido. Assim uma conta criada hoje sempre comeca no
+        // Ovo e percorre o ciclo completo sem depender das datas historicas de outra familia.
+        var nextTotalClosedDays = pacus.TotalClosedDays + 1;
+        var newStage = DetermineStage(
+            settings?.GrowthStages,
+            routine.Date,
+            stageBefore,
+            nextTotalClosedDays);
+
+        pacus.TotalClosedDays = nextTotalClosedDays;
         pacus.Stage = newStage;
         pacus.Size = ComputeSize(newStage, pacus.TotalClosedDays);
         pacus.LastGrowthDate = routine.Date;
@@ -133,20 +142,48 @@ public class DayClosingService : IDayClosingService
         });
     }
 
-    // Estagio e determinado pela configuracao em settings.growthStages (datas do calendario
-    // atual, ex. Ovo 09/08 -> Adulto 31/08). Se nao houver configuracao, mantem o estagio atual
-    // â€” nunca regride e nunca avanca "no escuro" sem uma regra definida.
-    private static PacusStage DetermineStage(List<GrowthStageConfig>? growthStages, string operationalDate, PacusStage fallback)
+    // Por padrao, o estagio acompanha os dias vividos do proprio PACUS:
+    //   0-4  Ovo
+    //   5-8  Rachando
+    //   9-13 Eclosao
+    //   14-18 Bebe
+    //   19-22 Jovem
+    //   23+  Adulto
+    //
+    // growthStages continua aceito como override legado/configuravel por calendario.
+    // Em qualquer caminho o PACUS nunca regride: um ajuste manual para um estagio mais
+    // avancado e preservado nos fechamentos seguintes.
+    private static PacusStage DetermineStage(
+        List<GrowthStageConfig>? growthStages,
+        string operationalDate,
+        PacusStage fallback,
+        int totalClosedDays)
     {
-        if (growthStages is null || growthStages.Count == 0) return fallback;
+        if (growthStages is null || growthStages.Count == 0)
+        {
+            var relativeStage = DetermineStageFromClosedDays(totalClosedDays);
+            return (int)relativeStage < (int)fallback ? fallback : relativeStage;
+        }
 
         var applicable = growthStages
             .Where(s => !TimezoneHelper.IsBefore(operationalDate, s.Date)) // s.Date <= operationalDate
             .OrderByDescending(s => s.Date)
             .FirstOrDefault();
 
-        return applicable?.Stage ?? fallback;
+        if (applicable is null) return fallback;
+        return (int)applicable.Stage < (int)fallback ? fallback : applicable.Stage;
     }
+
+    private static PacusStage DetermineStageFromClosedDays(int totalClosedDays) =>
+        totalClosedDays switch
+        {
+            >= 23 => PacusStage.Adult,
+            >= 19 => PacusStage.Young,
+            >= 14 => PacusStage.Baby,
+            >= 9 => PacusStage.Hatching,
+            >= 5 => PacusStage.Cracking,
+            _ => PacusStage.Egg,
+        };
 
     // Tamanho progressivo e simples por enquanto â€” cresce com o total de dias fechados,
     // com um teto por estagio para o salto visual acompanhar o estagio (filhote -> pequeno,

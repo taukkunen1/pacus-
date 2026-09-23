@@ -329,6 +329,86 @@ public class DayClosingServiceTests
                 l => l.UserId == userId));
     }
 
+    [Theory]
+    [InlineData(0, PacusStage.Egg, 1, PacusStage.Egg)]
+    [InlineData(4, PacusStage.Egg, 5, PacusStage.Cracking)]
+    [InlineData(8, PacusStage.Cracking, 9, PacusStage.Hatching)]
+    [InlineData(13, PacusStage.Hatching, 14, PacusStage.Baby)]
+    [InlineData(18, PacusStage.Baby, 19, PacusStage.Young)]
+    [InlineData(22, PacusStage.Young, 23, PacusStage.Adult)]
+    public async Task SemCalendario_EvoluiPelosDiasVividos(
+        int daysBefore,
+        PacusStage stageBefore,
+        int expectedDays,
+        PacusStage expectedStage)
+    {
+        var (
+            dayClosing,
+            dailyRoutine,
+            _,
+            pacusRepo,
+            _,
+            _) = BuildSystem();
+
+        var userId = ObjectId.GenerateNewId();
+        var pacus = NewPacus(userId);
+        pacus.TotalClosedDays = daysBefore;
+        pacus.Stage = stageBefore;
+
+        await pacusRepo.CreateAsync(pacus);
+
+        await dailyRoutine.CreateRoutineForDateAsync(
+            userId,
+            "2026-08-23",
+            "America/Sao_Paulo");
+
+        await CloseUpTo(
+            dayClosing,
+            userId,
+            "2026-08-24");
+
+        var updated = await pacusRepo.GetByFamilyIdAsync(userId);
+
+        Assert.NotNull(updated);
+        Assert.Equal(expectedDays, updated!.TotalClosedDays);
+        Assert.Equal(expectedStage, updated.Stage);
+    }
+
+    [Fact]
+    public async Task AjusteManualMaisAvancado_NaoRegrideSemCalendario()
+    {
+        var (
+            dayClosing,
+            dailyRoutine,
+            _,
+            pacusRepo,
+            _,
+            _) = BuildSystem();
+
+        var userId = ObjectId.GenerateNewId();
+        var pacus = NewPacus(userId);
+        pacus.TotalClosedDays = 2;
+        pacus.Stage = PacusStage.Young;
+
+        await pacusRepo.CreateAsync(pacus);
+
+        await dailyRoutine.CreateRoutineForDateAsync(
+            userId,
+            "2026-08-23",
+            "America/Sao_Paulo");
+
+        await CloseUpTo(
+            dayClosing,
+            userId,
+            "2026-08-24");
+
+        var updated = await pacusRepo.GetByFamilyIdAsync(userId);
+
+        Assert.NotNull(updated);
+        Assert.Equal(3, updated!.TotalClosedDays);
+        Assert.Equal(PacusStage.Young, updated.Stage);
+    }
+
     [Fact]
     public async Task ReversaoDeTarefa_DesmarcarDevolveExatamenteOsPontosGanhos()
     {

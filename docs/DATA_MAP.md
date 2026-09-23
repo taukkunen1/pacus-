@@ -1,6 +1,6 @@
 # PACUS — Mapa de Dados
 
-Documento de referência para conformidade com a LGPD (Lei 13.709/2018), gerado a partir do código-fonte real do backend inicialmente em `feature/next-migration` (checklist de segurança e LGPD, item B1) e posteriormente integrado em `main`. Cobre as 13 collections do MongoDB usadas pela aplicação — as 11 previstas originalmente no checklist, `audit_logs` criada no item A5 e `chat_messages` adicionada para comunicação privada entre membros da família.
+Documento de referência para conformidade com a LGPD (Lei 13.709/2018), gerado a partir do código-fonte real do backend inicialmente em `feature/next-migration` (checklist de segurança e LGPD, item B1) e posteriormente integrado em `main`. Cobre as 14 collections do MongoDB usadas pela aplicação — as 11 previstas originalmente no checklist, `audit_logs`, `chat_messages` e `chat_read_states`.
 
 Este documento é a base para os itens seguintes do checklist: B2 (exportação de dados), B3 (exclusão de conta), D1 (registro de operações de tratamento) e D2 (RIPD).
 
@@ -39,7 +39,7 @@ Conta de cada membro da família — um documento por adulto e por criança.
 | `email` | string? | Só para adulto — usado no login. |
 | `passwordHash` | string? | Só para adulto — PBKDF2-SHA256, 100.000 iterações, salt de 16 bytes por senha (`PasswordHasher.cs`). Nunca a senha em texto puro. |
 | `pinHash` | string? | Só para criança — mesmo mecanismo do `passwordHash`, aplicado ao PIN de 4 dígitos. |
-| `timezone` | string | Fuso horário da família, configurável pelo adulto (`IFamilyTimezoneService`/`FamilyTimezoneService`, endpoints de leitura/atualização em `family-api.js`, tela em `settings.js`). |
+| `timezone` | string | Fuso horário da família, configurável pelo adulto (`IFamilyTimezoneService`/`FamilyTimezoneService`, endpoints de leitura/atualização em `FamilyController` e tela Flutter `settings_screen.dart`). |
 | `familyId` | ObjectId | Agrupa os membros da mesma família (adulto e criança(s) compartilham o mesmo `familyId`). |
 | `createdAt` / `updatedAt` | DateTime | Timestamps de auditoria básica. |
 
@@ -56,7 +56,7 @@ Conta de cada membro da família — um documento por adulto e por criança.
 
 Passando campo a campo: `_id`, `role`, `name`, `familyId`, `createdAt`/`updatedAt` são estruturais (sem eles o app não funciona). `email`/`passwordHash` (adulto) e `pinHash` (criança) são o mecanismo de autenticação em si — não há como remover sem remover login. Nenhum desses tem alternativa mais minimalista dado o modelo atual do produto.
 
-O campo **`timezone`** deixou de ser peso morto: o adulto agora pode configurar o fuso horário da família pela tela de Configurações (`settings.js`, `getFamilyTimezone`/`updateFamilyTimezone` em `family-api.js`), persistido via `IFamilyTimezoneService`/`FamilyTimezoneService`, e os pontos que antes usavam a string fixa `"America/Sao_Paulo"` (`DailyRoutinesController.GetToday`, `PointsController.AdjustBalance`, `StoreService.ApproveRedemptionAsync`, e o cálculo do dia operacional) já leem esse valor de volta. A opção **(a) Implementar de verdade**, cogitada anteriormente neste relatório, foi a que foi adotada.
+O campo **`timezone`** deixou de ser peso morto: o adulto agora pode configurar o fuso horário da família pela tela Flutter de Configurações (`settings_screen.dart`), persistido via `IFamilyTimezoneService`/`FamilyTimezoneService`, e os pontos que antes usavam a string fixa `"America/Sao_Paulo"` (`DailyRoutinesController.GetToday`, `PointsController.AdjustBalance`, `StoreService.ApproveRedemptionAsync`, e o cálculo do dia operacional) já leem esse valor de volta. A opção **(a) Implementar de verdade**, cogitada anteriormente neste relatório, foi a que foi adotada.
 
 Fora esse ponto, **nenhum outro campo de `users` foi coletado sem necessidade clara**, e nenhum dado sensível (art. 5º, II) está presente.
 
@@ -331,7 +331,7 @@ Log de auditoria para ações administrativas sensíveis, criado no item A5 — 
 - **Quem acessa:** só server-side hoje (`AuditLogRepository`) — sem endpoint de leitura no frontend ainda (natural candidato a um painel futuro "atividade recente da família").
 - **Base legal:** legítimo interesse (art. 7º, IX) — prevenção a fraude/abuso e responsabilização, ponderado como não conflitante com os interesses da criança (o log registra ações administrativas, não comportamento da criança).
 - **Retenção:** proposta — reter por período fixo (ex. 12 meses) mesmo após a ação que originou o log deixar de existir (ex. o `TaskTemplate` foi soft-deleted, mas o log da exclusão continua); reavaliar prazo definitivo no D2 (RIPD).
-- **Destino em exclusão:** **decisão pendente para o B3** — duas opções: (a) hard delete junto com a família (mais simples, mas perde a trilha caso a exclusão em si precise ser auditada); (b) reter por um período fixo pós-exclusão com `familyId`/`actorId` anonimizados (pseudonimização), preservando só o fato de que a ação ocorreu. Recomendação: opção (b) para ações que envolvem valores financeiros internos (ajuste de pontos), opção (a) para o restante — a decidir em B3.
+- **Destino em exclusão:** decisão B3 concluída — os logs são anonimizados, recebem `purgeAt` e são retidos por até 12 meses; um índice TTL realiza a exclusão definitiva depois desse prazo.
 - **Controles de segurança:** nunca alterado pelo fluxo normal da aplicação (só `CreateAsync`, sem update/delete no repositório).
 
 
@@ -358,6 +358,27 @@ Histórico do chat privado da família — cada mensagem é um documento, visív
 - **Destino em exclusão:** hard delete de todas as mensagens da família.
 - **Controles de segurança:** JWT obrigatório; leitura e escrita sempre filtradas pelo `FamilyId` obtido do token; o cliente não escolhe `familyId`, `senderId`, nome ou papel do remetente; mensagens vazias e acima de 2.000 caracteres são recusadas; testes de integração cobrem autenticação e isolamento entre famílias.
 
+## 14. `chat_read_states`
+
+Marcador de leitura do chat por membro da família. Não guarda conteúdo novo de conversa: apenas até qual instante cada usuário leu mensagens.
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `_id` | ObjectId | Identificador interno. |
+| `familyId` | ObjectId | Família à qual o marcador pertence. |
+| `userId` | ObjectId | Usuário dono do marcador de leitura. |
+| `lastReadAt` | DateTime | Horário da última mensagem marcada como lida. |
+| `updatedAt` | DateTime | Última atualização do marcador. |
+
+- **Finalidade:** calcular mensagens não lidas e manter o badge do Chat consistente entre sessões/dispositivos.
+- **Categoria do titular:** ambos.
+- **Origem:** gerado automaticamente quando o usuário visualiza a conversa.
+- **Quem acessa:** `ChatController`, `ChatReadStateRepository` e o Flutter via endpoints `/chat/unread-count` e `/chat/read`.
+- **Base legal:** execução de contrato (art. 7º, V); para perfil infantil, consentimento do responsável conforme art. 14, §1º.
+- **Retenção:** enquanto a conta da família existir.
+- **Destino em exclusão:** hard delete.
+- **Controles de segurança:** JWT obrigatório, isolamento por `FamilyId`, o usuário só atualiza o próprio marcador; índice único `{ familyId, userId }`.
+
 ---
 
 ## Resumo — retenção e exclusão por collection
@@ -377,8 +398,9 @@ Histórico do chat privado da família — cada mensagem é um documento, visív
 | `redemptions` | Indefinida (histórico) | Hard delete |
 | `audit_logs` | 12 meses após a exclusão, com anonimização | Anonimizado e retido pelo período definido |
 | `chat_messages` | Enquanto a conta existir | Hard delete |
+| `chat_read_states` | Enquanto a conta existir | Hard delete |
 
-Esta tabela é o ponto de partida direto para o **B3** (endpoint de exclusão de conta): a estratégia é, para 12 das 13 collections, excluir todos os documentos com o `FamilyId` da conta encerrada; `audit_logs` é a exceção, anonimizada e retida pelo período definido.
+O **B3 está concluído**: 13 das 14 collections são removidas por hard delete na exclusão da família; `audit_logs` é a única exceção, anonimizada e retida por até 12 meses antes da purga TTL.
 
 ## Achados e recomendações desta auditoria (para revisão)
 
@@ -386,7 +408,7 @@ Esta tabela é o ponto de partida direto para o **B3** (endpoint de exclusão de
 2. **`pacus_growth` e `task_events` não têm endpoint de leitura na UI normal do app** — são logs internos. O endpoint de exportação (`GET /api/v1/export`, item B2) já inclui os dois, então o adulto consegue ver esses dados via exportação mesmo sem uma tela dedicada no app.
 3. **`redemptions.itemTitle`/`cost` são cópias congeladas no momento do pedido** — bom para consistência histórica, mas significa que a exportação (B2) precisa considerar que o item pode não existir mais (`storeItemId` órfão) sem que isso seja um erro.
 4. **Nenhum dado sensível (LGPD art. 5º, II) é coletado hoje** — nenhuma collection tem saúde, biometria, dado racial, religioso, etc. O C1 (revisão de necessidade de coleta em `users`) deve confirmar isso e propor remoção de qualquer campo desnecessário encontrado.
-5. **`users.timezone` (achado do C1) foi resolvido** — agora existe um serviço e endpoints dedicados (`FamilyTimezoneService`, `family-api.js`, tela em `settings.js`) para o adulto configurar o fuso da família, e os pontos que antes ignoravam o valor salvo passaram a lê-lo de volta. Ver seção 1 (`users`) para o detalhamento.
+5. **`users.timezone` (achado do C1) foi resolvido** — agora existe um serviço e endpoints dedicados (`FamilyTimezoneService`, `FamilyController`, tela Flutter `settings_screen.dart`) para o adulto configurar o fuso da família, e os pontos que antes ignoravam o valor salvo passaram a lê-lo de volta. Ver seção 1 (`users`) para o detalhamento.
 
 ### Melhorias de banco de dados (fora do checklist original, sugeridas na revisão pós-auditoria)
 

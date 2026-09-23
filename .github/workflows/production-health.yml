@@ -35,7 +35,9 @@ jobs:
           PY
 
       - name: Check official frontend
+        shell: bash
         run: |
+          set -euo pipefail
           curl --fail --silent --show-error --retry 3 --retry-delay 5             --output /dev/null https://www.pacus.com.br/
 
       - name: Verify deployed backend version
@@ -44,7 +46,7 @@ jobs:
           set -euo pipefail
           STATUS="$(curl --silent --show-error             -o /dev/null             -w '%{http_code}'             https://pacus-pacus-api.fly.dev/api/v1/chat/unread-count)"
           if [ "$STATUS" != "401" ]; then
-            echo "::error::Endpoint V2 esperado retornou HTTP $STATUS (esperado 401 sem token)."
+            echo "::error::Endpoint V2 retornou HTTP $STATUS; esperado 401 sem token."
             exit 1
           fi
 
@@ -54,26 +56,7 @@ jobs:
           set -euo pipefail
           HEADERS="$(mktemp)"
           curl --fail --silent --show-error             -H "Origin: https://www.pacus.com.br"             -D "$HEADERS"             -o /dev/null             https://pacus-pacus-api.fly.dev/api/v1/health
-          if ! grep -Eqi '^access-control-allow-origin: https://www\.pacus\.com\.br\r?
-      - name: Verify retired Render origin stays blocked
-        shell: bash
-        run: |
-          set -euo pipefail
-          HEADERS="$(mktemp)"
-          curl --fail --silent --show-error             -H "Origin: https://pacus-1.onrender.com"             -D "$HEADERS"             -o /dev/null             https://pacus-pacus-api.fly.dev/api/v1/health
-          if grep -Eqi '^access-control-allow-origin:' "$HEADERS"; then
-            echo "::error::Origem antiga do Render voltou a ser aceita por CORS."
-            cat "$HEADERS"
-            exit 1
-          fi
-
-      - name: Summary
-        run: |
-          echo "PACUS production health OK" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Frontend: https://www.pacus.com.br" >> "$GITHUB_STEP_SUMMARY"
-          echo "- API/MongoDB: healthy" >> "$GITHUB_STEP_SUMMARY"
-          echo "- CORS oficial: validado" >> "$GITHUB_STEP_SUMMARY"
- "$HEADERS"; then
+          if ! tr -d '\r' < "$HEADERS" | grep -Fqi             "access-control-allow-origin: https://www.pacus.com.br"; then
             echo "::error::Dominio oficial sem Access-Control-Allow-Origin esperado."
             cat "$HEADERS"
             exit 1
@@ -85,7 +68,7 @@ jobs:
           set -euo pipefail
           HEADERS="$(mktemp)"
           curl --fail --silent --show-error             -H "Origin: https://pacus-1.onrender.com"             -D "$HEADERS"             -o /dev/null             https://pacus-pacus-api.fly.dev/api/v1/health
-          if grep -Eqi '^access-control-allow-origin:' "$HEADERS"; then
+          if tr -d '\r' < "$HEADERS" | grep -Fqi             "access-control-allow-origin:"; then
             echo "::error::Origem antiga do Render voltou a ser aceita por CORS."
             cat "$HEADERS"
             exit 1
@@ -96,4 +79,5 @@ jobs:
           echo "PACUS production health OK" >> "$GITHUB_STEP_SUMMARY"
           echo "- Frontend: https://www.pacus.com.br" >> "$GITHUB_STEP_SUMMARY"
           echo "- API/MongoDB: healthy" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backend V2: ativo" >> "$GITHUB_STEP_SUMMARY"
           echo "- CORS oficial: validado" >> "$GITHUB_STEP_SUMMARY"

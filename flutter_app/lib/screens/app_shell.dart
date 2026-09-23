@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../brand.dart';
 import '../models.dart';
+import 'chat_screen.dart';
 import 'history_screen.dart';
 import 'home_screen.dart';
 import 'pacus_screen.dart';
@@ -39,6 +40,8 @@ class _PacusShellState extends State<PacusShell> {
             HomeScreen(api: widget.api, session: widget.session, onLogout: widget.onLogout)),
         _TabSpec('Amanhã', Icons.edit_calendar_outlined,
             TomorrowScreen(api: widget.api, session: widget.session)),
+        _TabSpec('Chat', Icons.chat_bubble_outline,
+            ChatScreen(api: widget.api, session: widget.session)),
         _TabSpec('Histórico', Icons.history,
             HistoryScreen(api: widget.api)),
         _TabSpec('Pontos', Icons.stars_outlined,
@@ -115,6 +118,7 @@ class _PacusShellState extends State<PacusShell> {
             ],
           ),
           bottomNavigationBar: NavigationBar(
+            labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
             selectedIndex: index,
             onDestinationSelected: (value) => setState(() => index = value),
             destinations: [

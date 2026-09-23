@@ -6,7 +6,7 @@ using PacusEntity = Pacus.Domain.Entities.Pacus;
 
 namespace Pacus.Application.Services;
 
-// Reune os dados das 12 collections da familia num unico objeto (LGPD, item
+// Reune os dados das 13 collections da familia num unico objeto (LGPD, item
 // B2 -- portabilidade de dados). Le direto dos repositorios "GetAllByFamilyAsync"
 // (sem os filtros de "so ativo"/"so recente" que a UI normal usa), pra garantir
 // que a exportacao e realmente completa -- ver docs/DATA_MAP.md.
@@ -23,6 +23,7 @@ public class DataExportService : IDataExportService
     private readonly ITaskEventRepository _taskEventRepository;
     private readonly IStoreRepository _storeRepository;
     private readonly IAuditLogRepository _auditLogRepository;
+    private readonly IChatMessageRepository _chatMessageRepository;
 
     public DataExportService(
         IUserRepository userRepository,
@@ -35,7 +36,8 @@ public class DataExportService : IDataExportService
         IPacusGrowthRepository pacusGrowthRepository,
         ITaskEventRepository taskEventRepository,
         IStoreRepository storeRepository,
-        IAuditLogRepository auditLogRepository)
+        IAuditLogRepository auditLogRepository,
+        IChatMessageRepository chatMessageRepository)
     {
         _userRepository = userRepository;
         _pacusRepository = pacusRepository;
@@ -48,6 +50,7 @@ public class DataExportService : IDataExportService
         _taskEventRepository = taskEventRepository;
         _storeRepository = storeRepository;
         _auditLogRepository = auditLogRepository;
+        _chatMessageRepository = chatMessageRepository;
     }
 
     public async Task<FamilyDataExport> ExportFamilyDataAsync(ObjectId familyId)
@@ -64,6 +67,7 @@ public class DataExportService : IDataExportService
         var storeItems = await _storeRepository.GetAllItemsByFamilyAsync(familyId);
         var redemptions = await _storeRepository.GetAllRedemptionsByFamilyAsync(familyId);
         var auditLogs = await _auditLogRepository.GetAllByFamilyAsync(familyId);
+        var chatMessages = await _chatMessageRepository.GetAllByFamilyAsync(familyId);
 
         var members = users
             .Select(u => new FamilyMemberExport(
@@ -90,6 +94,7 @@ public class DataExportService : IDataExportService
             taskEvents,
             storeItems,
             redemptions,
+            chatMessages,
             auditLogs);
     }
 }

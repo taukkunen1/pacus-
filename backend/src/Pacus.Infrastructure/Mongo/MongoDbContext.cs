@@ -86,4 +86,8 @@ public class MongoDbContext
         _database.GetCollection<Redemption>("redemptions");
 
     public IMongoCollection<AuditLog> AuditLogs =>
-        _database.GetCollection<AuditLog>("audit_logs");}
+        _database.GetCollection<AuditLog>("audit_logs");
+
+    public IMongoCollection<ChatMessage> ChatMessages =>
+        _database.GetCollection<ChatMessage>("chat_messages");
+}

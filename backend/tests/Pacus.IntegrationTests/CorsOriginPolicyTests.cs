@@ -8,7 +8,7 @@ public class CorsOriginPolicyTests
     public void Production_ShouldAllowOnlyOfficialDomain()
     {
         var origins = CorsOriginPolicy.Resolve(
-            isDevelopment: false,
+            useDevelopmentOrigins: false,
             configuredOrigins:
                 "https://pacus-1.onrender.com,https://taukkunen1.github.io,http://localhost:5500");
 
@@ -19,7 +19,7 @@ public class CorsOriginPolicyTests
     public void Development_ShouldRespectConfiguredOrigins()
     {
         var origins = CorsOriginPolicy.Resolve(
-            isDevelopment: true,
+            useDevelopmentOrigins: true,
             configuredOrigins:
                 "http://localhost:5500,http://localhost:3000");
 
@@ -32,7 +32,7 @@ public class CorsOriginPolicyTests
     public void Development_ShouldFallbackToLocalhost()
     {
         var origins = CorsOriginPolicy.Resolve(
-            isDevelopment: true,
+            useDevelopmentOrigins: true,
             configuredOrigins: null);
 
         Assert.Equal(

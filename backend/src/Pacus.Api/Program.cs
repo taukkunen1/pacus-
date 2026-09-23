@@ -18,6 +18,14 @@ using Pacus.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Fly.io injeta FLY_APP_NAME em runtime. Tratamos esse sinal como fonte
+// autoritativa de "producao" para controles de seguranca, mesmo se existir
+// algum ASPNETCORE_ENVIRONMENT antigo/stale configurado no provedor.
+var isFlyRuntime = !string.IsNullOrWhiteSpace(
+    Environment.GetEnvironmentVariable("FLY_APP_NAME"));
+var useDevelopmentBehavior =
+    builder.Environment.IsDevelopment() && !isFlyRuntime;
+
 // Carrega explicitamente os User Secrets do projeto.
 // Isso evita depender apenas do carregamento automático do ambiente Development.
 builder.Configuration.AddUserSecrets<Program>(optional: true);
@@ -245,7 +253,7 @@ builder.Services.AddCors(options =>
         ?? builder.Configuration["Cors:AllowedOrigins"];
 
     var origins = CorsOriginPolicy.Resolve(
-        builder.Environment.IsDevelopment(),
+        useDevelopmentBehavior,
         configuredOrigins);
 
     options.AddDefaultPolicy(policy =>
@@ -256,7 +264,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+if (useDevelopmentBehavior)
 {
     app.UseSwagger();
     app.UseSwaggerUI();
@@ -276,7 +284,7 @@ app.UseCors();
 // ativo ali os testes comecariam a tomar 429 sem nenhuma relacao com o que
 // estao validando. Em producao (Fly.io) o ambiente nao e Development, entao
 // o limite continua valendo de verdade.
-if (!app.Environment.IsDevelopment())
+if (!useDevelopmentBehavior)
 {
     app.UseRateLimiter();
 }

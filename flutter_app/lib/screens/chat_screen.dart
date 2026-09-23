@@ -84,28 +84,37 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _refreshNewMessages() async {
-    if (_loading || _refreshing || _messages.isEmpty && _error != null) return;
+    if (_loading || _refreshing || (_messages.isEmpty && _error != null)) {
+      return;
+    }
 
     _refreshing = true;
     try {
-      final lastId = _messages.isEmpty ? null : _messages.last['id']?.toString();
-      final path = lastId == null || lastId.isEmpty
-          ? '/chat/messages'
-          : '/chat/messages?afterId=$lastId';
-
       final wasNearBottom = _isNearBottom;
-      final data = await widget.api.getList(path);
-      final existingIds = _messages.map((m) => m['id']?.toString()).toSet();
-      final incoming = data
+      final data = await widget.api.getList('/chat/messages');
+      final refreshed = data
           .whereType<Map>()
           .map((item) => Map<String, dynamic>.from(item))
-          .where((item) => !existingIds.contains(item['id']?.toString()))
           .toList();
 
-      if (!mounted || incoming.isEmpty) return;
+      if (!mounted) return;
+
+      final changed = refreshed.length != _messages.length ||
+          refreshed.asMap().entries.any((entry) {
+            if (entry.key >= _messages.length) return true;
+            final current = _messages[entry.key];
+            final next = entry.value;
+            return current['id']?.toString() != next['id']?.toString() ||
+                current['requestStatus']?.toString() !=
+                    next['requestStatus']?.toString();
+          });
+
+      if (!changed) return;
 
       setState(() {
-        _messages.addAll(incoming);
+        _messages
+          ..clear()
+          ..addAll(refreshed);
         _error = null;
       });
 
@@ -114,8 +123,7 @@ class _ChatScreenState extends State<ChatScreen> {
         await _markReadThroughLastMessage();
       }
     } catch (_) {
-      // Falha de sincronizacao em segundo plano nao apaga o historico nem
-      // interrompe a digitacao. A proxima rodada tenta novamente.
+      // A proxima rodada tenta de novo sem interromper a conversa.
     } finally {
       _refreshing = false;
     }

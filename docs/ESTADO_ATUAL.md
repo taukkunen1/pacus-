@@ -110,3 +110,15 @@ Endpoints sensíveis permanecem protegidos por JWT e regras de papel/família no
 A comparação funcional final está em `docs/FLUTTER_MIGRATION_AUDIT.md`.
 
 Resultado: o Flutter cobre o conjunto funcional útil do frontend legado. As diferenças encontradas na auditoria foram portadas quando ainda tinham valor de produto; código legado sem uso real não foi carregado para a nova base.
+
+
+## Hospedagem e CORS
+
+A migração Render → Fly.io está encerrada.
+
+- Frontend: GitHub Pages em `https://www.pacus.com.br`.
+- API: Fly.io em `https://pacus-pacus-api.fly.dev`.
+- Banco: MongoDB Atlas.
+- O antigo serviço do Render foi suspenso.
+- Em produção, o backend aceita CORS exclusivamente de `https://www.pacus.com.br`.
+- Configurações antigas de CORS no provedor não conseguem reabrir origens aposentadas, porque a whitelist de produção é aplicada no código.

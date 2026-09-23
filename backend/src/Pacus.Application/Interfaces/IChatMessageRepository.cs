@@ -15,6 +15,14 @@ public interface IChatMessageRepository
         ObjectId familyId,
         ObjectId userId,
         ObjectId? afterId);
+    Task<long> CountPendingRequestsAsync(ObjectId familyId);
+    Task<ChatMessage?> TryTransitionRequestAsync(
+        ObjectId familyId,
+        ObjectId messageId,
+        string expectedStatus,
+        string newStatus,
+        ObjectId? reviewedBy = null,
+        DateTime? reviewedAt = null);
     Task<List<ChatMessage>> GetAllByFamilyAsync(ObjectId familyId);
     Task DeleteAllByFamilyAsync(ObjectId familyId);
 }

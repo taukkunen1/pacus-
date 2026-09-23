@@ -162,7 +162,7 @@ public class DayClosingService : IDayClosingService
         if (growthStages is null || growthStages.Count == 0)
         {
             var relativeStage = DetermineStageFromClosedDays(totalClosedDays);
-            return relativeStage < fallback ? fallback : relativeStage;
+            return (int)relativeStage < (int)fallback ? fallback : relativeStage;
         }
 
         var applicable = growthStages
@@ -171,7 +171,7 @@ public class DayClosingService : IDayClosingService
             .FirstOrDefault();
 
         if (applicable is null) return fallback;
-        return applicable.Stage < fallback ? fallback : applicable.Stage;
+        return (int)applicable.Stage < (int)fallback ? fallback : applicable.Stage;
     }
 
     private static PacusStage DetermineStageFromClosedDays(int totalClosedDays) =>

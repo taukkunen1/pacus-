@@ -26,7 +26,7 @@ public class AccountDeletionService : IAccountDeletionService
     private readonly IPacusGrowthRepository _pacusGrowthRepository;
     private readonly ITaskEventRepository _taskEventRepository;
     private readonly IStoreRepository _storeRepository;
-    private readonly IAuditLogRepository _auditLogRepository;
+    private readonly IAuditLogRepository _auditLogRepository;\n    private readonly IChatMessageRepository _chatMessageRepository;
 
     public AccountDeletionService(
         IUserRepository userRepository,
@@ -75,7 +75,7 @@ public class AccountDeletionService : IAccountDeletionService
         });
 
         // audit_logs: excecao da regra -- anonimiza em vez de apagar (ver comentario
-        // da classe). As outras 11 collections seguem hard delete direto.
+        // da classe). As outras 12 collections seguem hard delete direto.
         await _auditLogRepository.AnonymizeByFamilyAsync(familyId, now.Add(AuditLogRetentionAfterDeletion));
 
         await _dailyRoutineRepository.DeleteAllByFamilyAsync(familyId);
@@ -84,7 +84,7 @@ public class AccountDeletionService : IAccountDeletionService
         await _pacusGrowthRepository.DeleteAllByFamilyAsync(familyId);
         await _taskEventRepository.DeleteAllByFamilyAsync(familyId);
         await _storeRepository.DeleteAllRedemptionsByFamilyAsync(familyId);
-        await _storeRepository.DeleteAllItemsByFamilyAsync(familyId);
+        await _storeRepository.DeleteAllItemsByFamilyAsync(familyId);\n        await _chatMessageRepository.DeleteAllByFamilyAsync(familyId);
         await _settingsRepository.DeleteByFamilyIdAsync(familyId);
         await _habitatRepository.DeleteByFamilyIdAsync(familyId);
         await _pacusRepository.DeleteByFamilyIdAsync(familyId);

@@ -10,6 +10,8 @@ import '../api.dart';
 import '../brand.dart';
 import '../models.dart';
 import '../ui/pacus_components.dart';
+import '../ui/quick_task_dialog.dart';
+import '../utils/effort_messages.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.api, required this.session, required this.onLogout});
@@ -21,39 +23,90 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   DailyRoutine? routine;
   bool loading = true;
   String? error;
   Timer? timer;
+  Timer? dayBoundaryTimer;
   int? sessionMinutes;
   DateTime? sessionEndsAt;
   Duration remaining = Duration.zero;
   bool sessionPaused = false;
   bool completing = false;
+  bool slowLoading = false;
+  String loadedLocalDayKey = '';
 
   String get _sessionKey => 'pacus.flutter.session:${routine?.familyId ?? ''}:${routine?.date ?? ''}';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _scheduleDayBoundary();
     _load();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     timer?.cancel();
+    dayBoundaryTimer?.cancel();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _checkDayBoundary();
+  }
+
+  String _localDayKey([DateTime? value]) {
+    final date = value ?? DateTime.now();
+    return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  void _scheduleDayBoundary() {
+    dayBoundaryTimer?.cancel();
+    final now = DateTime.now();
+    final next = DateTime(now.year, now.month, now.day + 1, 0, 0, 5);
+    dayBoundaryTimer = Timer(next.difference(now), () async {
+      await _checkDayBoundary(force: true);
+      _scheduleDayBoundary();
+    });
+  }
+
+  Future<void> _checkDayBoundary({bool force = false}) async {
+    final current = _localDayKey();
+    if (force || (loadedLocalDayKey.isNotEmpty && current != loadedLocalDayKey)) {
+      await _load();
+    }
+  }
+
   Future<void> _load() async {
+    final initialLoad = routine == null;
+    Timer? slowTimer;
+    if (initialLoad && mounted) {
+      setState(() {
+        loading = true;
+        slowLoading = false;
+      });
+      slowTimer = Timer(const Duration(seconds: 4), () {
+        if (mounted && loading && routine == null) {
+          setState(() => slowLoading = true);
+        }
+      });
+    }
+
     try {
       final value = await widget.api.getToday();
       routine = value;
+      loadedLocalDayKey = _localDayKey();
       await _restoreSession();
-      if (mounted) setState(() { loading = false; error = null; });
+      if (mounted) setState(() { loading = false; slowLoading = false; error = null; });
     } catch (e) {
-      if (mounted) setState(() { loading = false; error = e.toString(); });
+      if (mounted) setState(() { loading = false; slowLoading = false; error = e.toString(); });
+    } finally {
+      slowTimer?.cancel();
     }
   }
 
@@ -260,14 +313,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _toggleTask(DailyTask task) async {
+    final wasDone = task.isDone;
     try {
-      if (task.isDone) {
+      if (wasDone) {
         await widget.api.reopenTask(task.id);
       } else {
         await widget.api.completeTask(task.id);
       }
       final updated = await widget.api.getToday();
-      if (mounted) setState(() => routine = updated);
+      if (!mounted) return;
+      setState(() => routine = updated);
+      if (!wasDone) {
+        final completed = updated.tasks.firstWhere((item) => item.id == task.id, orElse: () => task);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(pickEffortMessage(completed, updated.tasks))),
+        );
+      }
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     }
@@ -342,65 +403,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _createDailyTask() async {
-    final title = TextEditingController();
-    final points = TextEditingController(text: '1');
-    String period = 'morning';
-    String type = 'expected';
-    final payload = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialog) => AlertDialog(
-          title: const Text('Nova tarefa de hoje'),
-          content: SizedBox(
-            width: 460,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              TextField(controller: title, decoration: const InputDecoration(labelText: 'Título')),
-              const SizedBox(height: 10),
-              TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos')),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: period,
-                decoration: const InputDecoration(labelText: 'Período'),
-                items: const [
-                  DropdownMenuItem(value: 'morning', child: Text('Manhã')),
-                  DropdownMenuItem(value: 'afternoon', child: Text('Tarde')),
-                  DropdownMenuItem(value: 'evening', child: Text('Noite')),
-                ],
-                onChanged: (v) => setDialog(() => period = v ?? period),
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: type,
-                decoration: const InputDecoration(labelText: 'Tipo'),
-                items: const [
-                  DropdownMenuItem(value: 'mandatory', child: Text('Obrigatória')),
-                  DropdownMenuItem(value: 'expected', child: Text('Esperada')),
-                  DropdownMenuItem(value: 'challenge', child: Text('Desafio')),
-                ],
-                onChanged: (v) => setDialog(() => type = v ?? type),
-              ),
-            ]),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-            FilledButton(onPressed: () => Navigator.pop(context, {
-              'title': title.text.trim(),
-              'description': null,
-              'type': type,
-              'period': period,
-              'points': int.tryParse(points.text) ?? 1,
-            }), child: const Text('Adicionar')),
-          ],
-        ),
-      ),
+    final payload = await showQuickTaskDialog(
+      context,
+      allowPermanent: widget.session.isAdult,
     );
-    title.dispose();
-    points.dispose();
-    if (payload == null || (payload['title']?.toString() ?? '').isEmpty) return;
+    if (payload == null) return;
+    final body = Map<String, dynamic>.from(payload);
+    final permanent = body.remove('permanent') == true;
     try {
-      await widget.api.request('/daily-tasks', method: 'POST', body: payload);
+      if (permanent) {
+        await widget.api.request('/tasks', method: 'POST', body: body);
+      } else {
+        await widget.api.request('/daily-tasks', method: 'POST', body: body);
+      }
       final updated = await widget.api.getToday();
-      if (mounted) setState(() => routine = updated);
+      if (!mounted) return;
+      setState(() => routine = updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(permanent ? 'Tarefa permanente criada.' : 'Tarefa adicionada somente para hoje.')),
+      );
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     }
@@ -427,72 +448,43 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _editDailyTask(DailyTask task) async {
-    final title = TextEditingController(text: task.title);
-    final description = TextEditingController(text: task.description ?? '');
-    final points = TextEditingController(text: task.points.toString());
-    String period = task.period;
-    String type = task.type;
-    final payload = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialog) => AlertDialog(
-          title: const Text('Editar tarefa de hoje'),
-          content: SizedBox(
-            width: 460,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              TextField(controller: title, decoration: const InputDecoration(labelText: 'Título')),
-              const SizedBox(height: 8),
-              TextField(controller: description, decoration: const InputDecoration(labelText: 'Descrição')),
-              const SizedBox(height: 8),
-              TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos')),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: period,
-                decoration: const InputDecoration(labelText: 'Período'),
-                items: const [
-                  DropdownMenuItem(value: 'morning', child: Text('Manhã')),
-                  DropdownMenuItem(value: 'afternoon', child: Text('Tarde')),
-                  DropdownMenuItem(value: 'evening', child: Text('Noite')),
-                ],
-                onChanged: (v) => setDialog(() => period = v ?? period),
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: type,
-                decoration: const InputDecoration(labelText: 'Tipo'),
-                items: const [
-                  DropdownMenuItem(value: 'mandatory', child: Text('Obrigatória')),
-                  DropdownMenuItem(value: 'expected', child: Text('Esperada')),
-                  DropdownMenuItem(value: 'challenge', child: Text('Desafio')),
-                ],
-                onChanged: (v) => setDialog(() => type = v ?? type),
-              ),
-            ]),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, {
-                'title': title.text.trim(),
-                'description': description.text.trim().isEmpty ? null : description.text.trim(),
-                'type': type,
-                'period': period,
-                'points': int.tryParse(points.text) ?? task.points,
-                'options': task.options,
-                'reason': task.reason,
-              }),
-              child: const Text('Salvar'),
-            ),
-          ],
-        ),
-      ),
+    final payload = await showQuickTaskDialog(
+      context,
+      task: task,
+      allowPermanent: widget.session.isAdult &&
+          (task.taskTemplateId == null || task.taskTemplateId!.isEmpty),
+      initialPeriod: task.period,
     );
-    title.dispose(); description.dispose(); points.dispose();
     if (payload == null) return;
+    final body = Map<String, dynamic>.from(payload);
+    final permanent = body.remove('permanent') == true;
     try {
-      await widget.api.request('/daily-tasks/' + task.id, method: 'PUT', body: payload);
+      if (permanent) {
+        await widget.api.request('/tasks', method: 'POST', body: body);
+        await widget.api.delete('/daily-tasks/' + task.id);
+      } else {
+        await widget.api.request(
+          '/daily-tasks/' + task.id,
+          method: 'PUT',
+          body: {
+            'title': body['title'],
+            'description': body['description'],
+            'type': body['type'],
+            'period': body['period'],
+            'points': body['points'],
+            'options': body['options'],
+            'reason': body['reason'],
+          },
+        );
+      }
       final updated = await widget.api.getToday();
-      if (mounted) setState(() => routine = updated);
+      if (!mounted) return;
+      setState(() => routine = updated);
+      if (permanent) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tarefa promovida a permanente.')),
+        );
+      }
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     }
@@ -619,6 +611,28 @@ class _HomeScreenState extends State<HomeScreen> {
     return h > 0 ? '${two(h)}:${two(m)}:${two(s)}' : '${two(m)}:${two(s)}';
   }
 
+  void _showWhatsNext(DailyRoutine value) {
+    final pending = value.tasks.where((task) => !task.isDeleted && !task.isDone).toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
+    DailyTask? next;
+    final plan = List<Map<String, dynamic>>.from(value.eveningPlan)
+      ..sort((a, b) => ((a['order'] as num?)?.toInt() ?? 0).compareTo((b['order'] as num?)?.toInt() ?? 0));
+    for (final item in plan) {
+      final taskId = item['taskId']?.toString();
+      for (final task in pending) {
+        if (task.id == taskId) {
+          next = task;
+          break;
+        }
+      }
+      if (next != null) break;
+    }
+    next ??= pending.isEmpty ? null : pending.first;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(next == null ? 'Você já cuidou de tudo por aqui. 🐟✨' : 'E agora: ${next.title}')),
+    );
+  }
+
   String _formatMinutes(int minutes) {
     if (minutes >= 60) {
       final h = minutes ~/ 60, m = minutes % 60;
@@ -629,7 +643,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (loading) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                if (slowLoading) ...[
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Ainda carregando... o servidor pode estar iniciando depois de um tempo parado.',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     if (routine == null) {
       return Scaffold(body: Center(child: FilledButton(onPressed: _load, child: Text(error ?? 'Tentar novamente'))));
     }
@@ -682,7 +717,22 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 20),
                   _tasksCard(r),
                   const SizedBox(height: 12),
-                  OutlinedButton.icon(onPressed: () => _planEvening(r), icon: const Icon(Icons.nightlight_outlined), label: const Text('Planejar minha noite')),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _planEvening(r),
+                        icon: const Icon(Icons.nightlight_outlined),
+                        label: const Text('Planejar minha noite'),
+                      ),
+                      FilledButton.tonalIcon(
+                        onPressed: () => _showWhatsNext(r),
+                        icon: const Icon(Icons.arrow_forward_rounded),
+                        label: const Text('E agora?'),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

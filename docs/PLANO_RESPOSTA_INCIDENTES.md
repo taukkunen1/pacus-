@@ -23,7 +23,7 @@ Como um incidente pode ser percebido, hoje:
 - **Relato de usuário** — a família percebe algo estranho na própria conta (dado que não reconhece, saldo alterado sem explicação) e avisa pelo canal de contato.
 - **Você mesmo, ao revisar logs de erro da hospedagem** (Fly.io) ou métricas do MongoDB Atlas.
 
-🔲 *Lacuna conhecida: não há monitoramento automatizado (alertas de acesso anômalo, IDS, etc.) — para o volume atual de usuários, isso é proporcional, mas deve ser revisitado se a base de usuários crescer.*
+**Monitoramento automatizado de disponibilidade:** o workflow `.github/workflows/production-health.yml` verifica a cada 30 minutos frontend, API, conexão com MongoDB e política CORS. Ainda não há IDS/detecção comportamental de acesso anômalo; essa camada deve ser revisitada se a base de usuários crescer.
 
 ## 3. Investigação
 

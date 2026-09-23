@@ -125,17 +125,16 @@ public class PointsController : ControllerBase
     // Segunda parte do problema: famílias cujo Settings ja existia no Mongo antes dessa
     // mudanca (ex.: por terem ligado o tempo de jogo em algum momento) ficaram com
     // PointToBrlRate = 0.05 gravado no documento -- valor que nunca foi escolhido por
-    // ninguem (nao existe endpoint pra configurar essa taxa), so o default antigo da
-    // propriedade C# congelado no banco. Por isso curamos aqui: se o valor salvo for
-    // exatamente a taxa antiga, tratamos como "nao migrado", aplicamos e persistimos o
-    // default atual -- assim o proximo GetBalance ja vem certo sem precisar de migracao
-    // manual no banco de producao.
+    // ninguem, so o default antigo da propriedade C# congelado no banco. Por isso
+    // curamos aqui apenas enquanto PointToBrlRateConfigured=false. Depois de uma
+    // escolha explicita do adulto, inclusive R$ 0,05, o valor configurado e preservado.
     private async Task<double> GetPointToBrlRateAsync()
     {
         var settings = await _settingsRepository.GetByUserIdAsync(_currentUser.FamilyId);
         if (settings is null) return Settings.DefaultPointToBrlRate;
 
-        if (settings.PointToBrlRate == Settings.LegacyDefaultPointToBrlRate)
+        if (!settings.PointToBrlRateConfigured
+            && Math.Abs(settings.PointToBrlRate - Settings.LegacyDefaultPointToBrlRate) < 0.000001)
         {
             settings.PointToBrlRate = Settings.DefaultPointToBrlRate;
             settings.UpdatedAt = DateTime.UtcNow;

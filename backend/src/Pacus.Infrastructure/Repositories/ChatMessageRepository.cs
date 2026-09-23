@@ -59,17 +59,17 @@ public class ChatMessageRepository : IChatMessageRepository
     public Task<long> CountUnreadAsync(
         ObjectId familyId,
         ObjectId userId,
-        DateTime? after)
+        ObjectId? afterId)
     {
         var filter =
             Builders<ChatMessage>.Filter.Eq(m => m.FamilyId, familyId) &
             Builders<ChatMessage>.Filter.Ne(m => m.SenderId, userId);
 
-        if (after.HasValue)
+        if (afterId.HasValue)
         {
             filter &= Builders<ChatMessage>.Filter.Gt(
-                m => m.CreatedAt,
-                after.Value);
+                m => m.Id,
+                afterId.Value);
         }
 
         return _context.ChatMessages.CountDocumentsAsync(filter);

@@ -6,13 +6,13 @@ public static class CorsOriginPolicy
     public const string DevelopmentFallbackOrigin = "http://localhost:5500";
 
     public static string[] Resolve(
-        bool isDevelopment,
+        bool useDevelopmentOrigins,
         string? configuredOrigins)
     {
         // Em producao, o dominio oficial e a unica origem web aceita.
         // Isso evita que configuracoes antigas no provedor de hospedagem
         // reabram CORS para frontends aposentados.
-        if (!isDevelopment)
+        if (!useDevelopmentOrigins)
         {
             return [OfficialOrigin];
         }

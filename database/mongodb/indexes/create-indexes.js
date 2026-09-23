@@ -64,6 +64,12 @@ db.pacus_growth.createIndex({ pacusId: 1, createdAt: -1 });
 
 db.settings.createIndex({ userId: 1 }, { unique: true });
 
+db.chat_messages.createIndex({ familyId: 1, createdAt: 1 });
+db.chat_read_states.createIndex(
+  { familyId: 1, userId: 1 },
+  { unique: true, name: "one_chat_read_state_per_user" }
+);
+
 db.audit_logs.createIndex({ familyId: 1, createdAt: -1 });
 
 // Exclusao de conta (LGPD, item B3): logs de auditoria anonimizados sao apagados

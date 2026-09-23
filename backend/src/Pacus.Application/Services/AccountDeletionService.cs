@@ -28,6 +28,7 @@ public class AccountDeletionService : IAccountDeletionService
     private readonly IStoreRepository _storeRepository;
     private readonly IAuditLogRepository _auditLogRepository;
     private readonly IChatMessageRepository _chatMessageRepository;
+    private readonly IChatReadStateRepository _chatReadStateRepository;
 
     public AccountDeletionService(
         IUserRepository userRepository,
@@ -41,7 +42,8 @@ public class AccountDeletionService : IAccountDeletionService
         ITaskEventRepository taskEventRepository,
         IStoreRepository storeRepository,
         IAuditLogRepository auditLogRepository,
-        IChatMessageRepository chatMessageRepository)
+        IChatMessageRepository chatMessageRepository,
+        IChatReadStateRepository chatReadStateRepository)
     {
         _userRepository = userRepository;
         _pacusRepository = pacusRepository;
@@ -55,6 +57,7 @@ public class AccountDeletionService : IAccountDeletionService
         _storeRepository = storeRepository;
         _auditLogRepository = auditLogRepository;
         _chatMessageRepository = chatMessageRepository;
+        _chatReadStateRepository = chatReadStateRepository;
     }
 
     public async Task DeleteAccountAsync(ObjectId familyId, ObjectId requestedBy)
@@ -89,6 +92,7 @@ public class AccountDeletionService : IAccountDeletionService
         await _storeRepository.DeleteAllRedemptionsByFamilyAsync(familyId);
         await _storeRepository.DeleteAllItemsByFamilyAsync(familyId);
         await _chatMessageRepository.DeleteAllByFamilyAsync(familyId);
+        await _chatReadStateRepository.DeleteAllByFamilyAsync(familyId);
         await _settingsRepository.DeleteByFamilyIdAsync(familyId);
         await _habitatRepository.DeleteByFamilyIdAsync(familyId);
         await _pacusRepository.DeleteByFamilyIdAsync(familyId);

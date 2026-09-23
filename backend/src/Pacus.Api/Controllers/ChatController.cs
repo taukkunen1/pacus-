@@ -320,7 +320,15 @@ public class ChatController : ControllerBase
             CreatedAt = DateTime.UtcNow,
         };
 
-        await _chatRepository.CreateAsync(message);
+        try
+        {
+            await _chatRepository.CreateAsync(message);
+        }
+        catch
+        {
+            // A decisao do pedido ja foi persistida. Falha na mensagem de retorno
+            // nao pode transformar uma aprovacao/rejeicao concluida em erro para o usuario.
+        }
     }
 
     private async Task<User?> GetCurrentSenderAsync()

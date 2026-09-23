@@ -6,7 +6,7 @@ Gerado a partir da auditoria de 2026-08-28/29. Regra: seguimos esta lista, um it
 
 Convenção:
 - **[AQUI]** — dá pra fazer nesta sessão (código, testes, documento que eu redijo).
-- **[DEPOIS]** — precisa de acesso externo (Render, MongoDB Atlas, GitHub settings) ou decisão/assinatura sua. Fica anotado aqui pra não esquecer, eu não mexo nisso sozinho.
+- **[DEPOIS]** — precisa de acesso externo (Fly.io, MongoDB Atlas, GitHub settings) ou decisão/assinatura sua. Fica anotado aqui pra não esquecer.
 
 ---
 
@@ -17,7 +17,7 @@ Convenção:
 - [x] **[AQUI] A3. Testes de manipulação de ObjectId / troca de papel** (criança tentando ação de adulto, adulto de uma família usando id de outra) nos endpoints que ainda não cobrem isso.
 - [x] **[AQUI] A4. Renomear os campos `UserId` que na verdade significam `FamilyId`** em `DailyRoutine`, `TaskTemplate`, `StoreItem`, `Redemption`, `Settings`, `PointTransaction` (entidades + repositórios + serviços). Não é bug hoje, mas é a maior fonte provável de bug futuro.
 - [x] **[AQUI] A5. Log de auditoria para ações administrativas sensíveis** (excluir tarefa, aprovar/rejeitar resgate, ajustar pontos manualmente) — registrar quem fez, quando, e o que mudou, separado do dado em si.
-- [x] **[DEPOIS] A6. Confirmar no Render/Atlas:** usuário do MongoDB com privilégio mínimo, rede restrita (IP allowlist), TLS ativo, `CORS_ALLOWED_ORIGINS` configurado só com o domínio real (não `*`), HTTPS redirect funcionando de fato em produção.
+- [x] **[DEPOIS] A6. Confirmar na hospedagem/Atlas:** usuário do MongoDB com privilégio mínimo, rede restrita (IP allowlist), TLS ativo, CORS restrito ao domínio real e HTTPS funcionando de fato em produção.
 - [x] **[DEPOIS] A7. Checar o histórico do Git em busca de segredo vazado** (procurar se `JWT_SECRET`/connection string do Mongo já apareceram em algum commit antigo) e rotacionar se achar algo.
 - [x] **[DEPOIS] A8. Rotacionar o PAT clássico do GitHub** (`ghp_...`, escopo `repo` completo) por um fine-grained token limitado só a este repositório, ou revogar quando não precisar mais de push automatizado.
 
@@ -81,3 +81,14 @@ _(atualizado a cada item concluído)_
 ## Migração final do frontend — 2026-09-23
 
 O frontend oficial passou a ser exclusivamente Flutter Web (`flutter_app/`). O diretório legado `frontend/` foi removido após auditoria de paridade funcional. O CI não valida mais JavaScript legado: executa `flutter analyze`, `flutter test` e `flutter build web`. As páginas legais permanecem publicadas em `flutter_app/web/`.
+
+
+## Encerramento Render → Fly.io — 2026-09-23
+
+A migração de hospedagem foi encerrada tecnicamente:
+- o serviço antigo no Render foi suspenso;
+- o backend de produção roda no Fly.io;
+- `backend/fly.toml` declara `ASPNETCORE_ENVIRONMENT=Production` e `CORS_ALLOWED_ORIGINS=https://www.pacus.com.br`;
+- o backend aplica uma whitelist de produção independente da variável externa: somente `https://www.pacus.com.br` é aceito via CORS;
+- origens antigas como `pacus-1.onrender.com` e `taukkunen1.github.io` não são aceitas em produção;
+- referências operacionais ao Render foram removidas do código ativo; menções anteriores permanecem apenas no histórico deste documento.

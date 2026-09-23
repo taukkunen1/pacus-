@@ -170,12 +170,14 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _sending = true);
 
     try {
+      final body = <String, dynamic>{'type': type};
+      if (minutes != null) {
+        body['minutes'] = minutes;
+      }
+
       final sent = await widget.api.postMap(
         '/chat/requests',
-        {
-          'type': type,
-          if (minutes != null) 'minutes': minutes,
-        },
+        body,
       );
 
       if (!mounted) return;

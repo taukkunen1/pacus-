@@ -23,6 +23,7 @@ public record FamilyDataExport(
     List<TaskEvent> TaskEvents,
     List<StoreItem> StoreItems,
     List<Redemption> Redemptions,
+    List<ChatMessage> ChatMessages,
     List<AuditLog> AuditLogs
 );
 

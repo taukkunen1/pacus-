@@ -60,7 +60,7 @@ public class ChatController : ControllerBase
         var count = await _chatRepository.CountUnreadAsync(
             _currentUser.FamilyId,
             _currentUser.UserId,
-            readState?.LastReadAt);
+            readState?.LastReadMessageId);
 
         return Ok(new { unreadCount = count });
     }
@@ -81,12 +81,13 @@ public class ChatController : ControllerBase
         await _readStateRepository.UpsertAsync(
             _currentUser.FamilyId,
             _currentUser.UserId,
+            message.Id,
             message.CreatedAt);
 
         var count = await _chatRepository.CountUnreadAsync(
             _currentUser.FamilyId,
             _currentUser.UserId,
-            message.CreatedAt);
+            message.Id);
 
         return Ok(new { unreadCount = count });
     }

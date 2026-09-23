@@ -34,10 +34,50 @@ class PacusShell extends StatefulWidget {
 
 class _PacusShellState extends State<PacusShell> {
   int index = 0;
+  int todayPending = 0;
+  int storePending = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshBadges();
+  }
+
+  Future<void> _refreshBadges() async {
+    try {
+      if (widget.session.isAdult) {
+        final pending = await widget.api.getList('/store/redemptions/pending');
+        if (mounted) setState(() => storePending = pending.length);
+      } else {
+        final today = await widget.api.getToday();
+        if (mounted) {
+          setState(() => todayPending = (today.totalTasks - today.doneTasks).clamp(0, 999));
+        }
+      }
+    } catch (_) {
+      // Badge e informativo; falha aqui nao deve bloquear a navegacao.
+    }
+  }
+
+  void _selectTab(int value) {
+    setState(() => index = value);
+    _refreshBadges();
+  }
 
   List<_TabSpec> get tabs => [
-        _TabSpec('Hoje', Icons.today_outlined,
-            HomeScreen(api: widget.api, session: widget.session, onLogout: widget.onLogout)),
+        _TabSpec(
+          'Hoje',
+          Icons.today_outlined,
+          HomeScreen(
+            api: widget.api,
+            session: widget.session,
+            onLogout: widget.onLogout,
+            onPendingChanged: (value) {
+              if (mounted && todayPending != value) setState(() => todayPending = value);
+            },
+          ),
+          badge: widget.session.isAdult ? 0 : todayPending,
+        ),
         _TabSpec('Amanhã', Icons.edit_calendar_outlined,
             TomorrowScreen(api: widget.api, session: widget.session)),
         _TabSpec('Chat', Icons.chat_bubble_outline,
@@ -48,8 +88,18 @@ class _PacusShellState extends State<PacusShell> {
             PointsScreen(api: widget.api, session: widget.session)),
         _TabSpec('PACUS', Icons.water,
             PacusScreen(api: widget.api, session: widget.session)),
-        _TabSpec('Loja', Icons.storefront_outlined,
-            StoreScreen(api: widget.api, session: widget.session)),
+        _TabSpec(
+          'Loja',
+          Icons.storefront_outlined,
+          StoreScreen(
+            api: widget.api,
+            session: widget.session,
+            onPendingChanged: (value) {
+              if (mounted && storePending != value) setState(() => storePending = value);
+            },
+          ),
+          badge: widget.session.isAdult ? storePending : 0,
+        ),
         if (widget.session.isAdult)
           _TabSpec('Config', Icons.settings_outlined,
               SettingsScreen(api: widget.api, onLogout: widget.onLogout, themeMode: widget.themeMode, onThemeChanged: widget.onThemeChanged)),
@@ -83,12 +133,12 @@ class _PacusShellState extends State<PacusShell> {
                     ),
                   ),
                   selectedIndex: index,
-                  onDestinationSelected: (value) => setState(() => index = value),
+                  onDestinationSelected: _selectTab,
                   labelType: NavigationRailLabelType.all,
                   destinations: [
                     for (final tab in items)
                       NavigationRailDestination(
-                        icon: Icon(tab.icon),
+                        icon: _navIcon(tab),
                         label: Text(tab.label),
                       ),
                   ],
@@ -120,11 +170,11 @@ class _PacusShellState extends State<PacusShell> {
           bottomNavigationBar: NavigationBar(
             labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
             selectedIndex: index,
-            onDestinationSelected: (value) => setState(() => index = value),
+            onDestinationSelected: _selectTab,
             destinations: [
               for (final tab in items)
                 NavigationDestination(
-                  icon: Icon(tab.icon),
+                  icon: _navIcon(tab),
                   label: tab.label,
                 ),
             ],
@@ -133,13 +183,23 @@ class _PacusShellState extends State<PacusShell> {
       },
     );
   }
+
+  Widget _navIcon(_TabSpec tab) {
+    final icon = Icon(tab.icon);
+    if (tab.badge <= 0) return icon;
+    return Badge(
+      label: Text(tab.badge > 99 ? '99+' : tab.badge.toString()),
+      child: icon,
+    );
+  }
 }
 
 class _TabSpec {
-  const _TabSpec(this.label, this.icon, this.screen);
+  const _TabSpec(this.label, this.icon, this.screen, {this.badge = 0});
   final String label;
   final IconData icon;
   final Widget screen;
+  final int badge;
 }
 
 

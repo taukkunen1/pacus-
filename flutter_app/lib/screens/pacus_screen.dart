@@ -40,7 +40,7 @@ class _PacusScreenState extends State<PacusScreen> with SingleTickerProviderStat
     final size = TextEditingController(text: ((pacus?['size'] as num?)?.toDouble() ?? 0).toString());
     final days = TextEditingController(text: (pacus?['totalClosedDays'] ?? 0).toString());
     final hue = TextEditingController(text: pacus?['colorHue']?.toString() ?? '');
-    String stage = pacus?['stage']?.toString().toLowerCase() ?? 'young';
+    String stage = _stageKey(pacus?['stage']);
 
     final payload = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -56,8 +56,8 @@ class _PacusScreenState extends State<PacusScreen> with SingleTickerProviderStat
                 items: const [
                   DropdownMenuItem(value: 'egg', child: Text('Ovo')),
                   DropdownMenuItem(value: 'cracking', child: Text('Rachando')),
-                  DropdownMenuItem(value: 'hatching', child: Text('Eclodindo')),
-                  DropdownMenuItem(value: 'baby', child: Text('Filhote')),
+                  DropdownMenuItem(value: 'hatching', child: Text('Eclosão')),
+                  DropdownMenuItem(value: 'baby', child: Text('Bebê')),
                   DropdownMenuItem(value: 'young', child: Text('Jovem')),
                   DropdownMenuItem(value: 'adult', child: Text('Adulto')),
                 ],
@@ -97,10 +97,32 @@ class _PacusScreenState extends State<PacusScreen> with SingleTickerProviderStat
     }
   }
 
+  String _stageKey(dynamic raw) {
+    final key = raw?.toString().toLowerCase() ?? 'egg';
+    const valid = {'egg', 'cracking', 'hatching', 'baby', 'young', 'juvenile', 'adult'};
+    if (!valid.contains(key)) return 'egg';
+    return key == 'juvenile' ? 'young' : key;
+  }
+
   String _stage(dynamic raw) {
-    const labels = {'egg':'Ovo','cracking':'Rachando','hatching':'Eclodindo','baby':'Filhote','young':'Jovem','juvenile':'Jovem','adult':'Adulto'};
-    final key = raw?.toString().toLowerCase() ?? 'juvenile';
-    return labels[key] ?? raw?.toString() ?? 'Jovem';
+    const labels = {
+      'egg': 'Ovo',
+      'cracking': 'Rachando',
+      'hatching': 'Eclosão',
+      'baby': 'Bebê',
+      'young': 'Jovem',
+      'adult': 'Adulto',
+    };
+    return labels[_stageKey(raw)] ?? 'Ovo';
+  }
+
+  double _visualScale(String stage) {
+    return switch (stage) {
+      'baby' => .60,
+      'young' => .82,
+      'adult' => 1.0,
+      _ => 1.0,
+    };
   }
 
   @override Widget build(BuildContext context) => Scaffold(
@@ -128,20 +150,48 @@ class _PacusScreenState extends State<PacusScreen> with SingleTickerProviderStat
                 child: AnimatedBuilder(
                   animation: swim,
                   builder: (context, _) {
+                    final stage = _stageKey(pacus?['stage']);
+                    final isEggPhase = stage == 'egg' || stage == 'cracking' || stage == 'hatching';
                     final x = -0.72 + (swim.value * 1.44);
                     final wave = (swim.value - .5).abs();
+
                     return Stack(children: [
                       const Positioned(left: 20, top: 28, child: Text('○', style: TextStyle(fontSize: 30, color: Colors.white70))),
                       const Positioned(right: 40, top: 60, child: Text('○', style: TextStyle(fontSize: 20, color: Colors.white60))),
                       const Positioned(left: 55, bottom: 8, child: Text('🌿', style: TextStyle(fontSize: 54))),
                       const Positioned(right: 30, bottom: 4, child: Text('🪨', style: TextStyle(fontSize: 48))),
-                      Align(
-                        alignment: Alignment(x, .05 + wave * .22),
-                        child: Transform.scale(
-                          scaleX: swim.status == AnimationStatus.reverse ? -1 : 1,
-                          child: const SizedBox(width: 150, height: 100, child: CustomPaint(painter: _AxolotlPainter())),
+                      if (isEggPhase)
+                        Align(
+                          alignment: const Alignment(0, .30),
+                          child: Transform.rotate(
+                            angle: stage == 'egg' ? 0 : math.sin(swim.value * math.pi * 2) * .025,
+                            child: SizedBox(
+                              width: 105,
+                              height: 135,
+                              child: CustomPaint(painter: _EggPainter(stage)),
+                            ),
+                          ),
+                        )
+                      else
+                        Align(
+                          alignment: Alignment(x, .05 + wave * .22),
+                          child: Transform.scale(
+                            scale: _visualScale(stage),
+                            child: Transform(
+                              alignment: Alignment.center,
+                              transform: Matrix4.diagonal3Values(
+                                swim.status == AnimationStatus.reverse ? -1 : 1,
+                                1,
+                                1,
+                              ),
+                              child: const SizedBox(
+                                width: 150,
+                                height: 100,
+                                child: CustomPaint(painter: _AxolotlPainter()),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
                     ]);
                   },
                 ),
@@ -192,6 +242,87 @@ class _PacusScreenState extends State<PacusScreen> with SingleTickerProviderStat
       ]),
     ),
   );
+}
+
+
+class _EggPainter extends CustomPainter {
+  const _EggPainter(this.stage);
+
+  final String stage;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final shell = Paint()..color = const Color(0xFFF3E8D7);
+    final shellShade = Paint()..color = const Color(0xFFD9C8B2);
+    final crack = Paint()
+      ..color = const Color(0xFF8C7764)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final center = Offset(size.width * .5, size.height * .54);
+    final eggRect = Rect.fromCenter(
+      center: center,
+      width: size.width * .72,
+      height: size.height * .82,
+    );
+
+    canvas.drawOval(eggRect, shell);
+    canvas.drawArc(
+      eggRect.deflate(5),
+      .35,
+      2.15,
+      false,
+      shellShade
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3,
+    );
+
+    if (stage == 'cracking' || stage == 'hatching') {
+      final first = Path()
+        ..moveTo(size.width * .50, size.height * .18)
+        ..lineTo(size.width * .44, size.height * .31)
+        ..lineTo(size.width * .54, size.height * .39)
+        ..lineTo(size.width * .46, size.height * .50);
+      canvas.drawPath(first, crack);
+    }
+
+    if (stage == 'hatching') {
+      final second = Path()
+        ..moveTo(size.width * .54, size.height * .39)
+        ..lineTo(size.width * .67, size.height * .33)
+        ..lineTo(size.width * .72, size.height * .45);
+      canvas.drawPath(second, crack);
+
+      final third = Path()
+        ..moveTo(size.width * .46, size.height * .50)
+        ..lineTo(size.width * .35, size.height * .58)
+        ..lineTo(size.width * .40, size.height * .69);
+      canvas.drawPath(third, crack);
+
+      final baby = Paint()..color = const Color(0xFFF4A7B9);
+      final eye = Paint()..color = const Color(0xFF34252B);
+      canvas.drawCircle(
+        Offset(size.width * .51, size.height * .30),
+        size.width * .105,
+        baby,
+      );
+      canvas.drawCircle(
+        Offset(size.width * .47, size.height * .285),
+        2.2,
+        eye,
+      );
+      canvas.drawCircle(
+        Offset(size.width * .55, size.height * .285),
+        2.2,
+        eye,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _EggPainter oldDelegate) => oldDelegate.stage != stage;
 }
 
 

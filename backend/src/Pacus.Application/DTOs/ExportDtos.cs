@@ -5,7 +5,7 @@ using PacusEntity = Pacus.Domain.Entities.Pacus;
 namespace Pacus.Application.DTOs;
 
 // Exportacao completa dos dados da familia (LGPD, item B2 -- portabilidade de
-// dados, art. 18, V). Espelha exatamente as 12 collections listadas em
+// dados, art. 18, V). Espelha exatamente as 13 collections listadas em
 // docs/DATA_MAP.md. Nao inclui passwordHash/pinHash (nao sao "dados do
 // titular" no sentido de portabilidade -- sao segredos de autenticacao; ver
 // FamilyMemberExport abaixo).

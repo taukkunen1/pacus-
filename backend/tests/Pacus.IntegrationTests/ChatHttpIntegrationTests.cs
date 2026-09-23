@@ -221,7 +221,7 @@ public class ChatHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
         var adultSummary = await adultClient.GetFromJsonAsync<JsonElement>(
             "/api/v1/chat/unread-count");
 
-        Assert.Equal(1, adultSummary.GetProperty("unreadCount").GetInt64());
+        Assert.Equal(0, adultSummary.GetProperty("unreadCount").GetInt64());
         Assert.Equal(1, adultSummary.GetProperty("pendingRequests").GetInt64());
     }
 
@@ -281,6 +281,10 @@ public class ChatHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
             after.GetProperty("gameTimerExtraMinutes").GetInt32();
 
         Assert.Equal(beforeMinutes + 10, afterMinutes);
+
+        var childSummary = await childClient.GetFromJsonAsync<JsonElement>(
+            "/api/v1/chat/unread-count");
+        Assert.Equal(1, childSummary.GetProperty("unreadCount").GetInt64());
 
         var secondApprove = await adultClient.PutAsJsonAsync(
             $"/api/v1/chat/requests/{requestId}/approve",

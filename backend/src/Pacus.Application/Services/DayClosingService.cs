@@ -108,22 +108,25 @@ public class DayClosingService : IDayClosingService
             stageBefore,
             nextTotalClosedDays);
 
-        pacus.TotalClosedDays = nextTotalClosedDays;
-        pacus.Stage = newStage;
-        pacus.Size = ComputeSize(newStage, pacus.TotalClosedDays);
-        pacus.LastGrowthDate = routine.Date;
-        pacus.UpdatedAt = DateTime.UtcNow;
+        var newSize = ComputeSize(newStage, nextTotalClosedDays);
+        var now = _clock.UtcNow;
+        PacusStageHistoryEntry? historyEntry = newStage != stageBefore
+            ? new PacusStageHistoryEntry { Stage = newStage, ReachedAt = now }
+            : null;
 
-        if (newStage != stageBefore)
-        {
-            pacus.StageHistory.Add(new PacusStageHistoryEntry
-            {
-                Stage = newStage,
-                ReachedAt = DateTime.UtcNow,
-            });
-        }
+        // CAS no proprio Mongo: duas abas/dispositivos podem chegar aqui ao mesmo tempo,
+        // mas apenas uma consegue trocar LastGrowthDate para esta data. Isso fecha a janela
+        // que existia entre "consultar o growth log" e "salvar o PACUS".
+        var applied = await _pacusRepository.TryApplyGrowthAsync(
+            routine.FamilyId,
+            routine.Date,
+            nextTotalClosedDays,
+            newStage,
+            newSize,
+            historyEntry,
+            now);
 
-        await _pacusRepository.UpdateAsync(pacus);
+        if (!applied) return;
 
         // Log dedicado em pacus_growth â€” auditavel independentemente do estado atual do PACUS,
         // e e o que garante (via indice unico) que o crescimento nunca duplica por dia.
@@ -137,8 +140,8 @@ public class DayClosingService : IDayClosingService
             StageBefore = stageBefore,
             StageAfter = newStage,
             SizeBefore = sizeBefore,
-            SizeAfter = pacus.Size,
-            CreatedAt = DateTime.UtcNow,
+            SizeAfter = newSize,
+            CreatedAt = now,
         });
     }
 

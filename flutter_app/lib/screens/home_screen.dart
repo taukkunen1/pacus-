@@ -335,13 +335,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _cancelSession() async {
     if (sessionMinutes == null || completing) return;
 
+    final refundableMinutes = math.min(
+      sessionMinutes!,
+      (remaining.inSeconds / 60).ceil(),
+    );
+    final usedMinutes = math.max(0, sessionMinutes! - refundableMinutes);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Encerrar esta sessão?'),
-        content: const Text(
-          'Você voltará para o tempo disponível de hoje. '
-          'O tempo que ainda não foi usado será devolvido ao saldo.',
+        content: Text(
+          'Você usou aproximadamente ${_formatMinutes(usedMinutes)}. '
+          '${_formatMinutes(refundableMinutes)} voltarão para o tempo disponível de hoje.',
         ),
         actions: [
           TextButton(
@@ -989,6 +995,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (active) {
       final totalSeconds = math.max(1, sessionMinutes! * 60);
       final progress = (1 - remaining.inSeconds / totalSeconds).clamp(0.0, 1.0);
+      final usedSeconds = math.max(0, totalSeconds - remaining.inSeconds);
+      final usedLabel = _clock(Duration(seconds: usedSeconds));
+      final endLabel = sessionEndsAt == null
+          ? null
+          : TimeOfDay.fromDateTime(sessionEndsAt!.toLocal()).format(context);
       return Card(
         color: Theme.of(context).colorScheme.primaryContainer,
         child: Padding(
@@ -1005,6 +1016,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ? 'Sessão pausada • o tempo não está correndo'
                   : 'Você escolheu ${_formatMinutes(sessionMinutes!)} • depois restam ${_formatMinutes(sessionPersistedOnServer ? available : math.max(0, available - sessionMinutes!))}',
               style: TextStyle(fontWeight: sessionPaused ? FontWeight.w800 : FontWeight.w500),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              sessionPaused
+                  ? 'Tempo utilizado: $usedLabel'
+                  : 'Tempo utilizado: $usedLabel • término previsto: $endLabel',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 14),
             Wrap(

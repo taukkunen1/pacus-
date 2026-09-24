@@ -186,4 +186,55 @@ public class GameTimerSessionTests
         Assert.Equal(15, second.GameTimerSessionMinutes);
         Assert.NotNull(second.GameTimerSessionEndsAt);
     }
+    [Fact]
+    public async Task PauseEResume_Repetidos_SaoIdempotentes()
+    {
+        var (_, service) = BuildSystem();
+        var familyId = ObjectId.GenerateNewId();
+        var actorId = ObjectId.GenerateNewId();
+        await service.CreateRoutineForDateAsync(familyId, "2026-09-24", "America/Sao_Paulo");
+        await service.StartGameTimerSessionAsync(familyId, 30, actorId, "child");
+
+        var paused1 = await service.PauseGameTimerSessionAsync(familyId, actorId, "child");
+        var paused2 = await service.PauseGameTimerSessionAsync(familyId, actorId, "child");
+        Assert.Equal(paused1.GameTimerSessionRemainingSeconds, paused2.GameTimerSessionRemainingSeconds);
+
+        var resumed1 = await service.ResumeGameTimerSessionAsync(familyId, actorId, "child");
+        var resumed2 = await service.ResumeGameTimerSessionAsync(familyId, actorId, "child");
+        Assert.Equal(resumed1.GameTimerSessionMinutes, resumed2.GameTimerSessionMinutes);
+        Assert.NotNull(resumed2.GameTimerSessionEndsAt);
+    }
+
+    [Fact]
+    public async Task Cancel_Repetido_NaoDevolveSaldoDuasVezes()
+    {
+        var (_, service) = BuildSystem();
+        var familyId = ObjectId.GenerateNewId();
+        var actorId = ObjectId.GenerateNewId();
+        await service.CreateRoutineForDateAsync(familyId, "2026-09-24", "America/Sao_Paulo");
+        await service.StartGameTimerSessionAsync(familyId, 60, actorId, "child");
+
+        var first = await service.CancelGameTimerSessionAsync(familyId, actorId, "child");
+        var balanceAfterFirst = first.GameTimerExtraMinutes;
+        var second = await service.CancelGameTimerSessionAsync(familyId, actorId, "child");
+
+        Assert.Equal(balanceAfterFirst, second.GameTimerExtraMinutes);
+        Assert.Null(second.GameTimerSessionMinutes);
+    }
+
+    [Fact]
+    public async Task StartSession_PersisteHorarioInicial()
+    {
+        var (_, service) = BuildSystem();
+        var familyId = ObjectId.GenerateNewId();
+        var actorId = ObjectId.GenerateNewId();
+        await service.CreateRoutineForDateAsync(familyId, "2026-09-24", "America/Sao_Paulo");
+
+        var started = await service.StartGameTimerSessionAsync(familyId, 15, actorId, "child");
+
+        Assert.NotNull(started.GameTimerSessionStartedAt);
+        Assert.NotNull(started.GameTimerSessionEndsAt);
+        Assert.True(started.GameTimerSessionEndsAt > started.GameTimerSessionStartedAt);
+    }
+
 }

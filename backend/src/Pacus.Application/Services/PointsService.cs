@@ -41,6 +41,13 @@ public class PointsService : IPointsService
             TaskId = taskId,
             TaskTitle = taskTitle,
             Type = type,
+            SourceType = type switch
+            {
+                PointTransactionType.Redemption => "redemption",
+                PointTransactionType.Adjustment => "adjustment",
+                _ => "task",
+            },
+            SourceId = taskId,
             Points = points,
             BalanceAfter = currentBalance + points,
             Reason = reason,

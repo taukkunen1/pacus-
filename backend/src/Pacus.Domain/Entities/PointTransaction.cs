@@ -19,6 +19,9 @@ public class PointTransaction
     public string TaskId { get; set; } = string.Empty;
     public string TaskTitle { get; set; } = string.Empty;
     public PointTransactionType Type { get; set; }
+    // Origem normalizada para auditoria: task, redemption ou adjustment.
+    public string SourceType { get; set; } = string.Empty;
+    public string SourceId { get; set; } = string.Empty;
     // Delta assinado: Award positivo, Reversal/Redemption negativo, Adjustment +/-
     public int Points { get; set; }
     public int BalanceAfter { get; set; }

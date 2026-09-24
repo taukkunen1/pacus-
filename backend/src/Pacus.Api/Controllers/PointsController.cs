@@ -50,6 +50,7 @@ public class PointsController : ControllerBase
     // o extrato cresce uma transacao a cada tarefa concluida, ajuste ou resgate, pra
     // sempre. E a resposta usa PointTransactionResponse.ToResponse() em vez da entidade
     // de dominio crua (mesmo espirito do achado #3).
+    [RequireRole(UserRole.Adult)]
     [HttpGet("transactions")]
     public async Task<IActionResult> GetTransactions(
         [FromQuery] int page = 1,

@@ -327,6 +327,25 @@ public class FakePointTransactionRepository
         return Task.FromResult(transaction);
     }
 
+    public Task<long> BackfillSourceReferencesAsync()
+    {
+        long changed = 0;
+        foreach (var t in Transactions.Where(t =>
+                     string.IsNullOrWhiteSpace(t.SourceType) ||
+                     string.IsNullOrWhiteSpace(t.SourceId)))
+        {
+            t.SourceType = t.Type switch
+            {
+                PointTransactionType.Redemption => "redemption",
+                PointTransactionType.Adjustment => "adjustment",
+                _ => "task",
+            };
+            t.SourceId = string.IsNullOrWhiteSpace(t.TaskId) ? t.Id.ToString() : t.TaskId;
+            changed++;
+        }
+        return Task.FromResult(changed);
+    }
+
     public Task<int> GetBalanceAsync(
         ObjectId userId) =>
         Task.FromResult(

@@ -461,6 +461,9 @@ public class DailyRoutineService : IDailyRoutineService
         var actorRoleEnum = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
             ? UserRole.Adult
             : UserRole.Child;
+        // A crianca pode criar uma tarefa do proprio dia quando a permissao de autonomia
+        // estiver ativa, mas nunca define a recompensa financeira dessa tarefa.
+        var effectivePoints = actorRoleEnum == UserRole.Adult ? request.Points : 0;
 
         var template = new TaskTemplate
         {
@@ -470,7 +473,7 @@ public class DailyRoutineService : IDailyRoutineService
             Description = request.Description,
             Type = type,
             Period = period,
-            Points = request.Points,
+            Points = effectivePoints,
             Order = routine.Tasks.Count + 1,
             Active = false,
             Recurrence = "daily",
@@ -491,7 +494,7 @@ public class DailyRoutineService : IDailyRoutineService
             Type = type,
             Period = period,
             Order = routine.Tasks.Count + 1,
-            Points = request.Points,
+            Points = effectivePoints,
             Status = TaskItemStatus.Pending,
             Options = options,
             Reason = reason,
@@ -652,11 +655,14 @@ public class DailyRoutineService : IDailyRoutineService
             ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
 
         var oldPoints = task.Points;
+        var requestedPoints = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
+            ? request.Points
+            : oldPoints;
         task.Title = request.Title.Trim();
         task.Description = request.Description;
         task.Type = type;
         task.Period = period;
-        task.Points = request.Points;
+        task.Points = requestedPoints;
         task.Options = options;
         task.Reason = reason;
         // Se a opcao escolhida antes nao existe mais na lista nova, descarta -- nao faz
@@ -670,11 +676,11 @@ public class DailyRoutineService : IDailyRoutineService
         await _dailyRoutineRepository.UpdateAsync(routine);
 
         var role = ParseRole(actorRole);
-        if (task.Status == TaskItemStatus.Done && oldPoints != request.Points)
+        if (task.Status == TaskItemStatus.Done && oldPoints != requestedPoints)
         {
             await _pointsService.RecordAsync(userId, routine.Id, routine.Date, task.Id, task.Title,
-                PointTransactionType.Adjustment, request.Points - oldPoints, actorId, role,
-                $"Ajuste de pontos: {task.Title} ({oldPoints} -> {request.Points})");
+                PointTransactionType.Adjustment, requestedPoints - oldPoints, actorId, role,
+                $"Ajuste de pontos: {task.Title} ({oldPoints} -> {requestedPoints})");
         }
 
         await _taskEventRepository.CreateAsync(new TaskEvent

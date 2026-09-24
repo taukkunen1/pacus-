@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../brand.dart';
 import '../models.dart';
+import 'activity_screen.dart';
 import 'chat_screen.dart';
 import 'history_screen.dart';
 import 'home_screen.dart';
@@ -151,6 +152,9 @@ class _PacusShellState extends State<PacusShell> {
           ),
           badge: widget.session.isAdult ? storePending : 0,
         ),
+        if (widget.session.isAdult)
+          _TabSpec('Atividade', Icons.receipt_long_outlined,
+              ActivityScreen(api: widget.api)),
         if (widget.session.isAdult)
           _TabSpec('Config', Icons.settings_outlined,
               SettingsScreen(api: widget.api, onLogout: widget.onLogout, themeMode: widget.themeMode, onThemeChanged: widget.onThemeChanged)),

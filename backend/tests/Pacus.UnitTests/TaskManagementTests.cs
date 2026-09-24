@@ -44,7 +44,7 @@ public class TaskManagementTests
         var escovarDentes = reordered.Tasks.First(t => t.Id == idFirst);
         Assert.Equal(1, lerLivro.Order);
         Assert.Equal(2, escovarDentes.Order);
-        Assert.Equal(3, lerLivro.Points); // pontos nao mudam so por reordenar
+        Assert.Equal(0, lerLivro.Points); // tarefa criada pela crianca nao pode mintar PP
     }
 
     [Fact]
@@ -85,10 +85,10 @@ public class TaskManagementTests
         var userId = ObjectId.GenerateNewId();
         await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-24", "America/Sao_Paulo");
         var routine = await dailyRoutine.CreateAdHocTaskAsync(userId,
-            new CreateTaskRequest("Arrumar quarto", null, "expected", "afternoon", 3), userId, "child");
+            new CreateTaskRequest("Arrumar quarto", null, "expected", "afternoon", 3), userId, "adult");
         var taskId = routine.Tasks[0].Id;
 
-        await dailyRoutine.ToggleTaskAsync(userId, taskId, true, userId, "child"); // crianca sugeriu 3, ganhou 3
+        await dailyRoutine.ToggleTaskAsync(userId, taskId, true, userId, "child"); // adulto definiu 3; crianca concluiu
         Assert.Equal(3, await pointsRepo.GetBalanceAsync(userId));
 
         await dailyRoutine.AdjustTaskPointsAsync(userId, taskId, 2, userId, "adult"); // adulto aprova so 2
@@ -113,7 +113,7 @@ public class TaskManagementTests
         await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-24", "America/Sao_Paulo");
 
         var routine = await dailyRoutine.CreateAdHocTaskAsync(
-            userId, new CreateTaskRequest("Tarefa", null, "challenge", "evening", 4), userId, "child");
+            userId, new CreateTaskRequest("Tarefa", null, "challenge", "evening", 4), userId, "adult");
 
         Assert.Equal(4, routine.Tasks.Last().Points);
     }
@@ -153,7 +153,7 @@ public class TaskManagementTests
         var updated = await dailyRoutine.UpdateTaskAsync(userId, taskId,
             new DailyTaskUpdateRequest("Ler 20 paginas", "Livro escolhido pela crianca", "expected", "evening", 3), userId, "child");
         Assert.Equal("Ler 20 paginas", updated.Tasks.Last().Title);
-        Assert.Equal(3, updated.Tasks.Last().Points);
+        Assert.Equal(0, updated.Tasks.Last().Points);
 
         var deleted = await dailyRoutine.DeleteTaskAsync(userId, taskId, userId, "child");
         Assert.NotNull(deleted.Tasks.Last().DeletedAt);

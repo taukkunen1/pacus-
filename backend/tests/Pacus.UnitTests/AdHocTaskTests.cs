@@ -23,7 +23,7 @@ public class AdHocTaskTests
     }
 
     [Fact]
-    public async Task CriancaCriaTarefaNova_EntraNaRotinaDeHojeComPontosPropostosPelaCrianca()
+    public async Task CriancaCriaTarefaNova_EntraNaRotinaSemPoderCriarPontos()
     {
         var (dailyRoutine, routines, _, _) = BuildSystem();
         var userId = ObjectId.GenerateNewId();
@@ -34,7 +34,7 @@ public class AdHocTaskTests
 
         var created = Assert.Single(routine.Tasks);
         Assert.Equal("Comprar racao", created.Title);
-        Assert.Equal(3, created.Points);
+        Assert.Equal(0, created.Points);
         Assert.Equal("child", created.Origin);
 
         var saved = await routines.GetByUserAndDateAsync(userId, "2026-08-24");
@@ -59,7 +59,7 @@ public class AdHocTaskTests
         Assert.False(template!.Active); // nao gera tarefa nos proximos dias por padrao
         Assert.Equal("Fazer desenho", template.Title);
         Assert.Equal("capricho livre", template.Description);
-        Assert.Equal(2, template.Points);
+        Assert.Equal(0, template.Points);
     }
 
     [Fact]
@@ -77,12 +77,12 @@ public class AdHocTaskTests
         var nextDayBeforeActivation = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-25", "America/Sao_Paulo");
         Assert.Empty(nextDayBeforeActivation.Tasks);
 
-        // Ativa o template — "replicar em outro dia" sem reescrever titulo/tipo/pontos.
+        // Ativa o template — a tarefa criada pela crianca continua sem recompensa ate o adulto definir pontos.
         await templates.ActivateAsync(templateId);
 
         var followingDay = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-26", "America/Sao_Paulo");
         var replicated = Assert.Single(followingDay.Tasks);
         Assert.Equal("Regar as plantas", replicated.Title);
-        Assert.Equal(1, replicated.Points);
+        Assert.Equal(0, replicated.Points);
     }
 }

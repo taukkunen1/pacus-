@@ -488,7 +488,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
     }
 
     [Fact]
-    public async Task ChildPermissions_Defaults_ShouldAllowChildTaskOperations()
+    public async Task ChildPermissions_AllowOwnDayEdits_ButNeverDirectPointChanges()
     {
         using var factory = new PacusApiFactory(_mongo.ConnectionString);
         using var client = factory.CreateClient();
@@ -533,7 +533,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
             });
 
         Assert.Equal(
-            HttpStatusCode.OK,
+            HttpStatusCode.Forbidden,
             pointsResponse.StatusCode);
 
         var updateResponse = await client.PutAsJsonAsync(

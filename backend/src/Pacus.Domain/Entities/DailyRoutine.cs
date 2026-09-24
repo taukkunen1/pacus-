@@ -40,6 +40,15 @@ public class DailyRoutine
     public DateTime? GameTimerPausedAt { get; set; }
     public long GameTimerPausedMs { get; set; } = 0;
 
+    // Sessao ativa do cronometro. Diferente dos campos legados de pausa acima,
+    // estes campos representam a sessao escolhida na UI (15/30/45/60 min) e sao
+    // persistidos no Mongo. O saldo da sessao e reservado no inicio, entao fechar
+    // a aba, trocar de dispositivo ou perder a conexao no fim nao devolve tempo
+    // indevidamente nem permite consumir o mesmo saldo duas vezes.
+    public int? GameTimerSessionMinutes { get; set; }
+    public DateTime? GameTimerSessionEndsAt { get; set; }
+    public int? GameTimerSessionRemainingSeconds { get; set; }
+
     // Reacao pessoal do adulto sobre o dia (relatedness -- ver docs/PROPOSITO.md e
     // DailyReaction). Null enquanto ninguem reagiu hoje.
     public DailyReaction? Reaction { get; set; }

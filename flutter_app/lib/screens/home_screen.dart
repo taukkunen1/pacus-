@@ -38,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   DateTime? sessionEndsAt;
   Duration remaining = Duration.zero;
   bool sessionPaused = false;
+  bool sessionPersistedOnServer = false;
   bool completing = false;
   bool slowLoading = false;
   Timer? slowLoadTimer;
@@ -67,7 +68,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      final previousDayKey = lastDayKey;
       _checkDayBoundary();
+      if (previousDayKey == lastDayKey) {
+        // Recarrega o estado remoto ao voltar para a aba/app. Assim uma pausa,
+        // retomada ou finalizacao feita em outro dispositivo aparece aqui tambem.
+        _load();
+      }
     }
   }
 
@@ -135,21 +142,77 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _restoreSession() async {
-    if (routine == null) return;
+    final r = routine;
+    timer?.cancel();
+
+    // Sempre zera o estado em memoria antes de restaurar. Isso evita carregar uma
+    // sessao do dia anterior quando a rotina muda na virada do dia.
+    sessionMinutes = null;
+    sessionEndsAt = null;
+    remaining = Duration.zero;
+    sessionPaused = false;
+    sessionPersistedOnServer = false;
+
+    if (r == null) return;
+
+    final serverMinutes = r.gameTimerSessionMinutes;
+    if (serverMinutes != null && serverMinutes > 0) {
+      sessionPersistedOnServer = true;
+      sessionMinutes = serverMinutes;
+
+      // Qualquer cache antigo deixa de ser fonte de verdade assim que o servidor
+      // possui uma sessao persistida.
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_sessionKey);
+
+      final end = r.gameTimerSessionEndsAt;
+      if (end != null) {
+        sessionPaused = false;
+        sessionEndsAt = end;
+        final diff = end.difference(DateTime.now());
+        remaining = diff <= Duration.zero ? Duration.zero : diff;
+        _startTicker();
+        return;
+      }
+
+      final pausedSeconds = r.gameTimerSessionRemainingSeconds ?? 0;
+      if (pausedSeconds > 0) {
+        sessionPaused = true;
+        remaining = Duration(seconds: pausedSeconds);
+        return;
+      }
+
+      // Estado remoto inconsistente/expirado: a proxima acao no backend normaliza.
+      sessionMinutes = null;
+      sessionPersistedOnServer = false;
+      return;
+    }
+
+    // Compatibilidade de transicao: uma sessao iniciada antes desta correcao pode
+    // ainda existir apenas no localStorage. Ela continua funcionando ate terminar,
+    // mas toda sessao nova nasce no backend.
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_sessionKey);
     if (raw == null) return;
     final parts = raw.split('|');
-    if (parts.length != 2 && parts.length != 4) { await prefs.remove(_sessionKey); return; }
+    if (parts.length != 2 && parts.length != 4) {
+      await prefs.remove(_sessionKey);
+      return;
+    }
+
     final minutes = int.tryParse(parts[0]);
     final millis = int.tryParse(parts[1]);
-    if (minutes == null || millis == null || minutes <= 0) { await prefs.remove(_sessionKey); return; }
+    if (minutes == null || millis == null || minutes <= 0) {
+      await prefs.remove(_sessionKey);
+      return;
+    }
+
     sessionMinutes = minutes;
+    sessionPersistedOnServer = false;
 
     if (parts.length == 4 && parts[2] == '1') {
       final remainingSeconds = int.tryParse(parts[3]) ?? 0;
       sessionPaused = true;
-      sessionEndsAt = null;
       remaining = Duration(seconds: math.max(0, remainingSeconds));
       if (remaining <= Duration.zero) {
         await prefs.remove(_sessionKey);
@@ -167,22 +230,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _startSession(int minutes) async {
     final r = routine;
     if (r == null || minutes <= 0 || minutes > r.availableGameMinutes) return;
-    final end = DateTime.now().add(Duration(minutes: minutes));
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_sessionKey, '$minutes|${end.millisecondsSinceEpoch}|0|${minutes * 60}');
-    setState(() {
-      sessionMinutes = minutes;
-      sessionEndsAt = end;
-      remaining = Duration(minutes: minutes);
-      sessionPaused = false;
-    });
-    _startTicker();
+
+    try {
+      final updated = await widget.api.startGameTimerSession(minutes);
+      routine = updated;
+      await _restoreSession();
+      if (mounted) setState(() => error = null);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    }
   }
 
   void _startTicker() {
     timer?.cancel();
     _tick();
-    timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+    if (sessionEndsAt != null && remaining > Duration.zero) {
+      timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+    }
   }
 
   void _tick() {
@@ -201,9 +265,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _pauseSession() async {
     if (sessionMinutes == null || sessionPaused) return;
+
+    if (sessionPersistedOnServer) {
+      try {
+        final updated = await widget.api.pauseGameTimerSession();
+        routine = updated;
+        await _restoreSession();
+        if (mounted) setState(() => error = null);
+      } catch (e) {
+        if (mounted) setState(() => error = e.toString());
+      }
+      return;
+    }
+
+    // Sessao local legada, criada antes do deploy desta correcao.
     final end = sessionEndsAt;
     if (end == null) return;
-
     final diff = end.difference(DateTime.now());
     final safeRemaining = diff <= Duration.zero ? Duration.zero : diff;
     timer?.cancel();
@@ -226,6 +303,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _resumeSession() async {
     if (sessionMinutes == null || !sessionPaused || remaining <= Duration.zero) return;
 
+    if (sessionPersistedOnServer) {
+      try {
+        final updated = await widget.api.resumeGameTimerSession();
+        routine = updated;
+        await _restoreSession();
+        if (mounted) setState(() => error = null);
+      } catch (e) {
+        if (mounted) setState(() => error = e.toString());
+      }
+      return;
+    }
+
+    // Sessao local legada, criada antes do deploy desta correcao.
     final end = DateTime.now().add(remaining);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
@@ -241,22 +331,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     _startTicker();
   }
+
   Future<void> _finishSession() async {
     if (completing || sessionMinutes == null) return;
     completing = true;
+
+    final wasPersistedOnServer = sessionPersistedOnServer;
+    final selectedMinutes = sessionMinutes!;
+
     try {
-      final updated = await widget.api.consumeGameTimer(sessionMinutes!);
+      final updated = wasPersistedOnServer
+          ? await widget.api.finishGameTimerSession()
+          : await widget.api.consumeGameTimer(selectedMinutes);
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_sessionKey);
+
+      routine = updated;
+      await _restoreSession();
       await _playDuck();
+
       if (!mounted) return;
-      setState(() {
-        routine = updated;
-        sessionMinutes = null;
-        sessionEndsAt = null;
-        remaining = Duration.zero;
-        sessionPaused = false;
-      });
+      setState(() => error = null);
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
@@ -858,7 +954,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             Text(
               sessionPaused
                   ? 'Sessão pausada • o tempo não está correndo'
-                  : 'Você escolheu ${_formatMinutes(sessionMinutes!)} • depois restam ${_formatMinutes(math.max(0, available - sessionMinutes!))}',
+                  : 'Você escolheu ${_formatMinutes(sessionMinutes!)} • depois restam ${_formatMinutes(sessionPersistedOnServer ? available : math.max(0, available - sessionMinutes!))}',
               style: TextStyle(fontWeight: sessionPaused ? FontWeight.w800 : FontWeight.w500),
             ),
             const SizedBox(height: 14),

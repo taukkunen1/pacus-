@@ -78,6 +78,26 @@ void main() {
     expect(routine.availableGameMinutes, 0);
   });
 
+  test('DailyRoutine parses persisted game timer session', () {
+    final routine = DailyRoutine.fromJson({
+      'id': 'r3',
+      'familyId': 'f1',
+      'date': '2026-09-24',
+      'gameTimerEnabled': true,
+      'gameTimerMinutes': 120,
+      'gameTimerExtraMinutes': -30,
+      'gameTimerSessionMinutes': 30,
+      'gameTimerSessionEndsAt': '2026-09-24T12:30:00Z',
+      'gameTimerSessionRemainingSeconds': null,
+      'tasks': [],
+    });
+
+    expect(routine.availableGameMinutes, 90);
+    expect(routine.gameTimerSessionMinutes, 30);
+    expect(routine.gameTimerSessionEndsAt, DateTime.parse('2026-09-24T12:30:00Z'));
+    expect(routine.gameTimerSessionRemainingSeconds, isNull);
+  });
+
   test('AuthSession adult role is case insensitive', () {
     final session = AuthSession.fromJson({
       'token': 'token',

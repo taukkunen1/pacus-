@@ -56,6 +56,13 @@ public interface IDailyRoutineService
 
     // Debita uma sessao concluida do saldo diario. Adulto ou crianca podem chamar;
     // o service valida e nunca deixa o saldo ficar negativo.
+    // Sessao persistente do cronometro usado pela UI. O saldo e reservado no start;
+    // pause/resume/finish so alteram o estado da sessao, sem debitar novamente.
+    Task<DailyRoutine> StartGameTimerSessionAsync(ObjectId userId, int minutes, ObjectId actorId, string actorRole);
+    Task<DailyRoutine> PauseGameTimerSessionAsync(ObjectId userId, ObjectId actorId, string actorRole);
+    Task<DailyRoutine> ResumeGameTimerSessionAsync(ObjectId userId, ObjectId actorId, string actorRole);
+    Task<DailyRoutine> FinishGameTimerSessionAsync(ObjectId userId, ObjectId actorId, string actorRole);
+
     Task<DailyRoutine> ConsumeGameTimerAsync(ObjectId userId, int minutes, ObjectId actorId, string actorRole);
 
     // Ajusta o tempo total (+1h/-1h etc) — restrito a adulto; o controller

@@ -46,6 +46,18 @@ class PacusApi {
     }
   }
 
+  Future<DailyRoutine> startGameTimerSession(int minutes) async => DailyRoutine.fromJson(
+    await request('/daily-routines/today/game-timer/session/start', method: 'PUT', body: {'minutes': minutes}));
+
+  Future<DailyRoutine> pauseGameTimerSession() async => DailyRoutine.fromJson(
+    await request('/daily-routines/today/game-timer/session/pause', method: 'PUT'));
+
+  Future<DailyRoutine> resumeGameTimerSession() async => DailyRoutine.fromJson(
+    await request('/daily-routines/today/game-timer/session/resume', method: 'PUT'));
+
+  Future<DailyRoutine> finishGameTimerSession() async => DailyRoutine.fromJson(
+    await request('/daily-routines/today/game-timer/session/finish', method: 'PUT'));
+
   Future<DailyRoutine> consumeGameTimer(int minutes) async => DailyRoutine.fromJson(
     await request('/daily-routines/today/game-timer/consume', method: 'PUT', body: {'minutes': minutes}));
 

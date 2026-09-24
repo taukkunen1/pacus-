@@ -23,10 +23,12 @@ class DailyTask {
 }
 
 class DailyRoutine {
-  const DailyRoutine({required this.id, required this.familyId, required this.date, required this.gameTimerEnabled, required this.gameTimerMinutes, required this.gameTimerExtraMinutes, required this.tasks, this.reaction, this.tomorrowPlanConfirmedAt});
+  const DailyRoutine({required this.id, required this.familyId, required this.date, required this.gameTimerEnabled, required this.gameTimerMinutes, required this.gameTimerExtraMinutes, required this.tasks, this.gameTimerSessionMinutes, this.gameTimerSessionEndsAt, this.gameTimerSessionRemainingSeconds, this.reaction, this.tomorrowPlanConfirmedAt});
   final String id, familyId, date;
   final bool gameTimerEnabled;
   final int gameTimerMinutes, gameTimerExtraMinutes;
+  final int? gameTimerSessionMinutes, gameTimerSessionRemainingSeconds;
+  final DateTime? gameTimerSessionEndsAt;
   final List<DailyTask> tasks;
   final Map<String, dynamic>? reaction;
   final DateTime? tomorrowPlanConfirmedAt;
@@ -37,6 +39,9 @@ class DailyRoutine {
     id: json['id']?.toString() ?? '', familyId: json['familyId']?.toString() ?? '', date: json['date']?.toString() ?? '',
     gameTimerEnabled: json['gameTimerEnabled'] == true, gameTimerMinutes: (json['gameTimerMinutes'] as num?)?.toInt() ?? 120,
     gameTimerExtraMinutes: (json['gameTimerExtraMinutes'] as num?)?.toInt() ?? 0,
+    gameTimerSessionMinutes: (json['gameTimerSessionMinutes'] as num?)?.toInt(),
+    gameTimerSessionEndsAt: json['gameTimerSessionEndsAt'] == null ? null : DateTime.tryParse(json['gameTimerSessionEndsAt'].toString()),
+    gameTimerSessionRemainingSeconds: (json['gameTimerSessionRemainingSeconds'] as num?)?.toInt(),
     tasks: ((json['tasks'] as List?) ?? const []).whereType<Map<String, dynamic>>().map(DailyTask.fromJson).toList(),
     reaction: json['reaction'] is Map ? Map<String, dynamic>.from(json['reaction'] as Map) : null,
     tomorrowPlanConfirmedAt: json['tomorrowPlanConfirmedAt'] == null ? null : DateTime.tryParse(json['tomorrowPlanConfirmedAt'].toString()),

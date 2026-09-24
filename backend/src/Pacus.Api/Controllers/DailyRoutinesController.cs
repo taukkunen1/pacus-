@@ -168,6 +168,40 @@ public class DailyRoutinesController : ControllerBase
         return Ok(routine.ToResponse());
     }
 
+    // Sessao persistente usada pelo Flutter. O start reserva o saldo no backend;
+    // pause/resume/finish mantem o cronometro consistente entre reloads e dispositivos.
+    [HttpPut("today/game-timer/session/start")]
+    public async Task<IActionResult> StartGameTimerSession([FromBody] ConsumeGameTimerRequest request)
+    {
+        var routine = await _dailyRoutineService.StartGameTimerSessionAsync(
+            _currentUser.FamilyId, request.Minutes, _currentUser.UserId, _currentUser.Role.ToString());
+        return Ok(routine.ToResponse());
+    }
+
+    [HttpPut("today/game-timer/session/pause")]
+    public async Task<IActionResult> PauseGameTimerSession()
+    {
+        var routine = await _dailyRoutineService.PauseGameTimerSessionAsync(
+            _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString());
+        return Ok(routine.ToResponse());
+    }
+
+    [HttpPut("today/game-timer/session/resume")]
+    public async Task<IActionResult> ResumeGameTimerSession()
+    {
+        var routine = await _dailyRoutineService.ResumeGameTimerSessionAsync(
+            _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString());
+        return Ok(routine.ToResponse());
+    }
+
+    [HttpPut("today/game-timer/session/finish")]
+    public async Task<IActionResult> FinishGameTimerSession()
+    {
+        var routine = await _dailyRoutineService.FinishGameTimerSessionAsync(
+            _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString());
+        return Ok(routine.ToResponse());
+    }
+
     // Finaliza uma sessao escolhida pela crianca e debita esses minutos do saldo
     // diario. Sem RequireRole: a propria crianca precisa conseguir concluir a sessao.
     [HttpPut("today/game-timer/consume")]

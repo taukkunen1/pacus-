@@ -23,12 +23,12 @@ class DailyTask {
 }
 
 class DailyRoutine {
-  const DailyRoutine({required this.id, required this.familyId, required this.date, required this.gameTimerEnabled, required this.gameTimerMinutes, required this.gameTimerExtraMinutes, required this.tasks, this.gameTimerSessionMinutes, this.gameTimerSessionEndsAt, this.gameTimerSessionRemainingSeconds, this.reaction, this.tomorrowPlanConfirmedAt});
+  const DailyRoutine({required this.id, required this.familyId, required this.date, required this.gameTimerEnabled, required this.gameTimerMinutes, required this.gameTimerExtraMinutes, required this.tasks, this.gameTimerSessionMinutes, this.gameTimerSessionStartedAt, this.gameTimerSessionEndsAt, this.gameTimerSessionRemainingSeconds, this.reaction, this.tomorrowPlanConfirmedAt});
   final String id, familyId, date;
   final bool gameTimerEnabled;
   final int gameTimerMinutes, gameTimerExtraMinutes;
   final int? gameTimerSessionMinutes, gameTimerSessionRemainingSeconds;
-  final DateTime? gameTimerSessionEndsAt;
+  final DateTime? gameTimerSessionStartedAt, gameTimerSessionEndsAt;
   final List<DailyTask> tasks;
   final Map<String, dynamic>? reaction;
   final DateTime? tomorrowPlanConfirmedAt;
@@ -40,6 +40,7 @@ class DailyRoutine {
     gameTimerEnabled: json['gameTimerEnabled'] == true, gameTimerMinutes: (json['gameTimerMinutes'] as num?)?.toInt() ?? 120,
     gameTimerExtraMinutes: (json['gameTimerExtraMinutes'] as num?)?.toInt() ?? 0,
     gameTimerSessionMinutes: (json['gameTimerSessionMinutes'] as num?)?.toInt(),
+    gameTimerSessionStartedAt: json['gameTimerSessionStartedAt'] == null ? null : DateTime.tryParse(json['gameTimerSessionStartedAt'].toString()),
     gameTimerSessionEndsAt: json['gameTimerSessionEndsAt'] == null ? null : DateTime.tryParse(json['gameTimerSessionEndsAt'].toString()),
     gameTimerSessionRemainingSeconds: (json['gameTimerSessionRemainingSeconds'] as num?)?.toInt(),
     tasks: ((json['tasks'] as List?) ?? const []).whereType<Map<String, dynamic>>().map(DailyTask.fromJson).toList(),

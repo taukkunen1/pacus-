@@ -68,7 +68,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      final previousDayKey = lastDayKey;
       _checkDayBoundary();
+      if (previousDayKey == lastDayKey) {
+        // Recarrega o estado remoto ao voltar para a aba/app. Assim uma pausa,
+        // retomada ou finalizacao feita em outro dispositivo aparece aqui tambem.
+        _load();
+      }
     }
   }
 
@@ -238,7 +244,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _startTicker() {
     timer?.cancel();
     _tick();
-    timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+    if (sessionEndsAt != null && remaining > Duration.zero) {
+      timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+    }
   }
 
   void _tick() {

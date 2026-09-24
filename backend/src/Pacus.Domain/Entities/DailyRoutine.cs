@@ -46,6 +46,7 @@ public class DailyRoutine
     // a aba, trocar de dispositivo ou perder a conexao no fim nao devolve tempo
     // indevidamente nem permite consumir o mesmo saldo duas vezes.
     public int? GameTimerSessionMinutes { get; set; }
+    public DateTime? GameTimerSessionStartedAt { get; set; }
     public DateTime? GameTimerSessionEndsAt { get; set; }
     public int? GameTimerSessionRemainingSeconds { get; set; }
 

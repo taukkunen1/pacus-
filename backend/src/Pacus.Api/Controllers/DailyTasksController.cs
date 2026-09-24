@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Pacus.Api.Auth;
 using Pacus.Application.DTOs;
 using Pacus.Application.Interfaces;
+using Pacus.Domain.Enums;
 
 namespace Pacus.Api.Controllers;
 
@@ -82,6 +83,7 @@ public class DailyTasksController : ControllerBase
         return Ok(routine.ToResponse());
     }
 
+    [RequireRole(UserRole.Adult)]
     [HttpPut("{id}/points")]
     public async Task<IActionResult> AdjustPoints(
         string id,

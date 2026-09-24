@@ -194,6 +194,14 @@ public class DailyRoutinesController : ControllerBase
         return Ok(routine.ToResponse());
     }
 
+    [HttpPut("today/game-timer/session/cancel")]
+    public async Task<IActionResult> CancelGameTimerSession()
+    {
+        var routine = await _dailyRoutineService.CancelGameTimerSessionAsync(
+            _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString());
+        return Ok(routine.ToResponse());
+    }
+
     [HttpPut("today/game-timer/session/finish")]
     public async Task<IActionResult> FinishGameTimerSession()
     {

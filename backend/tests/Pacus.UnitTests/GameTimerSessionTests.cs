@@ -94,6 +94,60 @@ public class GameTimerSessionTests
     }
 
     [Fact]
+    public async Task CancelSession_DevolveSomenteTempoNaoUsadoEVoltaAoSaldo()
+    {
+        var (routines, service) = BuildSystem();
+        var familyId = ObjectId.GenerateNewId();
+        var actorId = ObjectId.GenerateNewId();
+
+        await service.CreateRoutineForDateAsync(
+            familyId, "2026-09-24", "America/Sao_Paulo");
+
+        var started = await service.StartGameTimerSessionAsync(
+            familyId, 60, actorId, "child");
+        Assert.Equal(-60, started.GameTimerExtraMinutes);
+
+        // Simula 30m01s usados: restam 29m59s. O saldo trabalha em minutos,
+        // entao os 29m59s restantes devolvem 30 minutos.
+        started.GameTimerSessionEndsAt = null;
+        started.GameTimerSessionRemainingSeconds = 1799;
+        await routines.UpdateAsync(started);
+
+        var cancelled = await service.CancelGameTimerSessionAsync(
+            familyId, actorId, "child");
+
+        Assert.Equal(-30, cancelled.GameTimerExtraMinutes);
+        Assert.Null(cancelled.GameTimerSessionMinutes);
+        Assert.Null(cancelled.GameTimerSessionEndsAt);
+        Assert.Null(cancelled.GameTimerSessionRemainingSeconds);
+    }
+
+    [Fact]
+    public async Task CancelSession_QuaseNoInicio_DevolveMinutoInteiroReservado()
+    {
+        var (routines, service) = BuildSystem();
+        var familyId = ObjectId.GenerateNewId();
+        var actorId = ObjectId.GenerateNewId();
+
+        await service.CreateRoutineForDateAsync(
+            familyId, "2026-09-24", "America/Sao_Paulo");
+
+        var started = await service.StartGameTimerSessionAsync(
+            familyId, 60, actorId, "child");
+
+        // Caso da UI mostrado pelo usuario: 59:58 restantes.
+        started.GameTimerSessionEndsAt = null;
+        started.GameTimerSessionRemainingSeconds = 3598;
+        await routines.UpdateAsync(started);
+
+        var cancelled = await service.CancelGameTimerSessionAsync(
+            familyId, actorId, "child");
+
+        Assert.Equal(0, cancelled.GameTimerExtraMinutes);
+        Assert.Null(cancelled.GameTimerSessionMinutes);
+    }
+
+    [Fact]
     public async Task StartSession_ComSessaoAtiva_RejeitaSegundaSessao()
     {
         var (_, service) = BuildSystem();

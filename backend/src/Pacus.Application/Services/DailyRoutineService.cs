@@ -869,6 +869,46 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
+    public async Task<DailyRoutine> CancelGameTimerSessionAsync(
+        ObjectId userId, ObjectId actorId, string actorRole)
+    {
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
+
+        await SyncGameTimerAsync(routine, userId);
+
+        var sessionMinutes = routine.GameTimerSessionMinutes;
+        if (sessionMinutes is null)
+            return routine;
+
+        // O saldo inteiro da sessao foi reservado no start. Ao cancelar, devolvemos
+        // somente o que ainda nao foi usado. Como o saldo do produto e em minutos,
+        // qualquer fracao de minuto restante e arredondada para cima. Ex.: 59:58
+        // restantes devolve 60 min; 29:59 restantes devolve 30 min.
+        int remainingSeconds;
+        if (routine.GameTimerSessionEndsAt is not null)
+        {
+            remainingSeconds = Math.Max(
+                0,
+                (int)Math.Ceiling(
+                    (routine.GameTimerSessionEndsAt.Value - DateTime.UtcNow).TotalSeconds));
+        }
+        else
+        {
+            remainingSeconds = Math.Max(0, routine.GameTimerSessionRemainingSeconds ?? 0);
+        }
+
+        var refundableMinutes = Math.Min(
+            sessionMinutes.Value,
+            (int)Math.Ceiling(remainingSeconds / 60.0));
+
+        routine.GameTimerExtraMinutes += refundableMinutes;
+        ClearGameTimerSession(routine);
+
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        return routine;
+    }
+
     public async Task<DailyRoutine> FinishGameTimerSessionAsync(
         ObjectId userId, ObjectId actorId, string actorRole)
     {

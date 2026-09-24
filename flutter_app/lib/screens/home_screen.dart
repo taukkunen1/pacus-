@@ -332,6 +332,55 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _startTicker();
   }
 
+  Future<void> _cancelSession() async {
+    if (sessionMinutes == null || completing) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Encerrar esta sessão?'),
+        content: const Text(
+          'Você voltará para o tempo disponível de hoje. '
+          'O tempo que ainda não foi usado será devolvido ao saldo.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Continuar sessão'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Encerrar e devolver'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    completing = true;
+    timer?.cancel();
+
+    try {
+      if (sessionPersistedOnServer) {
+        final updated = await widget.api.cancelGameTimerSession();
+        routine = updated;
+      } else {
+        // Sessao local antiga: ela nunca reservou saldo no backend, portanto basta
+        // remover o cache local para voltar ao saldo original.
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_sessionKey);
+      }
+
+      await _restoreSession();
+      if (mounted) setState(() => error = null);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    } finally {
+      completing = false;
+    }
+  }
+
   Future<void> _finishSession() async {
     if (completing || sessionMinutes == null) return;
     completing = true;
@@ -958,10 +1007,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               style: TextStyle(fontWeight: sessionPaused ? FontWeight.w800 : FontWeight.w500),
             ),
             const SizedBox(height: 14),
-            FilledButton.icon(
-              onPressed: sessionPaused ? _resumeSession : _pauseSession,
-              icon: Icon(sessionPaused ? Icons.play_arrow_rounded : Icons.pause_rounded),
-              label: Text(sessionPaused ? 'Retomar temporizador' : 'Pausar temporizador'),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                FilledButton.icon(
+                  onPressed: completing ? null : (sessionPaused ? _resumeSession : _pauseSession),
+                  icon: Icon(sessionPaused ? Icons.play_arrow_rounded : Icons.pause_rounded),
+                  label: Text(sessionPaused ? 'Retomar temporizador' : 'Pausar temporizador'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: completing ? null : _cancelSession,
+                  icon: const Icon(Icons.close_rounded),
+                  label: const Text('Voltar ao tempo disponível'),
+                ),
+              ],
             ),
           ]),
         ),

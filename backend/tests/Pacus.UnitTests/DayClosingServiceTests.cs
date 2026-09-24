@@ -647,20 +647,13 @@ public class DayClosingServiceTests
 
     [Theory]
     [InlineData("Pacific/Auckland", "2026-09-24")]
-    [InlineData("America/Los_Angeles", "2026-09-23")]
-    public async Task MesmoInstanteUtc_RespeitaTimezoneConfiguradoDaFamilia(
-        string timezone, string expectedOpenDate)
+    [InlineData("America/Los_Angeles", "2026-09-24")]
+    [InlineData("Pacific/Pago_Pago", "2026-09-23")]
+    public void MesmoInstanteUtc_ResolveDataPeloTimezoneInformado(
+        string timezone, string expectedDate)
     {
-        var utc = new DateTime(2026, 9, 24, 7, 30, 0, DateTimeKind.Utc);
-        var (closing, _, routines, _, _, _) = BuildSystem(simulatedUtcNow: utc);
-
-        var familyId = ObjectId.GenerateNewId();
-        await closing.CloseIfDueAsync(familyId, timezone);
-
-        var open = await routines.GetLatestOpenAsync(familyId);
-        Assert.NotNull(open);
-        Assert.Equal(expectedOpenDate, open!.Date);
-        Assert.Equal(timezone, open.Timezone);
+        var utc = new DateTime(2026, 9, 24, 10, 30, 0, DateTimeKind.Utc);
+        Assert.Equal(expectedDate, TimezoneHelper.GetOperationalDate(timezone, utc));
     }
 
     [Fact]

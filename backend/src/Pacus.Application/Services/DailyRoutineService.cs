@@ -798,6 +798,7 @@ public class DailyRoutineService : IDailyRoutineService
         // reload, fechamento da aba, troca de aparelho e falha de rede no encerramento.
         routine.GameTimerExtraMinutes -= minutes;
         routine.GameTimerSessionMinutes = minutes;
+        routine.GameTimerSessionStartedAt = now;
         routine.GameTimerSessionEndsAt = now.AddMinutes(minutes);
         routine.GameTimerSessionRemainingSeconds = null;
 
@@ -1169,6 +1170,7 @@ public class DailyRoutineService : IDailyRoutineService
     private static void ClearGameTimerSession(DailyRoutine routine)
     {
         routine.GameTimerSessionMinutes = null;
+        routine.GameTimerSessionStartedAt = null;
         routine.GameTimerSessionEndsAt = null;
         routine.GameTimerSessionRemainingSeconds = null;
     }

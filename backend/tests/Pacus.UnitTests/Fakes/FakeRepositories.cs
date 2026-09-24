@@ -78,6 +78,9 @@ public class FakeDailyRoutineRepository : IDailyRoutineRepository
         GameTimerExtraMinutes = source.GameTimerExtraMinutes,
         GameTimerPausedAt = source.GameTimerPausedAt,
         GameTimerPausedMs = source.GameTimerPausedMs,
+        GameTimerSessionMinutes = source.GameTimerSessionMinutes,
+        GameTimerSessionEndsAt = source.GameTimerSessionEndsAt,
+        GameTimerSessionRemainingSeconds = source.GameTimerSessionRemainingSeconds,
         Reaction = source.Reaction is null
             ? null
             : new DailyReaction

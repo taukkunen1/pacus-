@@ -264,6 +264,17 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Migracao online, idempotente e retrocompativel: completa sourceType/sourceId das
+// point_transactions criadas antes do ledger auditavel. Roda apenas nos documentos
+// ainda incompletos, portanto reinicios subsequentes nao reescrevem o historico.
+using (var migrationScope = app.Services.CreateScope())
+{
+    var points = migrationScope.ServiceProvider.GetRequiredService<IPointTransactionRepository>();
+    var migrated = await points.BackfillSourceReferencesAsync();
+    if (migrated > 0)
+        app.Logger.LogInformation("Backfilled source references for {Count} point transactions.", migrated);
+}
+
 if (useDevelopmentBehavior)
 {
     app.UseSwagger();

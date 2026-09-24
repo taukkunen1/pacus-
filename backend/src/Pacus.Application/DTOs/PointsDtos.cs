@@ -21,6 +21,8 @@ public record PointTransactionResponse(
     string TaskId,
     string TaskTitle,
     PointTransactionType Type,
+    string SourceType,
+    string SourceId,
     int Points,
     int BalanceAfter,
     string? Reason,
@@ -39,6 +41,11 @@ public static class PointTransactionMappingExtensions
         transaction.TaskId,
         transaction.TaskTitle,
         transaction.Type,
+        string.IsNullOrWhiteSpace(transaction.SourceType)
+            ? (transaction.Type == PointTransactionType.Redemption ? "redemption" :
+               transaction.Type == PointTransactionType.Adjustment ? "adjustment" : "task")
+            : transaction.SourceType,
+        string.IsNullOrWhiteSpace(transaction.SourceId) ? transaction.TaskId : transaction.SourceId,
         transaction.Points,
         transaction.BalanceAfter,
         transaction.Reason,

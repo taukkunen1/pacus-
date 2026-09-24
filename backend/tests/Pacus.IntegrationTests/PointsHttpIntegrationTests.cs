@@ -324,6 +324,20 @@ public sealed class PointsHttpIntegrationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task TransactionHistory_ShouldBeForbiddenForChild()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var family = await BootstrapAsync(client);
+        await LoginChildAsync(client, family);
+
+        var response = await client.GetAsync("/api/v1/points/transactions");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     // Log de auditoria (checklist de seguranca, item A5): ajuste manual de
     // saldo e uma acao administrativa sensivel e precisa deixar rastro na
     // colecao audit_logs, separado da propria transacao em point_transactions.

@@ -19,19 +19,22 @@ public class DailyRoutinesController : ControllerBase
     private readonly IDayClosingService _dayClosingService;
     private readonly IFamilyTimezoneService _familyTimezoneService;
     private readonly ICurrentUserService _currentUser;
+    private readonly IAuditLogRepository _auditLogRepository;
 
     public DailyRoutinesController(
         IDailyRoutineService dailyRoutineService,
         IDailyRoutineRepository dailyRoutineRepository,
         IDayClosingService dayClosingService,
         IFamilyTimezoneService familyTimezoneService,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        IAuditLogRepository auditLogRepository)
     {
         _dailyRoutineService = dailyRoutineService;
         _dailyRoutineRepository = dailyRoutineRepository;
         _dayClosingService = dayClosingService;
         _familyTimezoneService = familyTimezoneService;
         _currentUser = currentUser;
+        _auditLogRepository = auditLogRepository;
     }
 
     // Sem try/catch aqui de proposito (nem nas actions abaixo): NotFoundException/
@@ -175,6 +178,7 @@ public class DailyRoutinesController : ControllerBase
     {
         var routine = await _dailyRoutineService.StartGameTimerSessionAsync(
             _currentUser.FamilyId, request.Minutes, _currentUser.UserId, _currentUser.Role.ToString());
+        await LogTimerActionAsync("timer.session_started", routine);
         return Ok(routine.ToResponse());
     }
 
@@ -183,6 +187,7 @@ public class DailyRoutinesController : ControllerBase
     {
         var routine = await _dailyRoutineService.PauseGameTimerSessionAsync(
             _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString());
+        await LogTimerActionAsync("timer.session_paused", routine);
         return Ok(routine.ToResponse());
     }
 
@@ -191,6 +196,7 @@ public class DailyRoutinesController : ControllerBase
     {
         var routine = await _dailyRoutineService.ResumeGameTimerSessionAsync(
             _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString());
+        await LogTimerActionAsync("timer.session_resumed", routine);
         return Ok(routine.ToResponse());
     }
 
@@ -199,6 +205,7 @@ public class DailyRoutinesController : ControllerBase
     {
         var routine = await _dailyRoutineService.CancelGameTimerSessionAsync(
             _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString());
+        await LogTimerActionAsync("timer.session_cancelled", routine);
         return Ok(routine.ToResponse());
     }
 
@@ -207,6 +214,7 @@ public class DailyRoutinesController : ControllerBase
     {
         var routine = await _dailyRoutineService.FinishGameTimerSessionAsync(
             _currentUser.FamilyId, _currentUser.UserId, _currentUser.Role.ToString());
+        await LogTimerActionAsync("timer.session_finished", routine);
         return Ok(routine.ToResponse());
     }
 
@@ -253,4 +261,18 @@ public class DailyRoutinesController : ControllerBase
             _currentUser.FamilyId, request.Items, _currentUser.UserId, _currentUser.Role.ToString());
         return Ok(routine.ToResponse());
     }
+    private Task LogTimerActionAsync(string action, Pacus.Domain.Entities.DailyRoutine routine) =>
+        _auditLogRepository.CreateAsync(new Pacus.Domain.Entities.AuditLog
+        {
+            Id = MongoDB.Bson.ObjectId.GenerateNewId(),
+            FamilyId = _currentUser.FamilyId,
+            Action = action,
+            EntityType = "GameTimerSession",
+            EntityId = routine.Id.ToString(),
+            Details = $"Sessao={routine.GameTimerSessionMinutes?.ToString() ?? "encerrada"}min; restante={routine.GameTimerSessionRemainingSeconds?.ToString() ?? "rodando/encerrado"}s",
+            ActorId = _currentUser.UserId,
+            ActorRole = _currentUser.Role,
+            CreatedAt = DateTime.UtcNow,
+        });
+
 }

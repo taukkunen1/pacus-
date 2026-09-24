@@ -12,6 +12,9 @@ namespace Pacus.Api.Controllers;
 [Route("api/v1/activity")]
 public class ActivityController : ControllerBase
 {
+    private sealed record TimelineItem(
+        DateTime At, string Kind, string Action, string Title,
+        string? Details, string ActorRole, int? Delta);
     private readonly IAuditLogRepository _auditLogs;
     private readonly IPointTransactionRepository _points;
     private readonly IPacusGrowthRepository _growth;
@@ -42,48 +45,25 @@ public class ActivityController : ControllerBase
         var growthTask = _growth.GetAllByFamilyAsync(familyId);
         await Task.WhenAll(auditTask, pointsTask, growthTask);
 
-        var items = new List<object>();
+        var items = new List<TimelineItem>();
 
-        items.AddRange(auditTask.Result.Select(a => (object)new
-        {
-            at = a.CreatedAt,
-            kind = "audit",
-            action = a.Action,
-            title = a.EntityType,
-            details = a.Details,
-            actorRole = a.ActorRole.ToString(),
-            delta = (int?)null
-        }));
+        items.AddRange(auditTask.Result.Select(a => new TimelineItem(
+            a.CreatedAt, "audit", a.Action, a.EntityType, a.Details,
+            a.ActorRole.ToString(), null)));
 
-        items.AddRange(pointsTask.Result.Select(p => (object)new
-        {
-            at = p.CreatedAt,
-            kind = "points",
-            action = p.Type.ToString(),
-            title = p.TaskTitle,
-            details = p.Reason,
-            actorRole = p.ActorRole.ToString(),
-            delta = (int?)p.Points
-        }));
+        items.AddRange(pointsTask.Result.Select(p => new TimelineItem(
+            p.CreatedAt, "points", p.Type.ToString(), p.TaskTitle, p.Reason,
+            p.ActorRole.ToString(), p.Points)));
 
-        items.AddRange(growthTask.Result.Select(g => (object)new
-        {
-            at = g.CreatedAt,
-            kind = "growth",
-            action = "pacus.growth",
-            title = $"{g.StageBefore} → {g.StageAfter}",
-            details = $"Dia {g.Date}; tamanho {g.SizeBefore:0.##} → {g.SizeAfter:0.##}",
-            actorRole = "System",
-            delta = (int?)null
-        }));
+        items.AddRange(growthTask.Result.Select(g => new TimelineItem(
+            g.CreatedAt, "growth", "pacus.growth",
+            $"{g.StageBefore} → {g.StageAfter}",
+            $"Dia {g.Date}; tamanho {g.SizeBefore:0.##} → {g.SizeAfter:0.##}",
+            "System", null)));
 
-        // Tipos anonimos diferentes foram projetados acima para uma forma comum via
-        // serializacao; ordenar antes de materializar exige uma chave explicita.
         var ordered = items
-            .Select(x => new { Value = x, At = (DateTime)x.GetType().GetProperty("at")!.GetValue(x)! })
             .OrderByDescending(x => x.At)
             .Take(limit)
-            .Select(x => x.Value)
             .ToList();
 
         return Ok(ordered);

@@ -7,6 +7,8 @@ public interface IPointTransactionRepository
 {
     Task<PointTransaction> CreateAsync(PointTransaction transaction);
     Task<int> GetBalanceAsync(ObjectId userId);
+    // Migracao idempotente de registros anteriores ao ledger com sourceType/sourceId.
+    Task<long> BackfillSourceReferencesAsync();
 
     // Paginado (achado #4 da auditoria de API de 2026-09-01 -- ver docs/ESTADO_ATUAL.md).
     Task<(List<PointTransaction> Items, long TotalCount)> GetHistoryAsync(ObjectId userId, int page, int pageSize);

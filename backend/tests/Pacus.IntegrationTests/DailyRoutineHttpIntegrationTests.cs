@@ -770,6 +770,110 @@ public class DailyRoutineHttpIntegrationTests : IClassFixture<MongoIntegrationFi
 
 
 
+
+    [Fact]
+    public async Task CriticalJourney_ShouldSurviveReloadTimerAndTimezoneDayRollover()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+        await BootstrapAndLoginAdultAsync(client);
+
+        // Comeca no lado mais atrasado da linha internacional de data.
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync(
+            "/api/v1/family/timezone", new { timezone = "Pacific/Pago_Pago" })).StatusCode);
+
+        var firstDay = await client.GetFromJsonAsync<JsonElement>("/api/v1/daily-routines/today");
+        var firstDate = firstDay.GetProperty("date").GetString();
+
+        var create = await client.PostAsJsonAsync("/api/v1/daily-tasks", new
+        {
+            title = "Jornada critica", description = "E2E",
+            type = "expected", period = "afternoon", points = 5
+        });
+        Assert.Equal(HttpStatusCode.OK, create.StatusCode);
+        var routine = await create.Content.ReadFromJsonAsync<JsonElement>();
+        var taskId = routine.GetProperty("tasks").EnumerateArray()
+            .Last(x => x.GetProperty("title").GetString() == "Jornada critica")
+            .GetProperty("id").GetString()!;
+
+        Assert.Equal(HttpStatusCode.OK,
+            (await client.PostAsync($"/api/v1/daily-tasks/{taskId}/complete", null)).StatusCode);
+        var balance = await client.GetFromJsonAsync<JsonElement>("/api/v1/points");
+        Assert.Equal(5, balance.GetProperty("balance").GetInt32());
+
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync(
+            "/api/v1/daily-routines/today/game-timer/session/start", new { minutes = 60 })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsync(
+            "/api/v1/daily-routines/today/game-timer/session/pause", null)).StatusCode);
+
+        // Reload: nenhuma variavel local e reutilizada; estado vem novamente da API/Mongo.
+        var restored = await client.GetFromJsonAsync<JsonElement>("/api/v1/daily-routines/today");
+        Assert.Equal(60, restored.GetProperty("gameTimerSessionMinutes").GetInt32());
+        Assert.True(restored.GetProperty("gameTimerSessionRemainingSeconds").GetInt32() > 0);
+
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsync(
+            "/api/v1/daily-routines/today/game-timer/session/resume", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsync(
+            "/api/v1/daily-routines/today/game-timer/session/cancel", null)).StatusCode);
+
+        var cancelled = await client.GetFromJsonAsync<JsonElement>("/api/v1/daily-routines/today");
+        Assert.Equal(JsonValueKind.Null, cancelled.GetProperty("gameTimerSessionMinutes").ValueKind);
+
+        // Kiritimati esta 25h a frente de Pago Pago: a data operacional necessariamente
+        // avanca. Isso testa fechamento lazy sem depender da hora em que o CI roda.
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync(
+            "/api/v1/family/timezone", new { timezone = "Pacific/Kiritimati" })).StatusCode);
+        var nextDay = await client.GetFromJsonAsync<JsonElement>("/api/v1/daily-routines/today");
+        Assert.NotEqual(firstDate, nextDay.GetProperty("date").GetString());
+
+        var closed = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/v1/daily-routines?date={firstDate}");
+        Assert.Equal("closed", closed.GetProperty("status").GetString());
+        Assert.Equal(5, (await client.GetFromJsonAsync<JsonElement>("/api/v1/points"))
+            .GetProperty("balance").GetInt32());
+    }
+
+    [Fact]
+    public async Task TimerConcurrentRequests_ShouldPreserveSingleSessionAndBalanceInvariant()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+        await BootstrapAndLoginAdultAsync(client);
+        await client.GetAsync("/api/v1/daily-routines/today");
+
+        var starts = await Task.WhenAll(
+            client.PutAsJsonAsync("/api/v1/daily-routines/today/game-timer/session/start", new { minutes = 60 }),
+            client.PutAsJsonAsync("/api/v1/daily-routines/today/game-timer/session/start", new { minutes = 60 }));
+
+        Assert.Single(starts.Where(x => x.StatusCode == HttpStatusCode.OK));
+        Assert.All(starts, x => Assert.Contains(x.StatusCode,
+            new[] { HttpStatusCode.OK, HttpStatusCode.Conflict, HttpStatusCode.BadRequest }));
+
+        var active = await client.GetFromJsonAsync<JsonElement>("/api/v1/daily-routines/today");
+        Assert.Equal(60, active.GetProperty("gameTimerSessionMinutes").GetInt32());
+        Assert.Equal(-60, active.GetProperty("gameTimerExtraMinutes").GetInt32());
+
+        var pauses = await Task.WhenAll(
+            client.PutAsync("/api/v1/daily-routines/today/game-timer/session/pause", null),
+            client.PutAsync("/api/v1/daily-routines/today/game-timer/session/pause", null));
+        Assert.Contains(pauses, x => x.StatusCode == HttpStatusCode.OK);
+
+        var resumes = await Task.WhenAll(
+            client.PutAsync("/api/v1/daily-routines/today/game-timer/session/resume", null),
+            client.PutAsync("/api/v1/daily-routines/today/game-timer/session/resume", null));
+        Assert.Contains(resumes, x => x.StatusCode == HttpStatusCode.OK);
+
+        var cancels = await Task.WhenAll(
+            client.PutAsync("/api/v1/daily-routines/today/game-timer/session/cancel", null),
+            client.PutAsync("/api/v1/daily-routines/today/game-timer/session/cancel", null));
+        Assert.Contains(cancels, x => x.StatusCode == HttpStatusCode.OK);
+
+        var final = await client.GetFromJsonAsync<JsonElement>("/api/v1/daily-routines/today");
+        Assert.Equal(JsonValueKind.Null, final.GetProperty("gameTimerSessionMinutes").ValueKind);
+        Assert.Equal(0, final.GetProperty("gameTimerExtraMinutes").GetInt32());
+    }
+
+
     private async Task BootstrapAndLoginAdultAsync(HttpClient client)
 
 

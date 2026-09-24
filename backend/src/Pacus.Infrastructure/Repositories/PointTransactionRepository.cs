@@ -18,6 +18,37 @@ public class PointTransactionRepository : IPointTransactionRepository
         return transaction;
     }
 
+    public async Task<long> BackfillSourceReferencesAsync()
+    {
+        var filter = Builders<PointTransaction>.Filter.Or(
+            Builders<PointTransaction>.Filter.Eq(t => t.SourceType, string.Empty),
+            Builders<PointTransaction>.Filter.Exists("sourceType", false),
+            Builders<PointTransaction>.Filter.Eq(t => t.SourceId, string.Empty),
+            Builders<PointTransaction>.Filter.Exists("sourceId", false));
+
+        var legacy = await _context.PointTransactions.Find(filter).ToListAsync();
+        if (legacy.Count == 0) return 0;
+
+        var writes = legacy.Select(t =>
+        {
+            var sourceType = t.Type switch
+            {
+                Domain.Enums.PointTransactionType.Redemption => "redemption",
+                Domain.Enums.PointTransactionType.Adjustment => "adjustment",
+                _ => "task",
+            };
+            var sourceId = string.IsNullOrWhiteSpace(t.TaskId) ? t.Id.ToString() : t.TaskId;
+            return (WriteModel<PointTransaction>)new UpdateOneModel<PointTransaction>(
+                Builders<PointTransaction>.Filter.Eq(x => x.Id, t.Id),
+                Builders<PointTransaction>.Update
+                    .Set(x => x.SourceType, sourceType)
+                    .Set(x => x.SourceId, sourceId));
+        }).ToList();
+
+        var result = await _context.PointTransactions.BulkWriteAsync(writes);
+        return result.ModifiedCount;
+    }
+
     // Fonte da verdade: soma de todos os deltas. balanceAfter em cada doc e so um snapshot de leitura rapida.
     //
     // Antes carregava TODAS as transacoes da familia pra memoria pra somar em C#

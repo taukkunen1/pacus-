@@ -439,6 +439,29 @@ public class FakePacusRepository
         return Task.CompletedTask;
     }
 
+    public Task<bool> TryApplyGrowthAsync(
+        ObjectId familyId,
+        string date,
+        int totalClosedDays,
+        PacusStage stage,
+        double size,
+        PacusStageHistoryEntry? historyEntry,
+        DateTime updatedAt)
+    {
+        var pacus = _pacus.FirstOrDefault(p => p.FamilyId == familyId);
+        if (pacus is null || pacus.LastGrowthDate == date)
+            return Task.FromResult(false);
+
+        pacus.TotalClosedDays = totalClosedDays;
+        pacus.Stage = stage;
+        pacus.Size = size;
+        pacus.LastGrowthDate = date;
+        pacus.UpdatedAt = updatedAt;
+        if (historyEntry is not null)
+            pacus.StageHistory.Add(historyEntry);
+        return Task.FromResult(true);
+    }
+
     public Task DeleteByFamilyIdAsync(
         ObjectId familyId)
     {

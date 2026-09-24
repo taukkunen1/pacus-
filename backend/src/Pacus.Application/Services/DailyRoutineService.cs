@@ -763,6 +763,130 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
+    public async Task<DailyRoutine> StartGameTimerSessionAsync(
+        ObjectId userId, int minutes, ObjectId actorId, string actorRole)
+    {
+        if (minutes <= 0)
+            throw new ValidationException("Os minutos da sessao devem ser maiores que zero.");
+
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
+
+        await SyncGameTimerAsync(routine, userId);
+
+        var now = DateTime.UtcNow;
+        if (routine.GameTimerSessionMinutes is not null)
+        {
+            var expiredWhileRunning =
+                routine.GameTimerSessionEndsAt is not null &&
+                routine.GameTimerSessionEndsAt.Value <= now;
+            var invalidPausedSession =
+                routine.GameTimerSessionEndsAt is null &&
+                (routine.GameTimerSessionRemainingSeconds ?? 0) <= 0;
+
+            if (expiredWhileRunning || invalidPausedSession)
+                ClearGameTimerSession(routine);
+            else
+                throw new ValidationException("Ja existe uma sessao de tempo de tela em andamento.");
+        }
+
+        var availableMinutes = Math.Max(0, routine.GameTimerMinutes + routine.GameTimerExtraMinutes);
+        if (minutes > availableMinutes)
+            throw new ValidationException("A sessao escolhida e maior que o tempo disponivel hoje.");
+
+        // Reserva o saldo no inicio, e nao no fim. Isso torna o consumo resistente a
+        // reload, fechamento da aba, troca de aparelho e falha de rede no encerramento.
+        routine.GameTimerExtraMinutes -= minutes;
+        routine.GameTimerSessionMinutes = minutes;
+        routine.GameTimerSessionEndsAt = now.AddMinutes(minutes);
+        routine.GameTimerSessionRemainingSeconds = null;
+
+        // Mantem o mecanismo legado explicitamente pausado; a UX nova usa o saldo
+        // como carteira e a sessao persistente acima como unica fonte do cronometro.
+        routine.GameTimerPausedAt ??= now;
+
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        return routine;
+    }
+
+    public async Task<DailyRoutine> PauseGameTimerSessionAsync(
+        ObjectId userId, ObjectId actorId, string actorRole)
+    {
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
+
+        await SyncGameTimerAsync(routine, userId);
+
+        if (routine.GameTimerSessionMinutes is null)
+            return routine;
+
+        if (routine.GameTimerSessionEndsAt is null)
+            return routine; // ja esta pausada
+
+        var seconds = (int)Math.Ceiling(
+            (routine.GameTimerSessionEndsAt.Value - DateTime.UtcNow).TotalSeconds);
+
+        if (seconds <= 0)
+        {
+            ClearGameTimerSession(routine);
+        }
+        else
+        {
+            routine.GameTimerSessionRemainingSeconds = seconds;
+            routine.GameTimerSessionEndsAt = null;
+        }
+
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        return routine;
+    }
+
+    public async Task<DailyRoutine> ResumeGameTimerSessionAsync(
+        ObjectId userId, ObjectId actorId, string actorRole)
+    {
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
+
+        await SyncGameTimerAsync(routine, userId);
+
+        if (routine.GameTimerSessionMinutes is null)
+            return routine;
+
+        if (routine.GameTimerSessionEndsAt is not null)
+            return routine; // ja esta rodando
+
+        var seconds = routine.GameTimerSessionRemainingSeconds ?? 0;
+        if (seconds <= 0)
+        {
+            ClearGameTimerSession(routine);
+        }
+        else
+        {
+            routine.GameTimerSessionEndsAt = DateTime.UtcNow.AddSeconds(seconds);
+            routine.GameTimerSessionRemainingSeconds = null;
+        }
+
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        return routine;
+    }
+
+    public async Task<DailyRoutine> FinishGameTimerSessionAsync(
+        ObjectId userId, ObjectId actorId, string actorRole)
+    {
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
+
+        await SyncGameTimerAsync(routine, userId);
+
+        if (routine.GameTimerSessionMinutes is null)
+            return routine;
+
+        // O saldo ja foi reservado no StartGameTimerSessionAsync. Finalizar e apenas
+        // limpar o estado ativo; nunca debita novamente.
+        ClearGameTimerSession(routine);
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        return routine;
+    }
+
     public async Task<DailyRoutine> ConsumeGameTimerAsync(ObjectId userId, int minutes, ObjectId actorId, string actorRole)
     {
         if (minutes <= 0)
@@ -1000,6 +1124,13 @@ public class DailyRoutineService : IDailyRoutineService
         });
 
         return routine;
+    }
+
+    private static void ClearGameTimerSession(DailyRoutine routine)
+    {
+        routine.GameTimerSessionMinutes = null;
+        routine.GameTimerSessionEndsAt = null;
+        routine.GameTimerSessionRemainingSeconds = null;
     }
 
     private async Task SyncGameTimerAsync(DailyRoutine routine, ObjectId userId)

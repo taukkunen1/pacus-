@@ -612,4 +612,77 @@ public class DayClosingServiceTests
         dayClosing.CloseIfDueAsync(
             userId,
             "UTC");
+    [Fact]
+    public async Task ViradaDaMeiaNoite_UsaTimezoneDaFamilia_EFechaExatamenteUmaVez()
+    {
+        // 02:59:59 UTC ainda e 23:59:59 do dia 23 em Sao Paulo.
+        var beforeUtc = new DateTime(2026, 9, 24, 2, 59, 59, DateTimeKind.Utc);
+        var (beforeClosing, dailyRoutine, routines, pacusRepo, growthRepo, _) =
+            BuildSystem(simulatedUtcNow: beforeUtc);
+        var familyId = ObjectId.GenerateNewId();
+        await pacusRepo.CreateAsync(NewPacus(familyId));
+        await dailyRoutine.CreateRoutineForDateAsync(
+            familyId, "2026-09-23", "America/Sao_Paulo");
+
+        await beforeClosing.CloseIfDueAsync(familyId, "America/Sao_Paulo");
+        Assert.Equal(RoutineStatus.Open,
+            (await routines.GetByUserAndDateAsync(familyId, "2026-09-23"))!.Status);
+
+        // Um segundo depois e meia-noite local. Simula app fechado/offline durante a
+        // virada e reaberto depois: o fechamento lazy deve acontecer no primeiro acesso.
+        var afterClosing = new DayClosingService(
+            routines, dailyRoutine, pacusRepo, growthRepo, new FakeSettingsRepository(),
+            new FixedClock(beforeUtc.AddSeconds(1)));
+
+        await Task.WhenAll(
+            afterClosing.CloseIfDueAsync(familyId, "America/Sao_Paulo"),
+            afterClosing.CloseIfDueAsync(familyId, "America/Sao_Paulo"));
+
+        var closed = await routines.GetByUserAndDateAsync(familyId, "2026-09-23");
+        var pacus = await pacusRepo.GetByFamilyIdAsync(familyId);
+        Assert.Equal(RoutineStatus.Closed, closed!.Status);
+        Assert.Equal(1, pacus!.TotalClosedDays);
+        Assert.Single(growthRepo.Logs.Where(x => x.UserId == familyId && x.Date == "2026-09-23"));
+    }
+
+    [Theory]
+    [InlineData("Pacific/Auckland", "2026-09-24")]
+    [InlineData("America/Los_Angeles", "2026-09-23")]
+    public async Task MesmoInstanteUtc_RespeitaTimezoneConfiguradoDaFamilia(
+        string timezone, string expectedOpenDate)
+    {
+        var utc = new DateTime(2026, 9, 24, 7, 30, 0, DateTimeKind.Utc);
+        var (closing, _, routines, _, _, _) = BuildSystem(simulatedUtcNow: utc);
+
+        var familyId = ObjectId.GenerateNewId();
+        await closing.CloseIfDueAsync(familyId, timezone);
+
+        var open = await routines.GetLatestOpenAsync(familyId);
+        Assert.NotNull(open);
+        Assert.Equal(expectedOpenDate, open!.Date);
+        Assert.Equal(timezone, open.Timezone);
+    }
+
+    [Fact]
+    public async Task AdultoPermaneceEstagioTerminal_AoChegarEm100Dias_SemDuplicarCrescimento()
+    {
+        var (closing, dailyRoutine, _, pacusRepo, growthRepo, _) = BuildSystem();
+        var familyId = ObjectId.GenerateNewId();
+        var pacus = NewPacus(familyId);
+        pacus.TotalClosedDays = 99;
+        pacus.Stage = PacusStage.Adult;
+        pacus.LastGrowthDate = "2026-08-22";
+        await pacusRepo.CreateAsync(pacus);
+        await dailyRoutine.CreateRoutineForDateAsync(
+            familyId, "2026-08-23", "America/Sao_Paulo");
+
+        await closing.CloseIfDueAsync(familyId, "America/Sao_Paulo");
+        await closing.CloseIfDueAsync(familyId, "America/Sao_Paulo");
+
+        var updated = await pacusRepo.GetByFamilyIdAsync(familyId);
+        Assert.Equal(100, updated!.TotalClosedDays);
+        Assert.Equal(PacusStage.Adult, updated.Stage);
+        Assert.Single(growthRepo.Logs.Where(x => x.UserId == familyId && x.Date == "2026-08-23"));
+    }
+
 }

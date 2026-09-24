@@ -61,6 +61,7 @@ public interface IDailyRoutineService
     Task<DailyRoutine> StartGameTimerSessionAsync(ObjectId userId, int minutes, ObjectId actorId, string actorRole);
     Task<DailyRoutine> PauseGameTimerSessionAsync(ObjectId userId, ObjectId actorId, string actorRole);
     Task<DailyRoutine> ResumeGameTimerSessionAsync(ObjectId userId, ObjectId actorId, string actorRole);
+    Task<DailyRoutine> CancelGameTimerSessionAsync(ObjectId userId, ObjectId actorId, string actorRole);
     Task<DailyRoutine> FinishGameTimerSessionAsync(ObjectId userId, ObjectId actorId, string actorRole);
 
     Task<DailyRoutine> ConsumeGameTimerAsync(ObjectId userId, int minutes, ObjectId actorId, string actorRole);

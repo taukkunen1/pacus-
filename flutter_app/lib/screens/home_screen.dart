@@ -1020,7 +1020,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 OutlinedButton.icon(
                   onPressed: completing ? null : _cancelSession,
                   icon: const Icon(Icons.close_rounded),
-                  label: const Text('Encerrar sessão'),
+                  label: const Text('Voltar ao tempo disponível'),
                 ),
               ],
             ),

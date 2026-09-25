@@ -64,6 +64,9 @@ public class MongoDbContext
     public IMongoCollection<TaskTemplate> TaskTemplates =>
         _database.GetCollection<TaskTemplate>("task_templates");
 
+    public IMongoCollection<WaterIntake> WaterIntakes =>
+        _database.GetCollection<WaterIntake>("water_intakes");
+
     public IMongoCollection<PointTransaction> PointTransactions =>
         _database.GetCollection<PointTransaction>("point_transactions");
 

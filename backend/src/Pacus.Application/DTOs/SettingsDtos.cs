@@ -3,6 +3,7 @@ namespace Pacus.Application.DTOs;
 // Liga/desliga a trava de tarefas-da-manha -> tempo de jogo para a familia do
 // adulto autenticado. Fica desligado por padrao para toda familia nova.
 public record UpdateGameTimerRequest(bool Enabled, int? Minutes);
+public record UpdateWaterGoalRequest(int GoalMl);
 
 // Valor de referencia de 1 PP em reais. Nao representa moeda, saldo bancario
 // nem promessa de conversao financeira; e uma referencia definida pela familia.

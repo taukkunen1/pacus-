@@ -23,6 +23,7 @@ public class AccountDeletionService : IAccountDeletionService
     private readonly IDailyRoutineRepository _dailyRoutineRepository;
     private readonly ITaskTemplateRepository _taskTemplateRepository;
     private readonly IPointTransactionRepository _pointTransactionRepository;
+    private readonly IWaterIntakeRepository _waterIntakeRepository;
     private readonly IPacusGrowthRepository _pacusGrowthRepository;
     private readonly ITaskEventRepository _taskEventRepository;
     private readonly IStoreRepository _storeRepository;
@@ -38,6 +39,7 @@ public class AccountDeletionService : IAccountDeletionService
         IDailyRoutineRepository dailyRoutineRepository,
         ITaskTemplateRepository taskTemplateRepository,
         IPointTransactionRepository pointTransactionRepository,
+        IWaterIntakeRepository waterIntakeRepository,
         IPacusGrowthRepository pacusGrowthRepository,
         ITaskEventRepository taskEventRepository,
         IStoreRepository storeRepository,
@@ -52,6 +54,7 @@ public class AccountDeletionService : IAccountDeletionService
         _dailyRoutineRepository = dailyRoutineRepository;
         _taskTemplateRepository = taskTemplateRepository;
         _pointTransactionRepository = pointTransactionRepository;
+        _waterIntakeRepository = waterIntakeRepository;
         _pacusGrowthRepository = pacusGrowthRepository;
         _taskEventRepository = taskEventRepository;
         _storeRepository = storeRepository;
@@ -87,6 +90,7 @@ public class AccountDeletionService : IAccountDeletionService
         await _dailyRoutineRepository.DeleteAllByFamilyAsync(familyId);
         await _taskTemplateRepository.DeleteAllByFamilyAsync(familyId);
         await _pointTransactionRepository.DeleteAllByFamilyAsync(familyId);
+        await _waterIntakeRepository.DeleteByFamilyIdAsync(familyId);
         await _pacusGrowthRepository.DeleteAllByFamilyAsync(familyId);
         await _taskEventRepository.DeleteAllByFamilyAsync(familyId);
         await _storeRepository.DeleteAllRedemptionsByFamilyAsync(familyId);

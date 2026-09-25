@@ -41,6 +41,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool sessionPersistedOnServer = false;
   bool completing = false;
   bool slowLoading = false;
+  int waterTotalMl = 0;
+  int waterGoalMl = 2000;
+  bool waterBusy = false;
   Timer? slowLoadTimer;
   Timer? dayBoundaryTimer;
   late String lastDayKey;
@@ -118,6 +121,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final value = await widget.api.getToday();
       routine = value;
       await _restoreSession();
+      await _loadWater();
       widget.onPendingChanged?.call(
         widget.session.isAdult ? 0 : math.max(0, value.totalTasks - value.doneTasks),
       );
@@ -225,6 +229,91 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     sessionPaused = false;
     sessionEndsAt = DateTime.fromMillisecondsSinceEpoch(millis);
     _startTicker();
+  }
+
+  Future<void> _loadWater() async {
+    try {
+      final data = await widget.api.getMap('/water/today');
+      waterTotalMl = (data['totalMl'] as num?)?.toInt() ?? 0;
+      waterGoalMl = (data['goalMl'] as num?)?.toInt() ?? 2000;
+    } catch (_) {
+      // A rotina principal continua utilizavel se o modulo de agua falhar isoladamente.
+    }
+  }
+
+  Future<void> _addWater(int amountMl) async {
+    if (waterBusy) return;
+    setState(() => waterBusy = true);
+    try {
+      final eventId = '${widget.session.userId}-${DateTime.now().microsecondsSinceEpoch}';
+      final data = await widget.api.postMap('/water', {
+        'amountMl': amountMl,
+        'eventId': eventId,
+      });
+      if (!mounted) return;
+      setState(() {
+        waterTotalMl = (data['totalMl'] as num?)?.toInt() ?? waterTotalMl;
+        waterGoalMl = (data['goalMl'] as num?)?.toInt() ?? waterGoalMl;
+      });
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    } finally {
+      if (mounted) setState(() => waterBusy = false);
+    }
+  }
+
+  Future<void> _undoWater() async {
+    if (waterBusy) return;
+    setState(() => waterBusy = true);
+    try {
+      final data = await widget.api.request('/water/today/latest', method: 'DELETE');
+      if (!mounted) return;
+      setState(() {
+        waterTotalMl = ((data as Map)['totalMl'] as num?)?.toInt() ?? waterTotalMl;
+      });
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    } finally {
+      if (mounted) setState(() => waterBusy = false);
+    }
+  }
+
+  Widget _waterCard() {
+    final progress = waterGoalMl <= 0 ? 0.0 : (waterTotalMl / waterGoalMl).clamp(0.0, 1.0);
+    String liters(int ml) => '${(ml / 1000).toStringAsFixed(ml % 1000 == 0 ? 0 : 2)} L';
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            const Icon(Icons.water_drop_outlined),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('Água hoje', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
+            Text('${liters(waterTotalMl)} / ${liters(waterGoalMl)}',
+                style: const TextStyle(fontWeight: FontWeight.w800)),
+          ]),
+          const SizedBox(height: 12),
+          LinearProgressIndicator(value: progress, minHeight: 10, borderRadius: BorderRadius.circular(99)),
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final ml in const [150, 250, 300, 500])
+              FilledButton.tonal(
+                onPressed: waterBusy ? null : () => _addWater(ml),
+                child: Text('+$ml mL'),
+              ),
+            OutlinedButton.icon(
+              onPressed: waterBusy || waterTotalMl == 0 ? null : _undoWater,
+              icon: const Icon(Icons.undo),
+              label: const Text('Desfazer'),
+            ),
+          ]),
+          if (waterTotalMl >= waterGoalMl) ...[
+            const SizedBox(height: 10),
+            const Text('Meta de hoje registrada.', style: TextStyle(fontWeight: FontWeight.w700)),
+          ],
+        ]),
+      ),
+    );
   }
 
   Future<void> _startSession(int minutes) async {
@@ -925,6 +1014,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     const SizedBox(height: 12),
                   ],
                   _progressCard(r),
+                  const SizedBox(height: 12),
+                  _waterCard(),
                   if (r.tomorrowPlanConfirmedAt != null) ...[
                     const SizedBox(height: 12),
                     _plannedYesterdayCard(),

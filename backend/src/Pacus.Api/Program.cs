@@ -158,6 +158,7 @@ builder.Services.AddScoped<IHabitatRepository, HabitatRepository>();
 builder.Services.AddScoped<IDailyRoutineRepository, DailyRoutineRepository>();
 builder.Services.AddScoped<ITaskTemplateRepository, TaskTemplateRepository>();
 builder.Services.AddScoped<IPointTransactionRepository, PointTransactionRepository>();
+builder.Services.AddScoped<IWaterIntakeRepository, WaterIntakeRepository>();
 builder.Services.AddScoped<ITaskEventRepository, TaskEventRepository>();
 builder.Services.AddScoped<IStoreRepository, StoreRepository>();
 builder.Services.AddScoped<ISettingsRepository, SettingsRepository>();
@@ -273,6 +274,19 @@ using (var migrationScope = app.Services.CreateScope())
     var migrated = await points.BackfillSourceReferencesAsync();
     if (migrated > 0)
         app.Logger.LogInformation("Backfilled source references for {Count} point transactions.", migrated);
+
+    var mongo = migrationScope.ServiceProvider.GetRequiredService<MongoDbContext>();
+    var waterIndexKeys = MongoDB.Driver.Builders<Pacus.Domain.Entities.WaterIntake>.IndexKeys.Combine(
+        MongoDB.Driver.Builders<Pacus.Domain.Entities.WaterIntake>.IndexKeys.Ascending(x => x.FamilyId),
+        MongoDB.Driver.Builders<Pacus.Domain.Entities.WaterIntake>.IndexKeys.Ascending(x => x.EventId));
+    var waterEventIndex = new MongoDB.Driver.CreateIndexModel<Pacus.Domain.Entities.WaterIntake>(
+        waterIndexKeys,
+        new MongoDB.Driver.CreateIndexOptions
+        {
+            Unique = true,
+            Name = "water_event_idempotency"
+        });
+    await mongo.WaterIntakes.Indexes.CreateOneAsync(waterEventIndex);
 }
 
 if (useDevelopmentBehavior)

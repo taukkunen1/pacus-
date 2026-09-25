@@ -18,6 +18,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool timerEnabled = false;
   int timerMinutes = 120;
   double pointToBrlRate = 0.06;
+  int waterGoalMl = 2000;
   List<Map<String, dynamic>> members = [];
   List<Map<String, dynamic>> growth = [];
   List<Map<String, dynamic>> tasks = [];
@@ -33,6 +34,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final tz = await widget.api.getMap('/family/timezone');
       final timer = await widget.api.getMap('/settings/game-timer');
       final pointValue = await widget.api.getMap('/settings/point-value');
+      final water = await widget.api.getMap('/settings/water');
       final rawMembers = await widget.api.getList('/family/children');
       final rawGrowth = await widget.api.getList('/settings/growth-stages');
       final rawTasks = await widget.api.getList('/tasks');
@@ -43,6 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         timerEnabled = timer['enabled'] == true;
         timerMinutes = (timer['minutes'] as num?)?.toInt() ?? 120;
         pointToBrlRate = (pointValue['rate'] as num?)?.toDouble() ?? 0.06;
+        waterGoalMl = (water['goalMl'] as num?)?.toInt() ?? 2000;
         members = rawMembers.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         growth = rawGrowth.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         tasks = rawTasks.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -129,6 +132,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       await widget.api.request('/settings/game-timer', method: 'PUT', body: {'enabled': enabled, 'minutes': minutes});
       await _load();
+    } catch (e) { _snack(e.toString()); }
+  }
+
+  Future<void> _changeWaterGoal() async {
+    final value = await _ask(
+      'Meta diária de água',
+      'Quantidade em mL',
+      initial: waterGoalMl.toString(),
+      type: TextInputType.number,
+    );
+    if (value == null) return;
+    final goal = int.tryParse(value);
+    if (goal == null || goal < 250 || goal > 10000) {
+      _snack('Informe uma meta entre 250 e 10000 mL.');
+      return;
+    }
+    try {
+      await widget.api.request('/settings/water', method: 'PUT', body: {'goalMl': goal});
+      await _load();
+      _snack('Meta de água atualizada.');
     } catch (e) { _snack(e.toString()); }
   }
 

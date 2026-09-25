@@ -49,6 +49,13 @@ public class WaterController : ControllerBase
 
         var timezone = await _timezone.GetTimezoneAsync(_currentUser.FamilyId);
         var date = TimezoneHelper.GetOperationalDate(timezone, DateTime.UtcNow);
+        var settings = await _settings.GetByUserIdAsync(_currentUser.FamilyId);
+        var configuredGoal = settings?.WaterGoalMl ?? 1000;
+        var goal = configuredGoal is 500 or 800 or 1000 ? configuredGoal : 1000;
+        var currentTotal = (await _water.GetByDateAsync(_currentUser.FamilyId, date)).Sum(x => x.AmountMl);
+        if (currentTotal + request.AmountMl > goal)
+            return BadRequest(new { error = $"O total de hoje nao pode ultrapassar {goal} mL." });
+
         var intake = new WaterIntake
         {
             Id = ObjectId.GenerateNewId(),

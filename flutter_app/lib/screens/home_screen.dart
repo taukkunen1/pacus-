@@ -42,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool completing = false;
   bool slowLoading = false;
   int waterTotalMl = 0;
-  int waterGoalMl = 2000;
+  int waterGoalMl = 1000;
   bool waterBusy = false;
   Timer? slowLoadTimer;
   Timer? dayBoundaryTimer;
@@ -235,7 +235,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     try {
       final data = await widget.api.getMap('/water/today');
       waterTotalMl = (data['totalMl'] as num?)?.toInt() ?? 0;
-      waterGoalMl = (data['goalMl'] as num?)?.toInt() ?? 2000;
+      waterGoalMl = (data['goalMl'] as num?)?.toInt() ?? 1000;
     } catch (_) {
       // A rotina principal continua utilizavel se o modulo de agua falhar isoladamente.
     }

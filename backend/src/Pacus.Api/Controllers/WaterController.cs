@@ -84,7 +84,8 @@ public class WaterController : ControllerBase
     {
         var events = await _water.GetByDateAsync(_currentUser.FamilyId, date);
         var settings = await _settings.GetByUserIdAsync(_currentUser.FamilyId);
-        var goal = settings?.WaterGoalMl ?? 2000;
+        var configuredGoal = settings?.WaterGoalMl ?? 1000;
+        var goal = configuredGoal is 500 or 800 or 1000 ? configuredGoal : 1000;
         return new
         {
             date,

@@ -298,7 +298,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           Wrap(spacing: 8, runSpacing: 8, children: [
             for (final ml in const [150, 250, 300, 500])
               FilledButton.tonal(
-                onPressed: waterBusy ? null : () => _addWater(ml),
+                onPressed: waterBusy || waterTotalMl + ml > waterGoalMl ? null : () => _addWater(ml),
                 child: Text('+$ml mL'),
               ),
             OutlinedButton.icon(

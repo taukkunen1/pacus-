@@ -86,7 +86,12 @@ class _PacusShellState extends State<PacusShell> {
           }
         } else {
           final today = await widget.api.getToday();
-          final pending = (today.totalTasks - today.doneTasks).clamp(0, 999).toInt();
+          final water = await widget.api.getMap('/water/today');
+          final waterTotal = (water['totalMl'] as num?)?.toInt() ?? 0;
+          final waterGoal = (water['goalMl'] as num?)?.toInt() ?? 2000;
+          final hydrationPending = waterTotal >= waterGoal ? 0 : 1;
+          final pending =
+              (today.totalTasks - today.doneTasks + hydrationPending).clamp(0, 999).toInt();
           if (mounted && todayPending != pending) {
             setState(() => todayPending = pending);
           }

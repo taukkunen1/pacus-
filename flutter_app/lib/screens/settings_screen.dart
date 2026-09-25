@@ -19,6 +19,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int timerMinutes = 120;
   double pointToBrlRate = 0.06;
   int waterGoalMl = 2000;
+  int waterRewardPoints = 5;
   List<Map<String, dynamic>> members = [];
   List<Map<String, dynamic>> growth = [];
   List<Map<String, dynamic>> tasks = [];
@@ -46,6 +47,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         timerMinutes = (timer['minutes'] as num?)?.toInt() ?? 120;
         pointToBrlRate = (pointValue['rate'] as num?)?.toDouble() ?? 0.06;
         waterGoalMl = (water['goalMl'] as num?)?.toInt() ?? 2000;
+        waterRewardPoints = (water['rewardPoints'] as num?)?.toInt() ?? 5;
         members = rawMembers.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         growth = rawGrowth.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         tasks = rawTasks.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -149,9 +151,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
     try {
-      await widget.api.request('/settings/water', method: 'PUT', body: {'goalMl': goal});
+      await widget.api.request('/settings/water', method: 'PUT', body: {
+        'goalMl': goal,
+        'rewardPoints': waterRewardPoints,
+      });
       await _load();
       _snack('Meta de água atualizada.');
+    } catch (e) { _snack(e.toString()); }
+  }
+
+  Future<void> _changeWaterReward() async {
+    final value = await _ask(
+      'Recompensa por beber água',
+      'Pacus Points ao atingir a meta diária',
+      initial: waterRewardPoints.toString(),
+      type: TextInputType.number,
+    );
+    if (value == null) return;
+    final points = int.tryParse(value);
+    if (points == null || points < 0 || points > 100) {
+      _snack('Informe uma recompensa entre 0 e 100 PP.');
+      return;
+    }
+    try {
+      await widget.api.request('/settings/water', method: 'PUT', body: {
+        'goalMl': waterGoalMl,
+        'rewardPoints': points,
+      });
+      await _load();
+      _snack('Recompensa da tarefa de água atualizada.');
     } catch (e) { _snack(e.toString()); }
   }
 
@@ -443,6 +471,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             (waterGoalMl / 1000).toStringAsFixed(waterGoalMl % 1000 == 0 ? 0 : 2) + ' L por dia',
             Icons.water_drop_outlined,
             action: TextButton(onPressed: _changeWaterGoal, child: const Text('Alterar')),
+          ),
+          const SizedBox(height: 10),
+          _tile(
+            'Recompensa da tarefa de água',
+            waterRewardPoints == 0
+                ? 'Sem recompensa em PP'
+                : waterRewardPoints.toString() + ' PP ao atingir a meta',
+            Icons.stars_outlined,
+            action: TextButton(onPressed: _changeWaterReward, child: const Text('Alterar')),
           ),
           const SizedBox(height: 10),
           Card(

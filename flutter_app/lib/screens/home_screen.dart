@@ -43,6 +43,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool slowLoading = false;
   int waterTotalMl = 0;
   int waterGoalMl = 2000;
+  int waterRewardPoints = 5;
+  bool waterRewarded = false;
   bool waterBusy = false;
   Timer? slowLoadTimer;
   Timer? dayBoundaryTimer;
@@ -123,7 +125,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       await _restoreSession();
       await _loadWater();
       widget.onPendingChanged?.call(
-        widget.session.isAdult ? 0 : math.max(0, value.totalTasks - value.doneTasks),
+        widget.session.isAdult
+            ? 0
+            : math.max(
+                0,
+                value.totalTasks - value.doneTasks + (waterTotalMl >= waterGoalMl ? 0 : 1),
+              ),
       );
       if (mounted) {
         setState(() {
@@ -236,6 +243,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final data = await widget.api.getMap('/water/today');
       waterTotalMl = (data['totalMl'] as num?)?.toInt() ?? 0;
       waterGoalMl = (data['goalMl'] as num?)?.toInt() ?? 2000;
+      waterRewardPoints = (data['rewardPoints'] as num?)?.toInt() ?? 5;
+      waterRewarded = data['rewarded'] == true;
     } catch (_) {
       // A rotina principal continua utilizavel se o modulo de agua falhar isoladamente.
     }
@@ -254,6 +263,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       setState(() {
         waterTotalMl = (data['totalMl'] as num?)?.toInt() ?? waterTotalMl;
         waterGoalMl = (data['goalMl'] as num?)?.toInt() ?? waterGoalMl;
+        waterRewardPoints = (data['rewardPoints'] as num?)?.toInt() ?? waterRewardPoints;
+        waterRewarded = data['rewarded'] == true;
       });
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
@@ -270,6 +281,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() {
         waterTotalMl = ((data as Map)['totalMl'] as num?)?.toInt() ?? waterTotalMl;
+        waterRewarded = data['rewarded'] == true;
       });
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
@@ -288,10 +300,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           Row(children: [
             const Icon(Icons.water_drop_outlined),
             const SizedBox(width: 8),
-            const Expanded(child: Text('Água hoje', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
+            const Expanded(child: Text('Tarefa · Beber água', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
             Text('${liters(waterTotalMl)} / ${liters(waterGoalMl)}',
                 style: const TextStyle(fontWeight: FontWeight.w800)),
           ]),
+          const SizedBox(height: 6),
+          Text(
+            waterRewardPoints == 0
+                ? 'Meta diária sem recompensa em PP'
+                : '+$waterRewardPoints PP ao concluir',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
           const SizedBox(height: 12),
           LinearProgressIndicator(value: progress, minHeight: 10, borderRadius: BorderRadius.circular(99)),
           const SizedBox(height: 12),
@@ -309,7 +331,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ]),
           if (waterTotalMl >= waterGoalMl) ...[
             const SizedBox(height: 10),
-            const Text('Meta de hoje registrada.', style: TextStyle(fontWeight: FontWeight.w700)),
+            Text(
+              waterRewarded && waterRewardPoints > 0
+                  ? 'Tarefa concluída · +$waterRewardPoints PP'
+                  : 'Tarefa concluída.',
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
           ],
         ]),
       ),
@@ -1065,14 +1092,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _progressCard(DailyRoutine r) {
-    final progress = r.totalTasks == 0 ? 0.0 : r.doneTasks / r.totalTasks;
+    final hydrationDone = waterTotalMl >= waterGoalMl;
+    final totalTasks = r.totalTasks + 1;
+    final doneTasks = r.doneTasks + (hydrationDone ? 1 : 0);
+    final progress = totalTasks == 0 ? 0.0 : doneTasks / totalTasks;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(22),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Hoje', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
-          Text('${r.doneTasks} de ${r.totalTasks} tarefas concluídas', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+          Text('$doneTasks de $totalTasks tarefas concluídas', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
           const SizedBox(height: 14),
           LinearProgressIndicator(value: progress, minHeight: 10, borderRadius: BorderRadius.circular(99)),
         ]),

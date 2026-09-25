@@ -34,6 +34,9 @@ public class Settings
     public bool GameTimerEnabled { get; set; } = false;
     public int GameTimerMinutes { get; set; } = 120;
 
+    // Meta de hidratacao definida pela familia. Nao e recomendacao clinica automatica.
+    public int WaterGoalMl { get; set; } = 2000;
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

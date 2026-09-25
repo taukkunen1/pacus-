@@ -274,6 +274,17 @@ using (var migrationScope = app.Services.CreateScope())
     var migrated = await points.BackfillSourceReferencesAsync();
     if (migrated > 0)
         app.Logger.LogInformation("Backfilled source references for {Count} point transactions.", migrated);
+
+    var mongo = migrationScope.ServiceProvider.GetRequiredService<MongoDbContext>();
+    var waterEventIndex = new MongoDB.Driver.CreateIndexModel<Pacus.Domain.Entities.WaterIntake>(
+        MongoDB.Driver.Builders<Pacus.Domain.Entities.WaterIntake>.IndexKeys
+            .Ascending(x => x.FamilyId).Ascending(x => x.EventId),
+        new MongoDB.Driver.CreateIndexOptions
+        {
+            Unique = true,
+            Name = "water_event_idempotency"
+        });
+    await mongo.WaterIntakes.Indexes.CreateOneAsync(waterEventIndex);
 }
 
 if (useDevelopmentBehavior)

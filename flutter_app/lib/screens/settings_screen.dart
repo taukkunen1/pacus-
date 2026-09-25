@@ -438,6 +438,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             action: TextButton(onPressed: _changePointValue, child: const Text('Alterar')),
           ),
           const SizedBox(height: 10),
+          _tile(
+            'Meta diária de água',
+            (waterGoalMl / 1000).toStringAsFixed(waterGoalMl % 1000 == 0 ? 0 : 2) + ' L por dia',
+            Icons.water_drop_outlined,
+            action: TextButton(onPressed: _changeWaterGoal, child: const Text('Alterar')),
+          ),
+          const SizedBox(height: 10),
           Card(
             child: SwitchListTile(
               value: timerEnabled,

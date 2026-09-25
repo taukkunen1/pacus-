@@ -276,9 +276,11 @@ using (var migrationScope = app.Services.CreateScope())
         app.Logger.LogInformation("Backfilled source references for {Count} point transactions.", migrated);
 
     var mongo = migrationScope.ServiceProvider.GetRequiredService<MongoDbContext>();
+    var waterIndexKeys = MongoDB.Driver.Builders<Pacus.Domain.Entities.WaterIntake>.IndexKeys.Combine(
+        MongoDB.Driver.Builders<Pacus.Domain.Entities.WaterIntake>.IndexKeys.Ascending(x => x.FamilyId),
+        MongoDB.Driver.Builders<Pacus.Domain.Entities.WaterIntake>.IndexKeys.Ascending(x => x.EventId));
     var waterEventIndex = new MongoDB.Driver.CreateIndexModel<Pacus.Domain.Entities.WaterIntake>(
-        MongoDB.Driver.Builders<Pacus.Domain.Entities.WaterIntake>.IndexKeys
-            .Ascending(x => x.FamilyId).Ascending(x => x.EventId),
+        waterIndexKeys,
         new MongoDB.Driver.CreateIndexOptions
         {
             Unique = true,

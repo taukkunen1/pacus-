@@ -37,6 +37,11 @@ public class Settings
     // Meta de hidratacao definida pela familia. Nao e recomendacao clinica automatica.
     public int WaterGoalMl { get; set; } = 2000;
 
+    // Recompensa por concluir a tarefa diaria de hidratacao. O credito acontece
+    // apenas quando a meta e atingida e e revertido se o consumo for desfeito
+    // a ponto de voltar para baixo da meta.
+    public int WaterRewardPoints { get; set; } = 5;
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

@@ -158,6 +158,7 @@ builder.Services.AddScoped<IHabitatRepository, HabitatRepository>();
 builder.Services.AddScoped<IDailyRoutineRepository, DailyRoutineRepository>();
 builder.Services.AddScoped<ITaskTemplateRepository, TaskTemplateRepository>();
 builder.Services.AddScoped<IPointTransactionRepository, PointTransactionRepository>();
+builder.Services.AddScoped<IWaterIntakeRepository, WaterIntakeRepository>();
 builder.Services.AddScoped<ITaskEventRepository, TaskEventRepository>();
 builder.Services.AddScoped<IStoreRepository, StoreRepository>();
 builder.Services.AddScoped<ISettingsRepository, SettingsRepository>();

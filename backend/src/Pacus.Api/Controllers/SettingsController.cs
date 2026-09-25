@@ -172,15 +172,17 @@ public class SettingsController : ControllerBase
     public async Task<IActionResult> GetWater()
     {
         var settings = await _settingsRepository.GetByUserIdAsync(_currentUser.FamilyId);
-        return Ok(new { goalMl = settings?.WaterGoalMl ?? 2000 });
+        var configured = settings?.WaterGoalMl ?? 1000;
+        var goal = configured is 500 or 800 or 1000 ? configured : 1000;
+        return Ok(new { goalMl = goal });
     }
 
     [RequireRole(UserRole.Adult)]
     [HttpPut("water")]
     public async Task<IActionResult> UpdateWater([FromBody] UpdateWaterGoalRequest request)
     {
-        if (request.GoalMl < 250 || request.GoalMl > 10000)
-            return BadRequest(new { error = "A meta deve estar entre 250 e 10000 mL." });
+        if (request.GoalMl is not (500 or 800 or 1000))
+            return BadRequest(new { error = "Escolha uma meta de 500 mL, 800 mL ou 1 L." });
 
         var settings = await _settingsRepository.GetByUserIdAsync(_currentUser.FamilyId)
             ?? new Settings

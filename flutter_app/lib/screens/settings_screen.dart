@@ -18,7 +18,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool timerEnabled = false;
   int timerMinutes = 120;
   double pointToBrlRate = 0.06;
-  int waterGoalMl = 2000;
+  int waterGoalMl = 1000;
   List<Map<String, dynamic>> members = [];
   List<Map<String, dynamic>> growth = [];
   List<Map<String, dynamic>> tasks = [];
@@ -45,7 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         timerEnabled = timer['enabled'] == true;
         timerMinutes = (timer['minutes'] as num?)?.toInt() ?? 120;
         pointToBrlRate = (pointValue['rate'] as num?)?.toDouble() ?? 0.06;
-        waterGoalMl = (water['goalMl'] as num?)?.toInt() ?? 2000;
+        waterGoalMl = (water['goalMl'] as num?)?.toInt() ?? 1000;
         members = rawMembers.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         growth = rawGrowth.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         tasks = rawTasks.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -136,18 +136,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _changeWaterGoal() async {
-    final value = await _ask(
-      'Meta diária de água',
-      'Quantidade em mL',
-      initial: waterGoalMl.toString(),
-      type: TextInputType.number,
+    final goal = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Meta diária de água'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Escolha o total diário que será mostrado em Hoje.'),
+            const SizedBox(height: 14),
+            for (final option in const [(500, '500 mL'), (800, '800 mL'), (1000, '1 L')])
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: FilledButton.tonal(
+                  onPressed: () => Navigator.pop(context, option.$1),
+                  child: Text(option.$2),
+                ),
+              ),
+          ],
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar'))],
+      ),
     );
-    if (value == null) return;
-    final goal = int.tryParse(value);
-    if (goal == null || goal < 250 || goal > 10000) {
-      _snack('Informe uma meta entre 250 e 10000 mL.');
-      return;
-    }
+    if (goal == null) return;
     try {
       await widget.api.request('/settings/water', method: 'PUT', body: {'goalMl': goal});
       await _load();

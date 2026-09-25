@@ -40,10 +40,36 @@ public class WaterHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
         await BootstrapAndLoginAdultAsync(client);
 
         Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync(
-            "/api/v1/settings/water", new { goalMl = 1800 })).StatusCode);
+            "/api/v1/settings/water", new { goalMl = 800 })).StatusCode);
 
         var today = await client.GetFromJsonAsync<JsonElement>("/api/v1/water/today");
-        Assert.Equal(1800, today.GetProperty("goalMl").GetInt32());
+        Assert.Equal(800, today.GetProperty("goalMl").GetInt32());
+    }
+
+    [Fact]
+    public async Task WaterGoal_RejectsValuesOutsideAdultPresets()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+        await BootstrapAndLoginAdultAsync(client);
+
+        var response = await client.PutAsJsonAsync("/api/v1/settings/water", new { goalMl = 2000 });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task WaterIntake_CannotExceedConfiguredDailyMaximum()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+        await BootstrapAndLoginAdultAsync(client);
+
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync(
+            "/api/v1/settings/water", new { goalMl = 500 })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync(
+            "/api/v1/water", new { amountMl = 300, eventId = Guid.NewGuid().ToString("N") })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(
+            "/api/v1/water", new { amountMl = 250, eventId = Guid.NewGuid().ToString("N") })).StatusCode);
     }
 
     private static async Task BootstrapAndLoginAdultAsync(HttpClient client)

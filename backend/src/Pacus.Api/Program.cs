@@ -26,6 +26,14 @@ var isFlyRuntime = !string.IsNullOrWhiteSpace(
 var useDevelopmentBehavior =
     builder.Environment.IsDevelopment() && !isFlyRuntime;
 
+// Limites do Kestrel: corpo maximo de 1 MB (a API so recebe JSON pequeno) e sem
+// cabecalho "Server" revelando a tecnologia.
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.AddServerHeader = false;
+    options.Limits.MaxRequestBodySize = 1_048_576;
+});
+
 // Carrega explicitamente os User Secrets do projeto.
 // Isso evita depender apenas do carregamento automático do ambiente Development.
 builder.Configuration.AddUserSecrets<Program>(optional: true);
@@ -61,6 +69,13 @@ if (string.IsNullOrWhiteSpace(jwtSecret))
         "JWT_SECRET nao configurada.");
 }
 
+// HS256 exige chave forte: menos de 32 caracteres facilita forca bruta offline do token.
+if (jwtSecret.Length < 32)
+{
+    throw new InvalidOperationException(
+        "JWT_SECRET deve ter pelo menos 32 caracteres.");
+}
+
 builder.Services.Configure<JwtSettings>(options =>
 {
     options.Secret = jwtSecret;
@@ -84,6 +99,9 @@ builder.Services
                 ValidateAudience = true,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
+                RequireExpirationTime = true,
+                RequireSignedTokens = true,
+                ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
 
                 ValidIssuer =
                     builder.Configuration["Jwt:Issuer"]
@@ -106,11 +124,23 @@ builder.Services.AddAuthorization();
 // Rate limiting -- protege login (adulto/crianca) e criacao de familia contra
 // forca bruta. PIN da crianca tem so 4 digitos (10.000 combinacoes), entao sem
 // limite de tentativas da pra forcar bruta sem nenhum bloqueio. Particionado por
-// IP (X-Forwarded-For quando atras de proxy reverso/Fly.io, senao RemoteIpAddress).
+// IP real do cliente (cabecalho Fly-Client-IP do proxy do Fly.io, senao RemoteIpAddress).
 // Auditoria de seguranca, Fase A item A1.
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Teto geral por IP para toda a API (alem das politicas mais rigorosas abaixo):
+    // limita scraping/abuso e tentativas de enumeracao em qualquer endpoint.
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(GetClientIp(httpContext), _ =>
+            new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 300,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            }));
 
     options.AddPolicy("auth", httpContext =>
     {
@@ -171,6 +201,7 @@ builder.Services.AddScoped<IChatReadStateRepository, ChatReadStateRepository>();
 builder.Services.AddScoped<ICurrentUserService, HttpCurrentUserService>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
+builder.Services.AddSingleton<ILoginAttemptTracker, LoginAttemptTracker>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IBootstrapService, BootstrapService>();
 
@@ -299,6 +330,31 @@ if (useDevelopmentBehavior)
 // depois dele, nao so das actions dos controllers.
 app.UseExceptionHandler();
 
+// Cabecalhos de seguranca em toda resposta da API (JSON puro: nada de carregar
+// scripts/estilos/frames, entao a CSP pode ser a mais restritiva possivel).
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        var headers = context.Response.Headers;
+        headers["X-Content-Type-Options"] = "nosniff";
+        headers["X-Frame-Options"] = "DENY";
+        headers["Referrer-Policy"] = "no-referrer";
+        headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
+        headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+        headers["Cross-Origin-Resource-Policy"] = "same-site";
+        return Task.CompletedTask;
+    });
+
+    await next();
+});
+
+if (!useDevelopmentBehavior)
+{
+    // HSTS: o navegador so volta a falar com a API por HTTPS.
+    app.UseHsts();
+}
+
 app.UseHttpsRedirection();
 
 app.UseCors();
@@ -320,16 +376,18 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// X-Forwarded-For vem primeiro porque em producao (Fly.io) a API fica atras de
-// proxy reverso -- sem isso, todo cliente apareceria com o mesmo IP do proxy e o
-// rate limit ficaria compartilhado entre todo mundo (ou bloquearia todo mundo
-// junto). RemoteIpAddress e o fallback pra execucao local/direta.
+// Em producao (Fly.io) a API fica atras de proxy reverso -- sem ler o IP real do
+// cliente, todo mundo apareceria com o IP do proxy e compartilharia o mesmo limite.
 static string GetClientIp(HttpContext context)
 {
-    var forwarded = context.Request.Headers["X-Forwarded-For"].ToString();
-    if (!string.IsNullOrWhiteSpace(forwarded))
+    // Fly-Client-IP e definido pelo proxy do Fly.io (sobrescreve qualquer valor enviado
+    // pelo cliente), entao e a fonte confiavel do IP real. X-Forwarded-For NAO e usado:
+    // o cliente pode enviar o proprio cabecalho com um IP falso a cada requisicao e
+    // contornar o rate limit por completo.
+    var flyIp = context.Request.Headers["Fly-Client-IP"].ToString();
+    if (!string.IsNullOrWhiteSpace(flyIp))
     {
-        return forwarded.Split(',')[0].Trim();
+        return flyIp.Trim();
     }
 
     return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";

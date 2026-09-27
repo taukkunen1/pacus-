@@ -291,7 +291,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 const Center(child: PacusBrand()),
                 const SizedBox(height: 6),
-                Text('Rotina com autonomia', textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                Text('Autonomia, autocuidado e organização — com reforço positivo, sem punição', textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 const SizedBox(height: 28),
                 SegmentedButton<bool>(
                   segments: const [

@@ -72,7 +72,8 @@ public class DailyRoutinesController : ControllerBase
                 await _dayClosingService.CloseIfDueAsync(familyId, timezone);
 
                 var routine = await _dailyRoutineService.GetOrCreateTodayAsync(familyId, timezone);
-                return Ok(routine.ToResponse());
+                var habitStreaks = await _dailyRoutineService.ComputeHabitStreaksAsync(familyId, routine);
+                return Ok(routine.ToResponse(habitStreaks));
             }
             catch (ConflictException) when (attempt < GetTodayMaxAttempts)
             {

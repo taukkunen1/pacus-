@@ -1,5 +1,6 @@
 using Pacus.Domain.Entities;
 using Pacus.Domain.Enums;
+using Pacus.Application.Services;
 
 namespace Pacus.Application.DTOs;
 
@@ -63,7 +64,11 @@ public record DailyTaskResponse(
     string? PlannedBy,
     bool CreatedByMember,
     string? PlanCue,
-    bool RequiresAdultApproval
+    bool RequiresAdultApproval,
+    // Modo habito consolidado (ver DailyRoutineService.ComputeHabitStreaksAsync):
+    // 0 quando nao aplicavel (tarefa avulsa sem template, ou sem historico ainda).
+    int HabitStreakDays,
+    bool IsConsolidatedHabit
 );
 
 public record DailyRoutineResponse(
@@ -96,7 +101,7 @@ public record DailyRoutineResponse(
 
 public static class DailyRoutineMappingExtensions
 {
-    public static DailyTaskResponse ToResponse(this DailyTask task) => new(
+    public static DailyTaskResponse ToResponse(this DailyTask task, int habitStreakDays = 0) => new(
         task.Id,
         task.TaskTemplateId,
         task.Title,
@@ -122,15 +127,21 @@ public static class DailyRoutineMappingExtensions
         task.PlannedBy,
         task.CreatedByMember,
         task.PlanCue,
-        task.RequiresAdultApproval);
+        task.RequiresAdultApproval,
+        habitStreakDays,
+        habitStreakDays >= DailyRoutineService.HabitConsolidationDays);
 
-    public static DailyRoutineResponse ToResponse(this DailyRoutine routine) => new(
+    public static DailyRoutineResponse ToResponse(
+        this DailyRoutine routine, IReadOnlyDictionary<string, int>? habitStreaks = null) => new(
         routine.Id.ToString(),
         routine.FamilyId.ToString(),
         routine.Date,
         routine.Timezone,
         routine.Status,
-        routine.Tasks.Select(t => t.ToResponse()).ToList(),
+        routine.Tasks.Select(t => t.ToResponse(
+            t.TaskTemplateId is not null && habitStreaks is not null && habitStreaks.TryGetValue(t.TaskTemplateId, out var streak)
+                ? streak
+                : 0)).ToList(),
         routine.Stats.ToResponse(),
         routine.PointsEarned,
         routine.ClosedAt,

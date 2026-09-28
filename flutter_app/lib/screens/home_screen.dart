@@ -698,6 +698,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _createDailyTask() async {
     final title = TextEditingController();
+    final reason = TextEditingController();
     String period = 'morning';
     final payload = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -708,6 +709,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             width: 460,
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(controller: title, decoration: const InputDecoration(labelText: 'Título')),
+              const SizedBox(height: 10),
+              TextField(
+                controller: reason,
+                decoration: const InputDecoration(
+                  labelText: 'Por que isso importa (a criança vai ver)',
+                  helperText: 'Opcional -- em poucas palavras, o motivo real dessa tarefa.',
+                  helperMaxLines: 2,
+                ),
+                maxLines: 2,
+              ),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 initialValue: period,
@@ -726,6 +737,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             FilledButton(onPressed: () => Navigator.pop(context, {
               'title': title.text.trim(),
               'description': null,
+              'reason': reason.text.trim().isEmpty ? null : reason.text.trim(),
               'type': 'expected',
               'period': period,
               'points': 1,
@@ -734,7 +746,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       ),
     );
-    title.dispose();
+    title.dispose(); reason.dispose();
     if (payload == null || (payload['title']?.toString() ?? '').isEmpty) return;
     try {
       await widget.api.request('/daily-tasks', method: 'POST', body: payload);
@@ -1369,10 +1381,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             spacing: 7,
             runSpacing: 7,
             children: [
-              PacusBadge(
-                label: '${task.points} ${task.points == 1 ? 'ponto' : 'pontos'}',
-                icon: Icons.stars_rounded,
-              ),
+              // Modo habito consolidado (~66 dias seguidos, Lally et al. 2010): a
+              // essa altura a tarefa ja deixou de depender do Pacus Point pra
+              // acontecer, entao a badge de pontos da lugar a de habito -- o
+              // ponto continua contando pro saldo, so nao e mais o destaque visual.
+              if (task.isConsolidatedHabit)
+                const PacusBadge(
+                  label: 'Hábito consolidado',
+                  icon: Icons.eco_rounded,
+                  emphasis: true,
+                )
+              else
+                PacusBadge(
+                  label: '${task.points} ${task.points == 1 ? 'ponto' : 'pontos'}',
+                  icon: Icons.stars_rounded,
+                ),
               PacusBadge(label: _typeLabel(task.type)),
               if (task.createdByMember)
                 const PacusBadge(
@@ -1410,8 +1433,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           if (showReason) ...[
             const SizedBox(height: 6),
             _taskHint(
-              icon: Icons.lightbulb_outline_rounded,
-              label: 'Por quê',
+              icon: Icons.favorite_border_rounded,
+              label: 'Por que isso importa',
               text: reason,
             ),
           ],

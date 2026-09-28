@@ -34,19 +34,20 @@ void main() {
         'Você cuidou do dia inteiro sozinho!',
         'Dia completo — isso é consistência!',
         'Você deu conta de tudo hoje!',
+        'Dia fechado com organização, parabéns!',
       ),
     );
   });
 
-  test('usa mensagem de desafio quando o dia ainda nao terminou', () {
-    final challenge = task(type: 'challenge');
+  test('usa mensagem generica ou com titulo quando o dia ainda nao terminou', () {
+    final pending = task();
     final all = [
-      task(id: '1', type: 'challenge', status: 'done'),
+      task(id: '1', status: 'done'),
       task(id: '2', status: 'pending'),
     ];
 
     expect(
-      pickEffortMessage(challenge, all, random: Random(1)),
+      pickEffortMessage(pending, all, random: Random(1)),
       isNotEmpty,
     );
   });

@@ -1,9 +1,13 @@
 class DailyTask {
-  const DailyTask({required this.id, required this.title, required this.period, required this.type, required this.status, required this.points, this.order = 0, this.description, this.minimumGoalLabel, this.deletedAt, this.options = const [], this.selectedOption, this.reason, this.plannedBy, this.createdByMember = false, this.planCue, this.requiresAdultApproval = false});
+  const DailyTask({required this.id, required this.title, required this.period, required this.type, required this.status, required this.points, this.order = 0, this.description, this.minimumGoalLabel, this.deletedAt, this.options = const [], this.selectedOption, this.reason, this.plannedBy, this.createdByMember = false, this.planCue, this.requiresAdultApproval = false, this.habitStreakDays = 0, this.isConsolidatedHabit = false});
   final String id, title, period, type, status;
   final int points, order;
   final String? description, minimumGoalLabel, selectedOption, reason, plannedBy, planCue;
   final bool createdByMember, requiresAdultApproval;
+  // Modo habito consolidado (Lally et al. 2010, ~66 dias de repeticao pra virar
+  // automatico) -- so sinalizacao visual, nunca muda o Pacus Point da tarefa.
+  final int habitStreakDays;
+  final bool isConsolidatedHabit;
   final List<String> options;
   final DateTime? deletedAt;
   bool get isDone => status.toLowerCase() == 'done';
@@ -18,6 +22,8 @@ class DailyTask {
     selectedOption: json['selectedOption']?.toString(), reason: json['reason']?.toString(),
     plannedBy: json['plannedBy']?.toString(), createdByMember: json['createdByMember'] == true,
     planCue: json['planCue']?.toString(), requiresAdultApproval: json['requiresAdultApproval'] == true,
+    habitStreakDays: (json['habitStreakDays'] as num?)?.toInt() ?? 0,
+    isConsolidatedHabit: json['isConsolidatedHabit'] == true,
     deletedAt: json['deletedAt'] == null ? null : DateTime.tryParse(json['deletedAt'].toString()),
   );
 }

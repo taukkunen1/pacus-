@@ -37,7 +37,12 @@ Atualizado em 2026-09-23 após a auditoria final da migração para Flutter Web.
 - sugestões/autonomia;
 - histórico de dias;
 - atualização automática da tela na virada do dia;
-- reconhecimento de esforço ao concluir tarefas.
+- reconhecimento de esforço ao concluir tarefas (mensagens variadas, sem depender de
+  tipo/pontos -- ver flutter_app/lib/ui/effort_messages.dart);
+- modo hábito consolidado: tarefas permanentes com ~66 dias seguidos concluídos
+  (Lally et al. 2010) ganham uma badge "Hábito consolidado" no lugar da badge de
+  pontos -- sinalização visual apenas, nunca muda o Pacus Point da tarefa (ver
+  DailyRoutineService.ComputeHabitStreaksAsync).
 
 ### Pontos e recompensas
 - saldo de Pacus Points;

@@ -1381,10 +1381,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             spacing: 7,
             runSpacing: 7,
             children: [
-              PacusBadge(
-                label: '${task.points} ${task.points == 1 ? 'ponto' : 'pontos'}',
-                icon: Icons.stars_rounded,
-              ),
+              // Modo habito consolidado (~66 dias seguidos, Lally et al. 2010): a
+              // essa altura a tarefa ja deixou de depender do Pacus Point pra
+              // acontecer, entao a badge de pontos da lugar a de habito -- o
+              // ponto continua contando pro saldo, so nao e mais o destaque visual.
+              if (task.isConsolidatedHabit)
+                const PacusBadge(
+                  label: 'Hábito consolidado',
+                  icon: Icons.eco_rounded,
+                  emphasis: true,
+                )
+              else
+                PacusBadge(
+                  label: '${task.points} ${task.points == 1 ? 'ponto' : 'pontos'}',
+                  icon: Icons.stars_rounded,
+                ),
               PacusBadge(label: _typeLabel(task.type)),
               if (task.createdByMember)
                 const PacusBadge(

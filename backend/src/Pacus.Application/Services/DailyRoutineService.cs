@@ -1,3 +1,4 @@
+using System.Globalization;
 using MongoDB.Bson;
 using Pacus.Application.DTOs;
 using Pacus.Application.Interfaces;
@@ -28,6 +29,81 @@ public class DailyRoutineService : IDailyRoutineService
         _taskEventRepository = taskEventRepository;
         _pointsService = pointsService;
         _settingsRepository = settingsRepository;
+    }
+
+    // Lally, van Jaarsveld, Potts & Wardle (2010): media de ~66 dias pra um
+    // comportamento repetido virar automatico (a amostra variou de 18 a 254 dias
+    // dependendo da pessoa/comportamento -- 66 e so o ponto medio, nao uma garantia
+    // individual). Usado so como sinalizacao visual no app (ver docs/PROPOSITO.md);
+    // nunca reduz o Pacus Point da tarefa nem muda a validacao no backend.
+    public const int HabitConsolidationDays = 66;
+
+    // Quantos dias pra tras olhar no historico. Um pouco a mais que
+    // HabitConsolidationDays so pra nao cortar o calculo bem na borda quando a
+    // tarefa passou pouquinho do limiar.
+    private const int HabitStreakLookbackDays = HabitConsolidationDays + 14;
+
+    public async Task<Dictionary<string, int>> ComputeHabitStreaksAsync(ObjectId userId, DailyRoutine routine)
+    {
+        var templateIds = routine.Tasks
+            .Where(t => t.DeletedAt is null && !string.IsNullOrEmpty(t.TaskTemplateId))
+            .Select(t => t.TaskTemplateId!)
+            .Distinct()
+            .ToList();
+
+        var streaks = templateIds.ToDictionary(id => id, _ => 0);
+        if (templateIds.Count == 0)
+            return streaks;
+
+        if (!DateOnly.TryParseExact(routine.Date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var routineDate))
+            return streaks;
+
+        // O streak so considera dias JA FECHADOS antes de `routine.Date` -- o proprio
+        // dia de hoje nunca conta (ainda pode mudar ate o fechamento).
+        var toDate = routineDate.AddDays(-1);
+        var fromDate = toDate.AddDays(-HabitStreakLookbackDays);
+
+        var (history, _) = await _dailyRoutineRepository.GetHistoryAsync(
+            userId,
+            fromDate.ToString("yyyy-MM-dd"),
+            toDate.ToString("yyyy-MM-dd"),
+            page: 1,
+            pageSize: HabitStreakLookbackDays + 5);
+
+        var byDate = history.ToDictionary(r => r.Date, r => r);
+        var stillCounting = new HashSet<string>(templateIds);
+        var cursor = toDate;
+
+        while (stillCounting.Count > 0 && cursor >= fromDate)
+        {
+            var dateStr = cursor.ToString("yyyy-MM-dd");
+            if (!byDate.TryGetValue(dateStr, out var dayRoutine))
+                break; // sem rotina fechada nesse dia -- fim do historico continuo disponivel
+
+            var brokeToday = new List<string>();
+            foreach (var templateId in stillCounting)
+            {
+                var task = dayRoutine.Tasks.FirstOrDefault(
+                    t => t.TaskTemplateId == templateId && t.DeletedAt is null);
+                if (task is null)
+                {
+                    // Template nao existia/nao estava ativo nesse dia -- nao conta a favor
+                    // nem contra, mas tambem nao da pra afirmar streak continuo, entao para.
+                    brokeToday.Add(templateId);
+                    continue;
+                }
+                if (task.Status == TaskItemStatus.Done)
+                    streaks[templateId]++;
+                else
+                    brokeToday.Add(templateId);
+            }
+            foreach (var id in brokeToday)
+                stillCounting.Remove(id);
+
+            cursor = cursor.AddDays(-1);
+        }
+
+        return streaks;
     }
 
     public async Task<DailyRoutine> GetOrCreateTodayAsync(ObjectId userId, string timezone)

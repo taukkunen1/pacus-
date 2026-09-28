@@ -9,6 +9,14 @@ public interface IDailyRoutineService
 {
     // Garante que a rotina do dia existe; cria a partir dos task_templates ativos se necessario.
     Task<DailyRoutine> GetOrCreateTodayAsync(ObjectId userId, string timezone);
+
+    // Modo habito consolidado (2026-09-28, ver docs/PROPOSITO.md e Lally et al. 2010 --
+    // media de ~66 dias pra um comportamento virar automatico): pra cada tarefa permanente
+    // (TaskTemplateId != null) presente em `routine`, conta quantos dias consecutivos
+    // anteriores (rotinas fechadas, retroagindo a partir do dia anterior a `routine.Date`)
+    // essa mesma tarefa apareceu e foi concluida. Retorna TaskTemplateId -> streak em dias
+    // (0 quando nao ha nenhum dia anterior concluido, ou a tarefa e avulsa/sem template).
+    Task<Dictionary<string, int>> ComputeHabitStreaksAsync(ObjectId userId, DailyRoutine routine);
     Task<DailyRoutine> GetOrCreateTomorrowAsync(ObjectId userId, string timezone);
     Task<DailyRoutine> CreateTomorrowTaskAsync(ObjectId userId, TomorrowTaskRequest request, ObjectId actorId, string actorRole, string timezone);
     Task<DailyRoutine> UpdateTomorrowTaskAsync(ObjectId userId, string taskId, UpdateTomorrowTaskRequest request, ObjectId actorId, string actorRole, string timezone);

@@ -46,6 +46,16 @@ const _dayComplete = [
   'Dia fechado com organização, parabéns!',
 ];
 
+// Modo habito consolidado (task.isConsolidatedHabit, ~66 dias seguidos --
+// Lally et al. 2010): a essa altura a tarefa ja virou parte de quem a
+// crianca e, entao a mensagem reforca identidade/autonomia em vez de
+// "ganhou ponto".
+const _consolidatedHabitEffort = [
+  'Isso já é só... você! Nem precisa mais pensar, né?',
+  'Repetir isso todo dia virou parte de quem você é.',
+  'Você não faz isso pelo ponto -- faz porque já é seu jeito.',
+];
+
 String pickEffortMessage(
   DailyTask task,
   List<DailyTask> allTasks, {
@@ -63,6 +73,12 @@ String pickEffortMessage(
       .toList();
   if (period.isNotEmpty && period.every((t) => t.isDone)) {
     return _periodComplete[rng.nextInt(_periodComplete.length)];
+  }
+
+  // So parte do tempo, pra nao repetir sempre a mesma frase pra tarefas ja
+  // consolidadas e perder a variedade dos outros pools.
+  if (task.isConsolidatedHabit && rng.nextBool()) {
+    return _consolidatedHabitEffort[rng.nextInt(_consolidatedHabitEffort.length)];
   }
 
   final title = task.title.trim();

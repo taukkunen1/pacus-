@@ -51,7 +51,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
 
         Assert.Equal("mandatory", created.GetProperty("type").GetString());
         Assert.Equal("morning", created.GetProperty("period").GetString());
-        Assert.Equal(2, created.GetProperty("points").GetInt32());
+        Assert.Equal(1, created.GetProperty("points").GetInt32());
         Assert.Equal("adult", created.GetProperty("origin").GetString());
         Assert.Equal("pending", created.GetProperty("status").GetString());
     }

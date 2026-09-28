@@ -779,7 +779,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(controller: title, decoration: const InputDecoration(labelText: 'Título')),
               const SizedBox(height: 8),
-              TextField(controller: description, decoration: const InputDecoration(labelText: 'Descrição')),
+              TextField(
+                controller: description,
+                decoration: const InputDecoration(
+                  labelText: 'Por que isso importa (a criança vai ver)',
+                  helperText:
+                      'Explique em poucas palavras o motivo dessa tarefa -- isso aparece pra criança, não é só pra você.',
+                  helperMaxLines: 2,
+                ),
+                maxLines: 2,
+              ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 initialValue: period,
@@ -1384,11 +1393,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           if (description.isNotEmpty) ...[
             const SizedBox(height: 9),
-            Text(
-              description,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurface,
-              ),
+            _taskHint(
+              icon: Icons.favorite_border_rounded,
+              label: 'Por que isso importa',
+              text: description,
             ),
           ],
           if ((task.planCue ?? '').trim().isNotEmpty) ...[

@@ -262,7 +262,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 TextField(controller: title, decoration: const InputDecoration(labelText: 'Título')),
                 const SizedBox(height: 8),
-                TextField(controller: description, decoration: const InputDecoration(labelText: 'Descrição')),
+                TextField(
+                  controller: description,
+                  decoration: const InputDecoration(
+                    labelText: 'Por que isso importa (a criança vai ver)',
+                    helperText:
+                        'Explique em poucas palavras o motivo dessa tarefa -- isso aparece pra criança, não é só pra você.',
+                    helperMaxLines: 2,
+                  ),
+                  maxLines: 2,
+                ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   initialValue: period,

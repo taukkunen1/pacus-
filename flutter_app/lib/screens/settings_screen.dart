@@ -228,11 +228,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _editTask([Map<String, dynamic>? task]) async {
     final title = TextEditingController(text: task?['title']?.toString() ?? '');
     final description = TextEditingController(text: task?['description']?.toString() ?? '');
-    final points = TextEditingController(text: (task?['points'] ?? 1).toString());
     final minimum = TextEditingController(text: task?['minimumGoalLabel']?.toString() ?? '');
     final options = TextEditingController(text: ((task?['options'] as List?) ?? []).join(', '));
     final reasons = TextEditingController(text: ((task?['reasons'] as List?) ?? []).join(' | '));
-    String type = task?['type']?.toString().toLowerCase() ?? 'expected';
     String period = task?['period']?.toString().toLowerCase() ?? 'morning';
     String recurrence = task?['recurrence']?.toString().toLowerCase() ?? 'daily';
     final anchorDate = TextEditingController(text: task?['anchorDate']?.toString() ?? '');
@@ -265,19 +263,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 TextField(controller: title, decoration: const InputDecoration(labelText: 'Título')),
                 const SizedBox(height: 8),
                 TextField(controller: description, decoration: const InputDecoration(labelText: 'Descrição')),
-                const SizedBox(height: 8),
-                TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos')),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: type,
-                  decoration: const InputDecoration(labelText: 'Tipo'),
-                  items: const [
-                    DropdownMenuItem(value: 'mandatory', child: Text('Obrigatória')),
-                    DropdownMenuItem(value: 'expected', child: Text('Esperada')),
-                    DropdownMenuItem(value: 'challenge', child: Text('Desafio')),
-                  ],
-                  onChanged: (v) => setDialog(() => type = v ?? type),
-                ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   initialValue: period,
@@ -364,9 +349,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onPressed: () => Navigator.pop(context, {
                 'title': title.text.trim(),
                 'description': description.text.trim().isEmpty ? null : description.text.trim(),
-                'type': type,
+                'type': 'expected',
                 'period': period,
-                'points': int.tryParse(points.text) ?? 1,
+                'points': 1,
                 'recurrence': recurrence,
                 'customDays': recurrence == 'custom' ? selectedDays.toList() : null,
                 'anchorDate': recurrence == 'interval' && anchorDate.text.trim().isNotEmpty ? anchorDate.text.trim() : null,
@@ -392,7 +377,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
-    title.dispose(); description.dispose(); points.dispose(); minimum.dispose(); options.dispose(); reasons.dispose(); anchorDate.dispose(); intervalDays.dispose(); for (final controller in weekdayTitles.values) { controller.dispose(); }
+    title.dispose(); description.dispose(); minimum.dispose(); options.dispose(); reasons.dispose(); anchorDate.dispose(); intervalDays.dispose(); for (final controller in weekdayTitles.values) { controller.dispose(); }
     if (payload == null || (payload['title']?.toString() ?? '').isEmpty) return;
     try {
       if (task == null) {

@@ -44,7 +44,7 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
                 description = (string?)null,
                 type = "challenge",
                 period = "afternoon",
-                points = 3,
+                points = 1,
                 recurrence = "weekday_rotation",
                 variants = new[]
                 {
@@ -89,12 +89,12 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
                 description = (string?)null,
                 type = "challenge",
                 period = "afternoon",
-                points = 3,
+                points = 1,
                 recurrence = "weekday_rotation",
                 variants = new object[]
                 {
                     new { dayOfWeek = "monday", title = "Missão Detetive", description = (string?)null },
-                    new { dayOfWeek = "wednesday", title = "Chef por um Dia", description = (string?)null, points = 5 },
+                    new { dayOfWeek = "wednesday", title = "Chef por um Dia", description = (string?)null, points = 1 },
                 }
             });
 
@@ -127,7 +127,7 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
                 description = (string?)null,
                 type = "challenge",
                 period = "afternoon",
-                points = 3,
+                points = 1,
                 recurrence = "weekday_rotation",
                 variants = new[]
                 {
@@ -159,7 +159,7 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
                 description = (string?)null,
                 type = "challenge",
                 period = "afternoon",
-                points = 3,
+                points = 1,
                 recurrence = "custom",
                 customDays = new[] { "tuesday", "wednesday" }
             });
@@ -193,7 +193,7 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
                 description = (string?)null,
                 type = "expected",
                 period = "morning",
-                points = 2,
+                points = 1,
                 recurrence = "custom"
             });
 
@@ -349,7 +349,7 @@ public class TasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
                 description = "Template criado para o teste",
                 type = "mandatory",
                 period = "morning",
-                points = 2
+                points = 1
             });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);

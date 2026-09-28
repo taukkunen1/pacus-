@@ -33,7 +33,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                 description = "Tarefa criada pelo teste HTTP",
                 type = "mandatory",
                 period = "morning",
-                points = 2
+                points = 1
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -88,7 +88,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
             await response.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.Contains(
-            "Cada tarefa deve valer entre 1 e 10 Pacus Points",
+            "Cada tarefa deve valer exatamente 1 Pacus Point",
             body.GetProperty("error").GetString());
     }
 
@@ -180,7 +180,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                 description = (string?)null,
                 type = "expected",
                 period = "afternoon",
-                points = 3
+                points = 1
             });
 
         Assert.Equal(HttpStatusCode.NotFound, updateResponse.StatusCode);
@@ -225,7 +225,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                 description = (string?)null,
                 type = "expected",
                 period = "afternoon",
-                points = 3
+                points = 1
             });
 
         Assert.Equal(HttpStatusCode.NotFound, updateResponse.StatusCode);
@@ -252,7 +252,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
             $"/api/v1/daily-tasks/{taskId}/points",
             new
             {
-                points = 3
+                points = 1
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -529,7 +529,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
             $"/api/v1/daily-tasks/{taskId}/points",
             new
             {
-                points = 2
+                points = 1
             });
 
         Assert.Equal(
@@ -544,7 +544,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                 description = "editada",
                 type = "expected",
                 period = "afternoon",
-                points = 2
+                points = 1
             });
 
         Assert.Equal(
@@ -569,7 +569,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                 description = "Task criada para o teste",
                 type = "expected",
                 period = "afternoon",
-                points = 2
+                points = 1
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

@@ -788,7 +788,7 @@ public class DailyRoutineHttpIntegrationTests : IClassFixture<MongoIntegrationFi
         var create = await client.PostAsJsonAsync("/api/v1/daily-tasks", new
         {
             title = "Jornada critica", description = "E2E",
-            type = "expected", period = "afternoon", points = 5
+            type = "expected", period = "afternoon", points = 1
         });
         Assert.Equal(HttpStatusCode.OK, create.StatusCode);
         var routine = await create.Content.ReadFromJsonAsync<JsonElement>();

@@ -14,7 +14,7 @@ Estes termos são aceitos pelo **adulto responsável**, em nome próprio e da(s)
 
 O PACUS é um aplicativo de acompanhamento de rotina para famílias, construído em torno de reforço positivo e autonomia progressiva da criança — não de punição. Cada dia começa às 00:00 no fuso horário configurado. As principais funcionalidades:
 
-- **Tarefas**: o adulto configura tarefas permanentes (`mandatory`, `expected`, `challenge`), cada uma valendo de 1 a 10 Pacus Points. Não há penalização: uma tarefa não concluída simplesmente não rende pontos, sem desconto de saldo. Tarefas do dia atual podem ser ajustadas pela criança, conforme as permissões definidas pelo adulto.
+- **Tarefas**: o adulto configura tarefas permanentes, cada uma valendo exatamente 1 Pacus Point. Não há penalização: uma tarefa não concluída simplesmente não rende pontos, sem desconto de saldo. Tarefas do dia atual podem ser ajustadas pela criança, conforme as permissões definidas pelo adulto.
 - **Pacus Points**: mecanismo de gamificação por reforço positivo — pontos ganhos ao concluir tarefas (o valor de referência de 1 Pacus Point é configurável pelo adulto responsável, como parâmetro interno da família — o PACUS não processa nenhum pagamento real). O adulto também pode ajustar manualmente o saldo, quando necessário.
 - **Histórico**: o histórico de dias encerrados é preservado e pode ser consultado.
 - **PACUS (o bichinho)**: cresce uma vez por dia encerrado, independentemente da conclusão das tarefas — o crescimento nunca é revertido ou descontado como forma de punição.

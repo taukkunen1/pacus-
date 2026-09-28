@@ -1,6 +1,6 @@
 # Termos de Uso do PACUS
 
-**Última atualização: 23 de setembro de 2026**
+**Última atualização: 27 de setembro de 2026**
 
 > **Nota de revisão jurídica:** estes termos refletem o funcionamento atual do PACUS e estão publicados no produto, mas não foram revisados por advogado.
 
@@ -12,13 +12,14 @@ Estes termos são aceitos pelo **adulto responsável**, em nome próprio e da(s)
 
 ## 2. O que é o PACUS
 
-O PACUS é um aplicativo de acompanhamento de rotina para famílias. Cada dia começa às 00:00 no fuso horário configurado. As principais funcionalidades:
+O PACUS é um aplicativo de acompanhamento de rotina para famílias, construído em torno de reforço positivo e autonomia progressiva da criança — não de punição. Cada dia começa às 00:00 no fuso horário configurado. As principais funcionalidades:
 
-- **Tarefas**: o adulto configura tarefas permanentes (`mandatory`, `expected`, `challenge`), cada uma valendo de 1 a 10 Pacus Points (ou -1 a -10 como penalidade). Tarefas do dia atual podem ser ajustadas pela criança, conforme as permissões definidas pelo adulto.
-- **Pacus Points**: pontos ganhos ao concluir tarefas (o valor de referência de 1 Pacus Point é configurável pelo adulto responsável, como parâmetro interno da família — o PACUS não processa nenhum pagamento real).
+- **Tarefas**: o adulto configura tarefas permanentes (`mandatory`, `expected`, `challenge`), cada uma valendo de 1 a 10 Pacus Points. Não há penalização: uma tarefa não concluída simplesmente não rende pontos, sem desconto de saldo. Tarefas do dia atual podem ser ajustadas pela criança, conforme as permissões definidas pelo adulto.
+- **Pacus Points**: mecanismo de gamificação por reforço positivo — pontos ganhos ao concluir tarefas (o valor de referência de 1 Pacus Point é configurável pelo adulto responsável, como parâmetro interno da família — o PACUS não processa nenhum pagamento real). O adulto também pode ajustar manualmente o saldo, quando necessário.
 - **Histórico**: o histórico de dias encerrados é preservado e pode ser consultado.
-- **PACUS (o bichinho)**: cresce uma vez por dia encerrado, independentemente da conclusão das tarefas.
-- **Loja de recompensas**: o adulto cadastra itens resgatáveis com Pacus Points; a criança solicita o resgate, e o adulto aprova ou rejeita.
+- **PACUS (o bichinho)**: cresce uma vez por dia encerrado, independentemente da conclusão das tarefas — o crescimento nunca é revertido ou descontado como forma de punição.
+- **Loja de recompensas**: o adulto cadastra itens resgatáveis com Pacus Points, incluindo minutos de tempo de tela; a criança solicita o resgate, e o adulto aprova ou rejeita, respeitando limite diário e estoque configurados pelo adulto.
+- **Tempo de tela**: minutos resgatados na loja formam um saldo consumido em sessões cronometradas (com pausa/retomada e alarme sonoro de término); o adulto pode ajustar esse saldo manualmente.
 - **Chat familiar**: membros autenticados da mesma família podem trocar mensagens privadas dentro do PACUS.
 
 ## 3. Contas e responsabilidade do adulto

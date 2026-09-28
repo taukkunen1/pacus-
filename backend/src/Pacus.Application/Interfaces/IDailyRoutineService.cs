@@ -41,10 +41,6 @@ public interface IDailyRoutineService
     // conter todos os ids da rotina atual; a ordem da lista vira o novo campo Order.
     Task<DailyRoutine> ReorderTasksAsync(ObjectId userId, List<string> orderedTaskIds, ObjectId actorId, string actorRole);
 
-    // Ajusta os pontos de uma tarefa do dia atual (ex. adulto revendo o valor que a
-    // crianca propos). Se a tarefa ja estava concluida, gera uma transacao Adjustment
-    // com o delta — nunca edita silenciosamente um award ja registrado.
-    Task<DailyRoutine> AdjustTaskPointsAsync(ObjectId userId, string taskId, int newPoints, ObjectId actorId, string actorRole);
     Task<DailyRoutine> UpdateTaskAsync(ObjectId userId, string taskId, DailyTaskUpdateRequest request, ObjectId actorId, string actorRole);
     Task<DailyRoutine> DeleteTaskAsync(ObjectId userId, string taskId, ObjectId actorId, string actorRole);
 

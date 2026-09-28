@@ -6,8 +6,9 @@ using Pacus.Application.Exceptions;
 
 namespace Pacus.UnitTests;
 
-// Cenarios criticos #5 (alteracao de ordem) e #8 (tarefa alterada), mais o
-// caso de ajuste de pontos pelo adulto apos negociacao com a crianca.
+// Cenarios criticos #5 (alteracao de ordem) e #8 (tarefa alterada). O antigo
+// ajuste manual de pontos pelo adulto (AdjustTaskPointsAsync) foi removido --
+// toda tarefa vale exatamente 1 Pacus Point, entao nao ha mais o que ajustar.
 public class TaskManagementTests
 {
     private static (DailyRoutineService dailyRoutine, FakePointTransactionRepository pointsRepo)
@@ -32,7 +33,7 @@ public class TaskManagementTests
         var r1 = await dailyRoutine.CreateAdHocTaskAsync(userId,
             new CreateTaskRequest("Escovar dentes", null, "mandatory", "morning", 1), userId, "child");
         var r2 = await dailyRoutine.CreateAdHocTaskAsync(userId,
-            new CreateTaskRequest("Ler livro", null, "expected", "evening", 3), userId, "child");
+            new CreateTaskRequest("Ler livro", null, "expected", "evening", 1), userId, "child");
 
         var idFirst = r2.Tasks[0].Id;
         var idSecond = r2.Tasks[1].Id;
@@ -56,66 +57,28 @@ public class TaskManagementTests
         await dailyRoutine.CreateAdHocTaskAsync(userId,
             new CreateTaskRequest("Escovar dentes", null, "mandatory", "morning", 1), userId, "child");
         await dailyRoutine.CreateAdHocTaskAsync(userId,
-            new CreateTaskRequest("Ler livro", null, "expected", "evening", 3), userId, "child");
+            new CreateTaskRequest("Ler livro", null, "expected", "evening", 1), userId, "child");
 
         await Assert.ThrowsAsync<ValidationException>(
             () => dailyRoutine.ReorderTasksAsync(userId, new List<string> { "so-um-id" }, userId, "child"));
     }
 
     [Fact]
-    public async Task AjustarPontos_TarefaAindaPendente_NaoGeraTransacao()
+    public async Task CriarTarefa_Com1Ponto_NaoLancaExcecao()
     {
-        var (dailyRoutine, pointsRepo) = BuildSystem();
-        var userId = ObjectId.GenerateNewId();
-        await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-24", "America/Sao_Paulo");
-        var routine = await dailyRoutine.CreateAdHocTaskAsync(userId,
-            new CreateTaskRequest("Arrumar quarto", null, "expected", "afternoon", 3), userId, "child");
-        var taskId = routine.Tasks[0].Id;
-
-        var updated = await dailyRoutine.AdjustTaskPointsAsync(userId, taskId, 2, userId, "adult");
-
-        Assert.Equal(2, updated.Tasks[0].Points);
-        Assert.Empty(pointsRepo.Transactions); // ainda nao foi concluida, nada de dinheiro se move
-    }
-
-    [Fact]
-    public async Task AjustarPontos_TarefaJaConcluida_GeraTransacaoDeAjusteComODelta()
-    {
-        var (dailyRoutine, pointsRepo) = BuildSystem();
-        var userId = ObjectId.GenerateNewId();
-        await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-24", "America/Sao_Paulo");
-        var routine = await dailyRoutine.CreateAdHocTaskAsync(userId,
-            new CreateTaskRequest("Arrumar quarto", null, "expected", "afternoon", 3), userId, "adult");
-        var taskId = routine.Tasks[0].Id;
-
-        await dailyRoutine.ToggleTaskAsync(userId, taskId, true, userId, "child"); // adulto definiu 3; crianca concluiu
-        Assert.Equal(3, await pointsRepo.GetBalanceAsync(userId));
-
-        await dailyRoutine.AdjustTaskPointsAsync(userId, taskId, 2, userId, "adult"); // adulto aprova so 2
-
-        Assert.Equal(2, await pointsRepo.GetBalanceAsync(userId)); // saldo reflete o valor final
-        Assert.Equal(2, pointsRepo.Transactions.Count(t => t.FamilyId == userId)); // award + adjustment
-    }
-
-    [Fact]
-    public async Task CriarTarefa_Com4Pontos_NaoLancaExcecao()
-    {
-        // Regressao: este teste esperava excecao para 4 pontos porque a regra
-        // de negocio antiga so aceitava 1, 2 ou 3 (ver commit historico). A
-        // regra atual (DailyRoutineService.ValidatePoints) aceita qualquer
-        // valor entre -10 e 10, exceto zero — 4 pontos e valido. Teste
-        // atualizado para refletir a regra vigente em vez de travar o CI com
-        // uma expectativa desatualizada. A cobertura de valores realmente
-        // invalidos continua em CriarTarefa_ComZeroPontos_LancaExcecao e nos
-        // testes de fora do range em TaskTemplateService/TasksController.
+        // 2026-09-27: toda tarefa passou a valer exatamente 1 Pacus Point (sem
+        // faixa configuravel e sem o antigo endpoint de ajuste manual, removido
+        // junto com este commit -- ver docs/ESTADO_ATUAL.md). A cobertura de
+        // valores invalidos continua em CriarTarefa_ComZeroPontos_LancaExcecao
+        // e CriarTarefa_Com11Pontos_LancaExcecao.
         var (dailyRoutine, _) = BuildSystem();
         var userId = ObjectId.GenerateNewId();
         await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-24", "America/Sao_Paulo");
 
         var routine = await dailyRoutine.CreateAdHocTaskAsync(
-            userId, new CreateTaskRequest("Tarefa", null, "challenge", "evening", 4), userId, "adult");
+            userId, new CreateTaskRequest("Tarefa", null, "challenge", "evening", 1), userId, "adult");
 
-        Assert.Equal(4, routine.Tasks.Last().Points);
+        Assert.Equal(1, routine.Tasks.Last().Points);
     }
 
     [Fact]
@@ -147,11 +110,11 @@ public class TaskManagementTests
         var userId = ObjectId.GenerateNewId();
         var routine = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-24", "America/Sao_Paulo");
         var created = await dailyRoutine.CreateAdHocTaskAsync(userId,
-            new CreateTaskRequest("Ler livro", null, "expected", "evening", 2), userId, "child");
+            new CreateTaskRequest("Ler livro", null, "expected", "evening", 1), userId, "child");
         var taskId = created.Tasks.Last().Id;
 
         var updated = await dailyRoutine.UpdateTaskAsync(userId, taskId,
-            new DailyTaskUpdateRequest("Ler 20 paginas", "Livro escolhido pela crianca", "expected", "evening", 3), userId, "child");
+            new DailyTaskUpdateRequest("Ler 20 paginas", "Livro escolhido pela crianca", "expected", "evening", 1), userId, "child");
         Assert.Equal("Ler 20 paginas", updated.Tasks.Last().Title);
         Assert.Equal(0, updated.Tasks.Last().Points);
 

@@ -83,22 +83,6 @@ public class DailyTasksController : ControllerBase
         return Ok(routine.ToResponse());
     }
 
-    [RequireRole(UserRole.Adult)]
-    [HttpPut("{id}/points")]
-    public async Task<IActionResult> AdjustPoints(
-        string id,
-        [FromBody] AdjustPointsRequest request)
-    {
-        var routine = await _dailyRoutineService.AdjustTaskPointsAsync(
-            _currentUser.FamilyId,
-            id,
-            request.Points,
-            _currentUser.UserId,
-            _currentUser.Role.ToString());
-
-        return Ok(routine.ToResponse());
-    }
-
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(
         string id,

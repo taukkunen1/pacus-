@@ -34,7 +34,7 @@ public class AutonomyPlanningTests
         var routine = await service.CreateRoutineForDateAsync(userId, "2026-09-10", "America/Sao_Paulo");
         var task = await service.CreateAdHocTaskAsync(
             userId,
-            new CreateTaskRequest("Ler", null, "mandatory", "evening", 5),
+            new CreateTaskRequest("Ler", null, "mandatory", "evening", 1),
             actorId,
             "child");
         var taskId = task.Tasks.Single(t => t.Title == "Ler").Id;
@@ -78,7 +78,7 @@ public class AutonomyPlanningTests
         await service.CreateRoutineForDateAsync(userId, "2026-09-10", "America/Sao_Paulo");
         var routine = await service.CreateAdHocTaskAsync(
             userId,
-            new CreateTaskRequest("Ler", null, "mandatory", "evening", 5),
+            new CreateTaskRequest("Ler", null, "mandatory", "evening", 1),
             actorId,
             "child");
         var taskId = routine.Tasks.Single().Id;
@@ -103,7 +103,7 @@ public class AutonomyPlanningTests
         await service.CreateRoutineForDateAsync(userId, "2026-09-10", "America/Sao_Paulo");
         var routine = await service.CreateAdHocTaskAsync(
             userId,
-            new CreateTaskRequest("Ler", null, "mandatory", "evening", 5),
+            new CreateTaskRequest("Ler", null, "mandatory", "evening", 1),
             actorId,
             "child");
         var taskId = routine.Tasks.Single().Id;
@@ -125,7 +125,7 @@ public class AutonomyPlanningTests
         await service.CreateRoutineForDateAsync(userId, "2026-09-10", "America/Sao_Paulo");
         var routine = await service.CreateAdHocTaskAsync(
             userId,
-            new CreateTaskRequest("Ler", null, "mandatory", "evening", 5),
+            new CreateTaskRequest("Ler", null, "mandatory", "evening", 1),
             actorId,
             "child");
         var taskId = routine.Tasks.Single().Id;
@@ -150,7 +150,7 @@ public class AutonomyPlanningTests
         await service.CreateRoutineForDateAsync(userId, "2026-09-10", "America/Sao_Paulo");
         var routine = await service.CreateAdHocTaskAsync(
             userId,
-            new CreateTaskRequest("Ler", null, "mandatory", "evening", 5),
+            new CreateTaskRequest("Ler", null, "mandatory", "evening", 1),
             actorId,
             "child");
         var taskId = routine.Tasks.Single().Id;
@@ -183,7 +183,7 @@ public class AutonomyPlanningTests
         // adulto 10 dias atras (fora da janela -- nao deve contar).
         var today = await dailyRoutineService.CreateRoutineForDateAsync(userId, "2026-09-10", "America/Sao_Paulo");
         var taskToday = (await dailyRoutineService.CreateAdHocTaskAsync(
-            userId, new CreateTaskRequest("Ler", null, "mandatory", "evening", 5), actorId, "child"))
+            userId, new CreateTaskRequest("Ler", null, "mandatory", "evening", 1), actorId, "child"))
             .Tasks.Single(t => t.Title == "Ler");
         await dailyRoutineService.SetTaskInitiativeAsync(
             userId, taskToday.Id, TaskInitiativeLevel.SelfStarted, actorId, "child");

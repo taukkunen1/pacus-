@@ -32,7 +32,7 @@ public class TaskRecurrenceTests
         var userId = ObjectId.GenerateNewId();
 
         await templates.CreateAsync(userId, userId,
-            new CreateTaskRequest("Duolingo", null, "challenge", "morning", 3, Recurrence: "weekday"));
+            new CreateTaskRequest("Duolingo", null, "challenge", "morning", 1, Recurrence: "weekday"));
 
         // 2026-08-29 = sabado, 2026-08-31 = segunda (confirmar com DateTime.DayOfWeek).
         var saturday = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-29", "America/Sao_Paulo");
@@ -55,7 +55,7 @@ public class TaskRecurrenceTests
                 null,
                 "challenge",
                 "afternoon",
-                3,
+                1,
                 Recurrence: "weekday_rotation",
                 Variants: new List<TaskVariantRequest>
                 {
@@ -80,37 +80,18 @@ public class TaskRecurrenceTests
         // Type/Period vem do template, iguais em toda variante. Points tambem,
         // quando a variante nao define um valor proprio (ver teste abaixo pro
         // caso em que define).
-        Assert.Equal(3, monday.Tasks.Single().Points);
+        Assert.Equal(1, monday.Tasks.Single().Points);
     }
 
-    [Fact]
-    public async Task RecorrenciaWeekdayRotation_VarianteComPontosProprios_SobrescreveOsDoTemplate()
-    {
-        var (templates, dailyRoutine) = BuildSystem(out _);
-        var userId = ObjectId.GenerateNewId();
-
-        // Points do template (3) e o padrao -- so a variante de quarta define um
-        // valor proprio (5), porque "Chef por um Dia" exige supervisao de adulto.
-        await templates.CreateAsync(userId, userId,
-            new CreateTaskRequest(
-                "Momento Criativo",
-                null,
-                "challenge",
-                "afternoon",
-                3,
-                Recurrence: "weekday_rotation",
-                Variants: new List<TaskVariantRequest>
-                {
-                    new("Monday", "Missão Detetive", null),
-                    new("Wednesday", "Chef por um Dia", "Com supervisão de um adulto.", Points: 5),
-                }));
-
-        var monday = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-31", "America/Sao_Paulo");
-        var wednesday = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-02", "America/Sao_Paulo");
-
-        Assert.Equal(3, monday.Tasks.Single().Points); // sem override -- usa o do template
-        Assert.Equal(5, wednesday.Tasks.Single().Points); // override da variante
-    }
+    // 2026-09-27: o override de pontos por variante (TaskVariantRequest.Points)
+    // ficou sem efeito observavel depois que toda tarefa passou a valer
+    // exatamente 1 Pacus Point -- o template e qualquer variante so podem
+    // valer 1 mesmo, entao "sobrescrever" nunca produz um valor diferente.
+    // O parser (TaskTemplateService.ParseVariants) continua aceitando o campo
+    // por compatibilidade com templates antigos ja salvos, mas nao ha mais um
+    // cenario onde o valor da variante difira do template -- por isso o teste
+    // que cobria essa diferenca foi removido em vez de mantido artificialmente
+    // verde (ver TaskValidation.ValidatePoints).
 
     [Fact]
     public async Task RecorrenciaWeekdayRotation_SemVariantes_LancaExcecao()
@@ -119,7 +100,7 @@ public class TaskRecurrenceTests
         var userId = ObjectId.GenerateNewId();
 
         await Assert.ThrowsAsync<ValidationException>(() => templates.CreateAsync(userId, userId,
-            new CreateTaskRequest("Momento Criativo", null, "challenge", "afternoon", 3, Recurrence: "weekday_rotation")));
+            new CreateTaskRequest("Momento Criativo", null, "challenge", "afternoon", 1, Recurrence: "weekday_rotation")));
     }
 
     [Fact]
@@ -134,7 +115,7 @@ public class TaskRecurrenceTests
                 null,
                 "challenge",
                 "afternoon",
-                3,
+                1,
                 Recurrence: "weekday_rotation",
                 Variants: new List<TaskVariantRequest> { new("Saturday", "Passeio", null) })));
     }
@@ -152,7 +133,7 @@ public class TaskRecurrenceTests
                 null,
                 "challenge",
                 "afternoon",
-                3,
+                1,
                 Recurrence: "custom",
                 CustomDays: new List<string> { "Tuesday", "Wednesday" }));
 
@@ -181,7 +162,7 @@ public class TaskRecurrenceTests
                 null,
                 "expected",
                 "morning",
-                2,
+                1,
                 Recurrence: "custom",
                 CustomDays: new List<string> { "Saturday" }));
 
@@ -201,7 +182,7 @@ public class TaskRecurrenceTests
         var userId = ObjectId.GenerateNewId();
 
         await Assert.ThrowsAsync<ValidationException>(() => templates.CreateAsync(userId, userId,
-            new CreateTaskRequest("Inglês", null, "challenge", "afternoon", 3, Recurrence: "custom")));
+            new CreateTaskRequest("Inglês", null, "challenge", "afternoon", 1, Recurrence: "custom")));
     }
 
     [Fact]

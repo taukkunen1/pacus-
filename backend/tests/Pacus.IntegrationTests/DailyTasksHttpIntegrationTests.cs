@@ -237,35 +237,6 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
     }
 
     [Fact]
-    public async Task AdjustPoints_ShouldChangeTaskPoints_ThroughHttp()
-    {
-        using var factory = new PacusApiFactory(_mongo.ConnectionString);
-        using var client = factory.CreateClient();
-
-        var family = await BootstrapAsync(client);
-        await LoginAdultAsync(client, family);
-        await EnsureTodayRoutineAsync(client);
-
-        var taskId = await CreateTaskAndGetIdAsync(client);
-
-        var response = await client.PutAsJsonAsync(
-            $"/api/v1/daily-tasks/{taskId}/points",
-            new
-            {
-                points = 1
-            });
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var routine =
-            await response.Content.ReadFromJsonAsync<JsonElement>();
-
-        var task = FindTask(routine, taskId);
-
-        Assert.Equal(3, task.GetProperty("points").GetInt32());
-    }
-
-    [Fact]
     public async Task Update_ShouldChangeTaskData_ThroughHttp()
     {
         using var factory = new PacusApiFactory(_mongo.ConnectionString);
@@ -396,36 +367,6 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
     }
 
     [Fact]
-    public async Task ChildPermissions_ShouldBlockPoints_WhenDisabled()
-    {
-        using var factory = new PacusApiFactory(_mongo.ConnectionString);
-        using var client = factory.CreateClient();
-
-        var family = await BootstrapAsync(client);
-
-        await LoginAdultAsync(client, family);
-        await EnsureTodayRoutineAsync(client);
-
-        var taskId = await CreateTaskAndGetIdAsync(client);
-
-        await SetChildPermissionsAsync(
-            factory,
-            family.FamilyId,
-            canSetPoints: false);
-
-        await LoginChildAsync(client, family);
-
-        var response = await client.PutAsJsonAsync(
-            $"/api/v1/daily-tasks/{taskId}/points",
-            new
-            {
-                points = 3
-            });
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
-
-    [Fact]
     public async Task ChildPermissions_ShouldBlockEdit_WhenDisabled()
     {
         using var factory = new PacusApiFactory(_mongo.ConnectionString);
@@ -488,7 +429,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
     }
 
     [Fact]
-    public async Task ChildPermissions_AllowOwnDayEdits_ButNeverDirectPointChanges()
+    public async Task ChildPermissions_AllowOwnDayEdits()
     {
         using var factory = new PacusApiFactory(_mongo.ConnectionString);
         using var client = factory.CreateClient();
@@ -524,17 +465,6 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                     "Tarefa infantil permitida")
                 .GetProperty("id")
                 .GetString()!;
-
-        var pointsResponse = await client.PutAsJsonAsync(
-            $"/api/v1/daily-tasks/{taskId}/points",
-            new
-            {
-                points = 1
-            });
-
-        Assert.Equal(
-            HttpStatusCode.Forbidden,
-            pointsResponse.StatusCode);
 
         var updateResponse = await client.PutAsJsonAsync(
             $"/api/v1/daily-tasks/{taskId}",

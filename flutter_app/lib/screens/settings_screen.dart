@@ -262,16 +262,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 TextField(controller: title, decoration: const InputDecoration(labelText: 'Título')),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: description,
-                  decoration: const InputDecoration(
-                    labelText: 'Por que isso importa (a criança vai ver)',
-                    helperText:
-                        'Explique em poucas palavras o motivo dessa tarefa -- isso aparece pra criança, não é só pra você.',
-                    helperMaxLines: 2,
-                  ),
-                  maxLines: 2,
-                ),
+                TextField(controller: description, decoration: const InputDecoration(labelText: 'Descrição')),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   initialValue: period,
@@ -348,7 +339,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 8),
                 TextField(controller: options, decoration: const InputDecoration(labelText: 'Opções, separadas por vírgula')),
                 const SizedBox(height: 8),
-                TextField(controller: reasons, decoration: const InputDecoration(labelText: 'Motivos, separados por |')),
+                TextField(
+                  controller: reasons,
+                  decoration: const InputDecoration(
+                    labelText: 'Por que isso importa (a criança vai ver)',
+                    helperText:
+                        'Frases sobre o motivo real da tarefa -- o Pacus mostra uma delas pra criança. Separe várias com "|" pra variar.',
+                    helperMaxLines: 2,
+                  ),
+                  maxLines: 2,
+                ),
               ]),
             ),
           ),

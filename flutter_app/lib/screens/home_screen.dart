@@ -698,6 +698,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _createDailyTask() async {
     final title = TextEditingController();
+    final reason = TextEditingController();
     String period = 'morning';
     final payload = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -708,6 +709,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             width: 460,
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(controller: title, decoration: const InputDecoration(labelText: 'Título')),
+              const SizedBox(height: 10),
+              TextField(
+                controller: reason,
+                decoration: const InputDecoration(
+                  labelText: 'Por que isso importa (a criança vai ver)',
+                  helperText: 'Opcional -- em poucas palavras, o motivo real dessa tarefa.',
+                  helperMaxLines: 2,
+                ),
+                maxLines: 2,
+              ),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 initialValue: period,
@@ -726,6 +737,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             FilledButton(onPressed: () => Navigator.pop(context, {
               'title': title.text.trim(),
               'description': null,
+              'reason': reason.text.trim().isEmpty ? null : reason.text.trim(),
               'type': 'expected',
               'period': period,
               'points': 1,
@@ -734,7 +746,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       ),
     );
-    title.dispose();
+    title.dispose(); reason.dispose();
     if (payload == null || (payload['title']?.toString() ?? '').isEmpty) return;
     try {
       await widget.api.request('/daily-tasks', method: 'POST', body: payload);
@@ -779,16 +791,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(controller: title, decoration: const InputDecoration(labelText: 'Título')),
               const SizedBox(height: 8),
-              TextField(
-                controller: description,
-                decoration: const InputDecoration(
-                  labelText: 'Por que isso importa (a criança vai ver)',
-                  helperText:
-                      'Explique em poucas palavras o motivo dessa tarefa -- isso aparece pra criança, não é só pra você.',
-                  helperMaxLines: 2,
-                ),
-                maxLines: 2,
-              ),
+              TextField(controller: description, decoration: const InputDecoration(labelText: 'Descrição')),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 initialValue: period,
@@ -1393,10 +1396,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           if (description.isNotEmpty) ...[
             const SizedBox(height: 9),
-            _taskHint(
-              icon: Icons.favorite_border_rounded,
-              label: 'Por que isso importa',
-              text: description,
+            Text(
+              description,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurface,
+              ),
             ),
           ],
           if ((task.planCue ?? '').trim().isNotEmpty) ...[
@@ -1418,8 +1422,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           if (showReason) ...[
             const SizedBox(height: 6),
             _taskHint(
-              icon: Icons.lightbulb_outline_rounded,
-              label: 'Por quê',
+              icon: Icons.favorite_border_rounded,
+              label: 'Por que isso importa',
               text: reason,
             ),
           ],

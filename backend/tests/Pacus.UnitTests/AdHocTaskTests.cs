@@ -29,7 +29,7 @@ public class AdHocTaskTests
         var userId = ObjectId.GenerateNewId();
         await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-24", "America/Sao_Paulo");
 
-        var request = new CreateTaskRequest("Comprar racao", null, "challenge", "afternoon", 3);
+        var request = new CreateTaskRequest("Comprar racao", null, "challenge", "afternoon", 1);
         var routine = await dailyRoutine.CreateAdHocTaskAsync(userId, request, userId, "child");
 
         var created = Assert.Single(routine.Tasks);
@@ -48,7 +48,7 @@ public class AdHocTaskTests
         var userId = ObjectId.GenerateNewId();
         await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-08-24", "America/Sao_Paulo");
 
-        var request = new CreateTaskRequest("Fazer desenho", "capricho livre", "challenge", "evening", 2);
+        var request = new CreateTaskRequest("Fazer desenho", "capricho livre", "challenge", "evening", 1);
         var routine = await dailyRoutine.CreateAdHocTaskAsync(userId, request, userId, "child");
         var task = routine.Tasks[0];
 

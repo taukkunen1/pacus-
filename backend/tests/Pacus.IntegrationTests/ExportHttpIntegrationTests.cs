@@ -223,7 +223,7 @@ public class ExportHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
 
                 period = "afternoon",
 
-                points = 2
+                points = 1
 
             });
 

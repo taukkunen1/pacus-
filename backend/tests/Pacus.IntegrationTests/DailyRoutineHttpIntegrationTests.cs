@@ -788,7 +788,7 @@ public class DailyRoutineHttpIntegrationTests : IClassFixture<MongoIntegrationFi
         var create = await client.PostAsJsonAsync("/api/v1/daily-tasks", new
         {
             title = "Jornada critica", description = "E2E",
-            type = "expected", period = "afternoon", points = 5
+            type = "expected", period = "afternoon", points = 1
         });
         Assert.Equal(HttpStatusCode.OK, create.StatusCode);
         var routine = await create.Content.ReadFromJsonAsync<JsonElement>();
@@ -799,7 +799,7 @@ public class DailyRoutineHttpIntegrationTests : IClassFixture<MongoIntegrationFi
         Assert.Equal(HttpStatusCode.OK,
             (await client.PostAsync($"/api/v1/daily-tasks/{taskId}/complete", null)).StatusCode);
         var balance = await client.GetFromJsonAsync<JsonElement>("/api/v1/points");
-        Assert.Equal(5, balance.GetProperty("balance").GetInt32());
+        Assert.Equal(1, balance.GetProperty("balance").GetInt32());
 
         Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync(
             "/api/v1/daily-routines/today/game-timer/session/start", new { minutes = 60 })).StatusCode);
@@ -829,7 +829,7 @@ public class DailyRoutineHttpIntegrationTests : IClassFixture<MongoIntegrationFi
         var closed = await client.GetFromJsonAsync<JsonElement>(
             $"/api/v1/daily-routines?date={firstDate}");
         Assert.Equal("closed", closed.GetProperty("status").GetString());
-        Assert.Equal(5, (await client.GetFromJsonAsync<JsonElement>("/api/v1/points"))
+        Assert.Equal(1, (await client.GetFromJsonAsync<JsonElement>("/api/v1/points"))
             .GetProperty("balance").GetInt32());
     }
 

@@ -36,7 +36,7 @@ public class AccountHttpIntegrationTests : IClassFixture<MongoIntegrationFixture
                 description = (string?)null,
                 type = "expected",
                 period = "afternoon",
-                points = 2
+                points = 1
             });
 
         var chatResponse = await client.PostAsJsonAsync(
@@ -109,7 +109,7 @@ public class AccountHttpIntegrationTests : IClassFixture<MongoIntegrationFixture
                 description = (string?)null,
                 type = "expected",
                 period = "afternoon",
-                points = 2
+                points = 1
             });
         var template = await templateResponse.Content.ReadFromJsonAsync<JsonElement>();
         var templateId = template.GetProperty("id").GetString();

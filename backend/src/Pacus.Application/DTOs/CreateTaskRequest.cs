@@ -45,5 +45,3 @@ public record TaskVariantRequest(
     // supervisao de adulto vale mais que uma rapida e sozinha).
     int? Points = null
 );
-
-public record AdjustPointsRequest(int Points);

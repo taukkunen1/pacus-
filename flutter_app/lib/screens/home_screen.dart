@@ -698,9 +698,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _createDailyTask() async {
     final title = TextEditingController();
-    final points = TextEditingController(text: '1');
     String period = 'morning';
-    String type = 'expected';
     final payload = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -710,8 +708,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             width: 460,
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(controller: title, decoration: const InputDecoration(labelText: 'Título')),
-              const SizedBox(height: 10),
-              TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos')),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 initialValue: period,
@@ -723,17 +719,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ],
                 onChanged: (v) => setDialog(() => period = v ?? period),
               ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: type,
-                decoration: const InputDecoration(labelText: 'Tipo'),
-                items: const [
-                  DropdownMenuItem(value: 'mandatory', child: Text('Obrigatória')),
-                  DropdownMenuItem(value: 'expected', child: Text('Esperada')),
-                  DropdownMenuItem(value: 'challenge', child: Text('Desafio')),
-                ],
-                onChanged: (v) => setDialog(() => type = v ?? type),
-              ),
             ]),
           ),
           actions: [
@@ -741,16 +726,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             FilledButton(onPressed: () => Navigator.pop(context, {
               'title': title.text.trim(),
               'description': null,
-              'type': type,
+              'type': 'expected',
               'period': period,
-              'points': int.tryParse(points.text) ?? 1,
+              'points': 1,
             }), child: const Text('Adicionar')),
           ],
         ),
       ),
     );
     title.dispose();
-    points.dispose();
     if (payload == null || (payload['title']?.toString() ?? '').isEmpty) return;
     try {
       await widget.api.request('/daily-tasks', method: 'POST', body: payload);
@@ -784,9 +768,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _editDailyTask(DailyTask task) async {
     final title = TextEditingController(text: task.title);
     final description = TextEditingController(text: task.description ?? '');
-    final points = TextEditingController(text: task.points.toString());
     String period = task.period;
-    String type = task.type;
     final payload = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -799,8 +781,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               const SizedBox(height: 8),
               TextField(controller: description, decoration: const InputDecoration(labelText: 'Descrição')),
               const SizedBox(height: 8),
-              TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos')),
-              const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 initialValue: period,
                 decoration: const InputDecoration(labelText: 'Período'),
@@ -811,17 +791,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ],
                 onChanged: (v) => setDialog(() => period = v ?? period),
               ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: type,
-                decoration: const InputDecoration(labelText: 'Tipo'),
-                items: const [
-                  DropdownMenuItem(value: 'mandatory', child: Text('Obrigatória')),
-                  DropdownMenuItem(value: 'expected', child: Text('Esperada')),
-                  DropdownMenuItem(value: 'challenge', child: Text('Desafio')),
-                ],
-                onChanged: (v) => setDialog(() => type = v ?? type),
-              ),
             ]),
           ),
           actions: [
@@ -830,9 +799,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               onPressed: () => Navigator.pop(context, {
                 'title': title.text.trim(),
                 'description': description.text.trim().isEmpty ? null : description.text.trim(),
-                'type': type,
+                'type': 'expected',
                 'period': period,
-                'points': int.tryParse(points.text) ?? task.points,
+                'points': 1,
                 'options': task.options,
                 'reason': task.reason,
               }),
@@ -842,7 +811,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       ),
     );
-    title.dispose(); description.dispose(); points.dispose();
+    title.dispose(); description.dispose();
     if (payload == null) return;
     try {
       await widget.api.request('/daily-tasks/' + task.id, method: 'PUT', body: payload);

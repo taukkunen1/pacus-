@@ -26,7 +26,7 @@ Atualizado em 2026-09-23 após a auditoria final da migração para Flutter Web.
 
 ### Rotina e autonomia
 - rotina de Hoje;
-- tarefas obrigatórias, esperadas e desafios;
+- categoria única de tarefa, valendo sempre 1 Pacus Point;
 - criação, edição, remoção e ordenação;
 - opções de escolha;
 - justificativa de importância;

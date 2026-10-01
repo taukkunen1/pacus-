@@ -33,7 +33,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                 description = "Tarefa criada pelo teste HTTP",
                 type = "mandatory",
                 period = "morning",
-                points = 2
+                points = 1
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -51,7 +51,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
 
         Assert.Equal("mandatory", created.GetProperty("type").GetString());
         Assert.Equal("morning", created.GetProperty("period").GetString());
-        Assert.Equal(2, created.GetProperty("points").GetInt32());
+        Assert.Equal(1, created.GetProperty("points").GetInt32());
         Assert.Equal("adult", created.GetProperty("origin").GetString());
         Assert.Equal("pending", created.GetProperty("status").GetString());
     }
@@ -88,7 +88,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
             await response.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.Contains(
-            "Cada tarefa deve valer entre 1 e 10 Pacus Points",
+            "Cada tarefa deve valer exatamente 1 Pacus Point",
             body.GetProperty("error").GetString());
     }
 
@@ -180,7 +180,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                 description = (string?)null,
                 type = "expected",
                 period = "afternoon",
-                points = 3
+                points = 1
             });
 
         Assert.Equal(HttpStatusCode.NotFound, updateResponse.StatusCode);
@@ -225,7 +225,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                 description = (string?)null,
                 type = "expected",
                 period = "afternoon",
-                points = 3
+                points = 1
             });
 
         Assert.Equal(HttpStatusCode.NotFound, updateResponse.StatusCode);
@@ -234,35 +234,6 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
             $"/api/v1/daily-tasks/{taskIdFromFamilyA}");
 
         Assert.Equal(HttpStatusCode.NotFound, deleteResponse.StatusCode);
-    }
-
-    [Fact]
-    public async Task AdjustPoints_ShouldChangeTaskPoints_ThroughHttp()
-    {
-        using var factory = new PacusApiFactory(_mongo.ConnectionString);
-        using var client = factory.CreateClient();
-
-        var family = await BootstrapAsync(client);
-        await LoginAdultAsync(client, family);
-        await EnsureTodayRoutineAsync(client);
-
-        var taskId = await CreateTaskAndGetIdAsync(client);
-
-        var response = await client.PutAsJsonAsync(
-            $"/api/v1/daily-tasks/{taskId}/points",
-            new
-            {
-                points = 3
-            });
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var routine =
-            await response.Content.ReadFromJsonAsync<JsonElement>();
-
-        var task = FindTask(routine, taskId);
-
-        Assert.Equal(3, task.GetProperty("points").GetInt32());
     }
 
     [Fact]
@@ -396,36 +367,6 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
     }
 
     [Fact]
-    public async Task ChildPermissions_ShouldBlockPoints_WhenDisabled()
-    {
-        using var factory = new PacusApiFactory(_mongo.ConnectionString);
-        using var client = factory.CreateClient();
-
-        var family = await BootstrapAsync(client);
-
-        await LoginAdultAsync(client, family);
-        await EnsureTodayRoutineAsync(client);
-
-        var taskId = await CreateTaskAndGetIdAsync(client);
-
-        await SetChildPermissionsAsync(
-            factory,
-            family.FamilyId,
-            canSetPoints: false);
-
-        await LoginChildAsync(client, family);
-
-        var response = await client.PutAsJsonAsync(
-            $"/api/v1/daily-tasks/{taskId}/points",
-            new
-            {
-                points = 3
-            });
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
-
-    [Fact]
     public async Task ChildPermissions_ShouldBlockEdit_WhenDisabled()
     {
         using var factory = new PacusApiFactory(_mongo.ConnectionString);
@@ -488,7 +429,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
     }
 
     [Fact]
-    public async Task ChildPermissions_AllowOwnDayEdits_ButNeverDirectPointChanges()
+    public async Task ChildPermissions_AllowOwnDayEdits()
     {
         using var factory = new PacusApiFactory(_mongo.ConnectionString);
         using var client = factory.CreateClient();
@@ -525,17 +466,6 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                 .GetProperty("id")
                 .GetString()!;
 
-        var pointsResponse = await client.PutAsJsonAsync(
-            $"/api/v1/daily-tasks/{taskId}/points",
-            new
-            {
-                points = 2
-            });
-
-        Assert.Equal(
-            HttpStatusCode.Forbidden,
-            pointsResponse.StatusCode);
-
         var updateResponse = await client.PutAsJsonAsync(
             $"/api/v1/daily-tasks/{taskId}",
             new
@@ -544,7 +474,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                 description = "editada",
                 type = "expected",
                 period = "afternoon",
-                points = 2
+                points = 1
             });
 
         Assert.Equal(
@@ -569,7 +499,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                 description = "Task criada para o teste",
                 type = "expected",
                 period = "afternoon",
-                points = 2
+                points = 1
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

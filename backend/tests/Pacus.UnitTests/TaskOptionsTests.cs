@@ -74,7 +74,7 @@ public class TaskOptionsTests
 
         await templates.CreateAsync(userId, userId,
             new CreateTaskRequest(
-                "Desafio Engenheiro", null, "challenge", "afternoon", 4,
+                "Desafio Engenheiro", null, "challenge", "afternoon", 1,
                 Options: new List<string> { "Torre de copos", "Ponte de papel", "Abrigo" }));
 
         var routine = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-01", "America/Sao_Paulo");
@@ -92,7 +92,7 @@ public class TaskOptionsTests
 
         await templates.CreateAsync(userId, userId,
             new CreateTaskRequest(
-                "Desafio Engenheiro", null, "challenge", "afternoon", 4,
+                "Desafio Engenheiro", null, "challenge", "afternoon", 1,
                 Options: new List<string> { "Torre de copos", "Ponte de papel" }));
 
         var routine = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-01", "America/Sao_Paulo");
@@ -111,7 +111,7 @@ public class TaskOptionsTests
 
         await templates.CreateAsync(userId, userId,
             new CreateTaskRequest(
-                "Desafio Engenheiro", null, "challenge", "afternoon", 4,
+                "Desafio Engenheiro", null, "challenge", "afternoon", 1,
                 Options: new List<string> { "Torre de copos", "Ponte de papel" }));
 
         var routine = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-01", "America/Sao_Paulo");
@@ -129,7 +129,7 @@ public class TaskOptionsTests
 
         await templates.CreateAsync(userId, userId,
             new CreateTaskRequest(
-                "Desafio Engenheiro", null, "challenge", "afternoon", 4,
+                "Desafio Engenheiro", null, "challenge", "afternoon", 1,
                 Options: new List<string> { "Torre de copos", "Ponte de papel" }));
 
         var routine = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-01", "America/Sao_Paulo");
@@ -170,7 +170,7 @@ public class TaskOptionsTests
 
         await templates.CreateAsync(userId, userId,
             new CreateTaskRequest(
-                "Escola", null, "mandatory", "morning", 2,
+                "Escola", null, "mandatory", "morning", 1,
                 Reason: "Aprender coisas novas te ajuda a crescer e ter mais escolhas."));
 
         var routine = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-01", "America/Sao_Paulo");
@@ -187,7 +187,7 @@ public class TaskOptionsTests
 
         await templates.CreateAsync(userId, userId,
             new CreateTaskRequest(
-                "Escola", null, "mandatory", "morning", 2,
+                "Escola", null, "mandatory", "morning", 1,
                 Reason: "Motivo original"));
 
         var routine = await dailyRoutine.CreateRoutineForDateAsync(userId, "2026-09-01", "America/Sao_Paulo");

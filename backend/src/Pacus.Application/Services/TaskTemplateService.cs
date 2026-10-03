@@ -277,7 +277,7 @@ public class TaskTemplateService : ITaskTemplateService
         TaskTemplate.RecurrenceInterval,
     };
 
-    private static (string Recurrence, List<TaskTemplateVariant> Variants, List<DayOfWeek> CustomDays, string? AnchorDate, int IntervalDays) ParseRecurrenceAndVariants(
+    public static (string Recurrence, List<TaskTemplateVariant> Variants, List<DayOfWeek> CustomDays, string? AnchorDate, int IntervalDays) ParseRecurrenceAndVariants(
         CreateTaskRequest request)
     {
         var recurrence = string.IsNullOrWhiteSpace(request.Recurrence)

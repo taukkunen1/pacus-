@@ -106,7 +106,7 @@ public class DailyRoutineService : IDailyRoutineService
             TaskTemplateId = null,
             Title = request.Title.Trim(),
             Description = request.Description,
-            Type = TaskType.Expected,
+            Type = TaskType.Mandatory,
             Period = period,
             Order = nextOrder,
             Points = 0,
@@ -464,6 +464,12 @@ public class DailyRoutineService : IDailyRoutineService
         // A crianca pode criar uma tarefa do proprio dia quando a permissao de autonomia
         // estiver ativa, mas nunca define a recompensa financeira dessa tarefa.
         var effectivePoints = actorRoleEnum == UserRole.Adult ? request.Points : 0;
+        var recurrenceRequest = request with
+        {
+            AnchorDate = request.AnchorDate ?? routine.Date
+        };
+        var (recurrence, variants, customDays, anchorDate, intervalDays) =
+            TaskTemplateService.ParseRecurrenceAndVariants(recurrenceRequest);
 
         var template = new TaskTemplate
         {
@@ -476,7 +482,11 @@ public class DailyRoutineService : IDailyRoutineService
             Points = effectivePoints,
             Order = routine.Tasks.Count + 1,
             Active = request.Permanent,
-            Recurrence = "daily",
+            Recurrence = recurrence,
+            Variants = variants,
+            CustomDays = customDays,
+            AnchorDate = anchorDate,
+            IntervalDays = intervalDays,
             Options = options,
             Reasons = reason is null ? new List<string>() : new List<string> { reason },
             CreatedBy = actorId,

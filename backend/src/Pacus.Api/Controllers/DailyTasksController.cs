@@ -115,13 +115,14 @@ public class DailyTasksController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(string id)
+    public async Task<IActionResult> Delete(string id, [FromQuery] bool permanent = false)
     {
         var routine = await _dailyRoutineService.DeleteTaskAsync(
             _currentUser.FamilyId,
             id,
             _currentUser.UserId,
-            _currentUser.Role.ToString());
+            _currentUser.Role.ToString(),
+            permanent);
 
         return Ok(routine.ToResponse());
     }

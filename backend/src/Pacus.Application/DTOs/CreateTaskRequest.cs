@@ -33,7 +33,8 @@ public record CreateTaskRequest(
     // Autonomia e planejamento (2026-09-10, ver TaskTemplate.MinimumGoalLabel): meta
     // minima e facil de comecar, pra tarefas que costumam ficar pra tras (ex.:
     // "minimo de 5 minutos"). Texto livre opcional, null = sem meta minima.
-    string? MinimumGoalLabel = null
+    string? MinimumGoalLabel = null,
+    bool Permanent = false
 );
 
 public record TaskVariantRequest(

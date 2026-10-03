@@ -46,7 +46,7 @@ public interface IDailyRoutineService
     // com o delta — nunca edita silenciosamente um award ja registrado.
     Task<DailyRoutine> AdjustTaskPointsAsync(ObjectId userId, string taskId, int newPoints, ObjectId actorId, string actorRole);
     Task<DailyRoutine> UpdateTaskAsync(ObjectId userId, string taskId, DailyTaskUpdateRequest request, ObjectId actorId, string actorRole);
-    Task<DailyRoutine> DeleteTaskAsync(ObjectId userId, string taskId, ObjectId actorId, string actorRole);
+    Task<DailyRoutine> DeleteTaskAsync(ObjectId userId, string taskId, ObjectId actorId, string actorRole, bool permanent = false);
 
     // Pausa/despausa o game timer do dia atual — qualquer papel pode chamar
     // (adulto ou crianca). No-op se ja estiver no estado pedido, ou se o

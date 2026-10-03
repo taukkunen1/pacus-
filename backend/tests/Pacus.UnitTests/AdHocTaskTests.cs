@@ -10,6 +10,43 @@ namespace Pacus.UnitTests;
 // ad-hoc sempre tem um caminho de ser replicada em outro dia (template inativo).
 public class AdHocTaskTests
 {
+    [Theory]
+    [InlineData("adult", 1)]
+    [InlineData("adult", 2)]
+    [InlineData("child", 1)]
+    [InlineData("child", 2)]
+    public async Task PermanentInterval_UsesOperationalDateAndSkipsDays(string role, int interval)
+    {
+        var (service, _, templates, _) = BuildSystem();
+        var familyId = ObjectId.GenerateNewId();
+        await service.CreateRoutineForDateAsync(familyId, "2026-08-24", "America/Sao_Paulo");
+        var today = await service.CreateAdHocTaskAsync(familyId,
+            new CreateTaskRequest("Ler", "Dez minutos", "mandatory", "evening", 3,
+                Recurrence: "interval", IntervalDays: interval, Permanent: true), familyId, role);
+        var template = await templates.GetByIdAsync(ObjectId.Parse(today.Tasks[0].TaskTemplateId!));
+        Assert.Equal("2026-08-24", template!.AnchorDate);
+        Assert.Equal(interval, template.IntervalDays);
+        Assert.Equal("interval", template.Recurrence);
+        var tomorrow = await service.CreateRoutineForDateAsync(familyId, "2026-08-25", "America/Sao_Paulo");
+        Assert.Equal(interval == 1 ? 1 : 0, tomorrow.Tasks.Count);
+        var followingDay = await service.CreateRoutineForDateAsync(familyId, "2026-08-26", "America/Sao_Paulo");
+        Assert.Equal("Dez minutos", Assert.Single(followingDay.Tasks).Description);
+    }
+
+    [Fact]
+    public async Task InvalidInterval_DoesNotCreateTemplateOrTask()
+    {
+        var (service, routines, templates, _) = BuildSystem();
+        var familyId = ObjectId.GenerateNewId();
+        await service.CreateRoutineForDateAsync(familyId, "2026-08-24", "America/Sao_Paulo");
+        await Assert.ThrowsAsync<Pacus.Application.Exceptions.ValidationException>(() =>
+            service.CreateAdHocTaskAsync(familyId,
+                new CreateTaskRequest("Ler", null, "mandatory", "evening", 3,
+                    Recurrence: "interval", IntervalDays: 0, Permanent: true), familyId, "adult"));
+        Assert.Empty(await templates.GetAllByFamilyAsync(familyId));
+        Assert.Empty((await routines.GetLatestOpenAsync(familyId))!.Tasks);
+    }
+
     [Fact]
     public async Task PermanentDeletion_RemovesAlreadyPlannedOccurrence()
     {

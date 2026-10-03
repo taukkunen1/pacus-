@@ -232,7 +232,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final minimum = TextEditingController(text: task?['minimumGoalLabel']?.toString() ?? '');
     final options = TextEditingController(text: ((task?['options'] as List?) ?? []).join(', '));
     final reasons = TextEditingController(text: ((task?['reasons'] as List?) ?? []).join(' | '));
-    String type = task?['type']?.toString().toLowerCase() ?? 'expected';
     String period = task?['period']?.toString().toLowerCase() ?? 'morning';
     String recurrence = task?['recurrence']?.toString().toLowerCase() ?? 'daily';
     final anchorDate = TextEditingController(text: task?['anchorDate']?.toString() ?? '');
@@ -267,17 +266,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 TextField(controller: description, decoration: const InputDecoration(labelText: 'Descrição')),
                 const SizedBox(height: 8),
                 TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos')),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: type,
-                  decoration: const InputDecoration(labelText: 'Tipo'),
-                  items: const [
-                    DropdownMenuItem(value: 'mandatory', child: Text('Obrigatória')),
-                    DropdownMenuItem(value: 'expected', child: Text('Esperada')),
-                    DropdownMenuItem(value: 'challenge', child: Text('Desafio')),
-                  ],
-                  onChanged: (v) => setDialog(() => type = v ?? type),
-                ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   initialValue: period,
@@ -364,7 +352,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onPressed: () => Navigator.pop(context, {
                 'title': title.text.trim(),
                 'description': description.text.trim().isEmpty ? null : description.text.trim(),
-                'type': type,
+                'type': 'mandatory',
                 'period': period,
                 'points': int.tryParse(points.text) ?? 1,
                 'recurrence': recurrence,

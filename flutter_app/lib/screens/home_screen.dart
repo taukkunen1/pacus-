@@ -700,9 +700,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final title = TextEditingController();
     final description = TextEditingController();
     final points = TextEditingController(text: '1');
-    bool permanent = false;
+    String repetition = 'today';
     String period = 'morning';
-    String type = 'expected';
     final payload = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -716,14 +715,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               const SizedBox(height: 10),
               TextField(controller: description, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'Descrição (opcional)')),
               const SizedBox(height: 10),
-              DropdownButtonFormField<bool>(
-                initialValue: permanent,
+              DropdownButtonFormField<String>(
+                initialValue: repetition,
                 decoration: const InputDecoration(labelText: 'Repetição'),
                 items: const [
-                  DropdownMenuItem(value: false, child: Text('Só hoje')),
-                  DropdownMenuItem(value: true, child: Text('Todos os dias (para sempre)')),
+                  DropdownMenuItem(value: 'today', child: Text('Só hoje')),
+                  DropdownMenuItem(value: 'daily', child: Text('A cada 1 dia (todos os dias)')),
+                  DropdownMenuItem(value: 'interval', child: Text('A cada 2 dias (dia sim, dia não)')),
                 ],
-                onChanged: (v) => setDialog(() => permanent = v ?? false),
+                onChanged: (v) => setDialog(() => repetition = v ?? 'today'),
               ),
               const SizedBox(height: 10),
               TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos')),
@@ -739,16 +739,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 onChanged: (v) => setDialog(() => period = v ?? period),
               ),
               const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: type,
-                decoration: const InputDecoration(labelText: 'Tipo'),
-                items: const [
-                  DropdownMenuItem(value: 'mandatory', child: Text('Obrigatória')),
-                  DropdownMenuItem(value: 'expected', child: Text('Esperada')),
-                  DropdownMenuItem(value: 'challenge', child: Text('Desafio')),
-                ],
-                onChanged: (v) => setDialog(() => type = v ?? type),
-              ),
             ]),
           ),
           actions: [
@@ -756,8 +746,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             FilledButton(onPressed: () => Navigator.pop(context, {
               'title': title.text.trim(),
               'description': description.text.trim().isEmpty ? null : description.text.trim(),
-              'permanent': permanent,
-              'type': type,
+              'permanent': repetition != 'today',
+              'recurrence': repetition == 'interval' ? 'interval' : 'daily',
+              'intervalDays': repetition == 'interval' ? 2 : null,
+              'type': 'mandatory',
               'period': period,
               'points': int.tryParse(points.text) ?? 1,
             }), child: const Text('Adicionar')),
@@ -816,7 +808,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final description = TextEditingController(text: task.description ?? '');
     final points = TextEditingController(text: task.points.toString());
     String period = task.period;
-    String type = task.type;
     final payload = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -842,16 +833,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 onChanged: (v) => setDialog(() => period = v ?? period),
               ),
               const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: type,
-                decoration: const InputDecoration(labelText: 'Tipo'),
-                items: const [
-                  DropdownMenuItem(value: 'mandatory', child: Text('Obrigatória')),
-                  DropdownMenuItem(value: 'expected', child: Text('Esperada')),
-                  DropdownMenuItem(value: 'challenge', child: Text('Desafio')),
-                ],
-                onChanged: (v) => setDialog(() => type = v ?? type),
-              ),
             ]),
           ),
           actions: [
@@ -860,7 +841,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               onPressed: () => Navigator.pop(context, {
                 'title': title.text.trim(),
                 'description': description.text.trim().isEmpty ? null : description.text.trim(),
-                'type': type,
+                'type': 'mandatory',
                 'period': period,
                 'points': int.tryParse(points.text) ?? task.points,
                 'options': task.options,
@@ -1434,7 +1415,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 label: '${task.points} ${task.points == 1 ? 'ponto' : 'pontos'}',
                 icon: Icons.stars_rounded,
               ),
-              PacusBadge(label: _typeLabel(task.type)),
               if (task.createdByMember)
                 const PacusBadge(
                   label: 'Criado por mim',
@@ -1529,14 +1509,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       ],
     );
-  }
-
-  String _typeLabel(String type) {
-    switch (type.toLowerCase()) {
-      case 'mandatory': return 'Obrigatória';
-      case 'challenge': return 'Desafio';
-      default: return 'Esperada';
-    }
   }
 
 }

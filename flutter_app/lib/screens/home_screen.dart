@@ -698,18 +698,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _createDailyTask() async {
     final title = TextEditingController();
+    final description = TextEditingController();
     final points = TextEditingController(text: '1');
+    bool permanent = false;
     String period = 'morning';
     String type = 'expected';
     final payload = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialog) => AlertDialog(
-          title: const Text('Nova tarefa de hoje'),
+          title: const Text('Nova tarefa'),
+          scrollable: true,
           content: SizedBox(
             width: 460,
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(controller: title, decoration: const InputDecoration(labelText: 'Título')),
+              const SizedBox(height: 10),
+              TextField(controller: description, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'Descrição (opcional)')),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<bool>(
+                initialValue: permanent,
+                decoration: const InputDecoration(labelText: 'Repetição'),
+                items: const [
+                  DropdownMenuItem(value: false, child: Text('Só hoje')),
+                  DropdownMenuItem(value: true, child: Text('Todos os dias (para sempre)')),
+                ],
+                onChanged: (v) => setDialog(() => permanent = v ?? false),
+              ),
               const SizedBox(height: 10),
               TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos')),
               const SizedBox(height: 10),
@@ -740,7 +755,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
             FilledButton(onPressed: () => Navigator.pop(context, {
               'title': title.text.trim(),
-              'description': null,
+              'description': description.text.trim().isEmpty ? null : description.text.trim(),
+              'permanent': permanent,
               'type': type,
               'period': period,
               'points': int.tryParse(points.text) ?? 1,
@@ -750,6 +766,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
     );
     title.dispose();
+    description.dispose();
     points.dispose();
     if (payload == null || (payload['title']?.toString() ?? '').isEmpty) return;
     try {
@@ -762,8 +779,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _deleteDailyTask(DailyTask task) async {
+    final permanent = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir tarefa'),
+        content: Text('Como deseja excluir "${task.title}"? A opção para sempre remove também dos próximos dias.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Só hoje')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Para sempre')),
+        ],
+      ),
+    );
+    if (permanent == null) return;
     try {
-      await widget.api.delete('/daily-tasks/' + task.id);
+      await widget.api.delete('/daily-tasks/${task.id}?permanent=$permanent');
       final updated = await widget.api.getToday();
       if (mounted) setState(() => routine = updated);
     } catch (e) {
@@ -1277,7 +1307,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             IconButton(
               onPressed: _createDailyTask,
               icon: const Icon(Icons.add_task_rounded),
-              tooltip: 'Adicionar tarefa de hoje',
+              tooltip: 'Adicionar tarefa',
             ),
           ],
         ),
@@ -1378,7 +1408,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         const PopupMenuItem(value: 'edit', child: Text('Editar')),
         const PopupMenuItem(value: 'initiative', child: Text('Como comecei')),
         const PopupMenuItem(value: 'skip', child: Text('O que aconteceu')),
-        const PopupMenuItem(value: 'delete', child: Text('Remover do dia')),
+        const PopupMenuItem(value: 'delete', child: Text('Excluir tarefa')),
       ],
     );
 

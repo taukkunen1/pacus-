@@ -475,7 +475,7 @@ public class DailyRoutineService : IDailyRoutineService
             Period = period,
             Points = effectivePoints,
             Order = routine.Tasks.Count + 1,
-            Active = false,
+            Active = request.Permanent,
             Recurrence = "daily",
             Options = options,
             Reasons = reason is null ? new List<string>() : new List<string> { reason },
@@ -693,13 +693,37 @@ public class DailyRoutineService : IDailyRoutineService
     }
 
     public async Task<DailyRoutine> DeleteTaskAsync(
-        ObjectId userId, string taskId, ObjectId actorId, string actorRole)
+        ObjectId userId, string taskId, ObjectId actorId, string actorRole, bool permanent = false)
     {
         await EnsureChildPermissionAsync(userId, actorRole, p => p.CanDeleteTasks);
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
             ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
         var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
             ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
+
+        if (permanent && TryParseObjectId(task.TaskTemplateId) is { } templateId)
+        {
+            var template = await _taskTemplateRepository.GetByIdAsync(templateId);
+            if (template is null || template.FamilyId != userId)
+                throw new NotFoundException("Tarefa permanente nao encontrada.");
+            await _taskTemplateRepository.SoftDeleteAsync(templateId);
+
+            // Remove future planned occurrences while preserving closed history.
+            var routines = await _dailyRoutineRepository.GetAllByFamilyAsync(userId);
+            foreach (var planned in routines.Where(r => r.Status == RoutineStatus.Planned &&
+                r.Tasks.Any(t => t.TaskTemplateId == task.TaskTemplateId && t.DeletedAt is null)))
+            {
+                foreach (var occurrence in planned.Tasks.Where(t =>
+                    t.TaskTemplateId == task.TaskTemplateId && t.DeletedAt is null))
+                {
+                    occurrence.DeletedAt = DateTime.UtcNow;
+                    occurrence.UpdatedAt = DateTime.UtcNow;
+                }
+                planned.Stats = BuildStats(planned.Tasks);
+                planned.TomorrowPlanConfirmedAt = null;
+                await _dailyRoutineRepository.UpdateAsync(planned);
+            }
+        }
 
         var wasDone = task.Status == TaskItemStatus.Done;
         task.DeletedAt = DateTime.UtcNow;

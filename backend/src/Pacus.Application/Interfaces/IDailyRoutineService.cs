@@ -84,6 +84,8 @@ public interface IDailyRoutineService
 
     // V4: primeira declaracao de iniciativa concede +1 ponto independentemente do nivel.
     // Pode ser chamada antes ou depois da conclusao da tarefa.
+    // Adulto pode atualizar somente a ocorrencia aberta, preservando pontos e progresso.
+    Task<DailyRoutine> ApplyTemplateSupportToTodayAsync(ObjectId userId, string taskId, ObjectId actorId, string actorRole);
     Task<DailyRoutine> RecordSupportActionAsync(ObjectId userId, string taskId, TaskSupportActionRequest request, ObjectId actorId, string actorRole);
 
     Task<DailyRoutine> SetTaskInitiativeAsync(ObjectId userId, string taskId, TaskInitiativeLevel initiative, ObjectId actorId, string actorRole);

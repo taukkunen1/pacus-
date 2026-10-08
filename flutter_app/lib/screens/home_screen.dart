@@ -896,10 +896,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             }
           }
 
-          Future<void> action(String kind, {int? index}) => save(
-                '/daily-tasks/${task.id}/support',
-                {'action': kind, if (index != null) 'stepIndex': index},
-              );
+          Future<void> action(String kind, {int? index}) {
+            final body = <String, dynamic>{'action': kind};
+            if (index != null) body['stepIndex'] = index;
+            return save('/daily-tasks/${task.id}/support', body);
+          }
 
           Future<void> chooseDifficulty() async {
             final selected = await showDialog<String>(

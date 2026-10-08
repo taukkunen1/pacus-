@@ -82,11 +82,8 @@ public interface IDailyRoutineService
     // acumular planos parciais); items vazio limpa o plano.
     Task<DailyRoutine> SetEveningPlanAsync(ObjectId userId, List<EveningPlanItemRequest> items, ObjectId actorId, string actorRole);
 
-    // Autodeclaracao de como a tarefa foi comecada -- ver TaskInitiativeLevel. Concede
-    // um pequeno bonus de pontos quando a iniciativa foi da propria crianca ou veio de
-    // uma sugestao do app (nunca quando precisou de lembrete de adulto -- ver
-    // DailyRoutineService.InitiativeBonusPoints). Pode ser chamado antes ou depois de
-    // concluir a tarefa.
+    // V4: primeira declaracao de iniciativa concede +1 ponto independentemente do nivel.
+    // Pode ser chamada antes ou depois da conclusao da tarefa.
     Task<DailyRoutine> SetTaskInitiativeAsync(ObjectId userId, string taskId, TaskInitiativeLevel initiative, ObjectId actorId, string actorRole);
 
     // Autodeclaracao de por que uma tarefa nao foi feita -- nunca afeta pontos nem

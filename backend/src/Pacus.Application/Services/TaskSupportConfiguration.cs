@@ -18,11 +18,20 @@ public static class TaskSupportConfiguration
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             [Reading] = new[] { "Escolher o livro", "Ler o trecho combinado", "Contar algo sobre a leitura" },
-            [Homework] = new[] { "Abrir o caderno", "Ler a primeira questao", "Resolver a primeira questao", "Concluir a licao prevista" },
+            [Homework] = new[] { "Separar o material da escola ou do ingles", "Ver quais atividades foram pedidas", "Escolher por qual atividade comecar", "Fazer a primeira atividade (pode comecar com 10 minutos)", "Continuar a licao, fazer pausas e pedir ajuda se precisar", "Conferir o que foi feito e guardar o material" },
             [Handwriting] = new[] { "Separar o caderno e lapis", "Escrever a primeira linha", "Concluir a quantidade combinada" },
             [Bathing] = new[] { "Pegar a toalha", "Abrir a janela do banheiro", "Lavar o cabelo", "Tomar banho", "Tirar as roupas do chao", "Guardar a toalha" },
             [MoodBoard] = new[] { "Pensar em como estou me sentindo hoje", "Escolher uma cor ou um desenho que combine com esse sentimento", "Desenhar na lousa", "Olhar meu desenho e, se quiser, contar algo sobre ele" },
         };
+
+    private static readonly string[] LegacyHomeworkSteps =
+    {
+        "Abrir o caderno", "Ler a primeira questao",
+        "Resolver a primeira questao", "Concluir a licao prevista",
+    };
+
+    public static bool IsLegacyHomeworkSteps(IReadOnlyList<string> steps) =>
+        steps.SequenceEqual(LegacyHomeworkSteps);
 
     public static bool IsHairWashDay(string date)
     {
@@ -33,6 +42,8 @@ public static class TaskSupportConfiguration
 
     public static List<string> StepsForDay(string? kind, List<string> steps, string date)
     {
+        if (kind == Homework && IsLegacyHomeworkSteps(steps))
+            return new List<string>(DefaultSteps[Homework]);
         if (kind != Bathing) return new List<string>(steps);
         var selected = new List<string>(DefaultSteps[Bathing]);
         if (!IsHairWashDay(date)) selected.Remove("Lavar o cabelo");

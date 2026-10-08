@@ -21,8 +21,19 @@ public static class TaskSupportConfiguration
             [Homework] = new[] { "Abrir o caderno", "Ler a primeira questao", "Resolver a primeira questao", "Concluir a licao prevista" },
             [Handwriting] = new[] { "Separar o caderno e lapis", "Escrever a primeira linha", "Concluir a quantidade combinada" },
             [Bathing] = new[] { "Pegar a toalha", "Abrir a janela do banheiro", "Lavar o cabelo", "Tomar banho", "Tirar as roupas do chao", "Guardar a toalha" },
-            [MoodBoard] = new[] { "Pensar em como estou me sentindo hoje", "Escolher uma cor ou um desenho que combine com esse sentimento", "Desenhar na lousa", "Olhar meu desenho e, se quiser, contar algo sobre ele" },
+            [MoodBoard] = new[] { "Escolher o humor de hoje", "Escolher o desafio criativo", "Fazer o primeiro traco", "Transformar o desenho", "Dar um nome a criacao (se quiser)" },
         };
+
+    private static readonly string[] MoodChallenges =
+    {
+        "Desafio: se seu humor fosse um monstro, como seria?",
+        "Desafio: qual seria a previsao do tempo dentro da sua cabeca?",
+        "Desafio: invente um planeta para o seu humor",
+        "Desafio: se seu dia fosse um personagem de videogame, como seria?",
+        "Desafio: desenhe um animal que represente seu dia",
+        "Desafio: transforme seu humor em um veiculo",
+        "Desafio: crie uma historia com tres desenhos sobre seu dia",
+    };
 
     public static bool IsHairWashDay(string date)
     {
@@ -33,6 +44,14 @@ public static class TaskSupportConfiguration
 
     public static List<string> StepsForDay(string? kind, List<string> steps, string date)
     {
+        if (kind == MoodBoard)
+        {
+            var day = DateOnly.ParseExact(date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+            var selected = new List<string>(steps);
+            if (selected.SequenceEqual(DefaultSteps[MoodBoard]))
+                selected[1] = MoodChallenges[(day.DayNumber % MoodChallenges.Length + MoodChallenges.Length) % MoodChallenges.Length];
+            return selected;
+        }
         if (kind != Bathing) return new List<string>(steps);
         var selected = new List<string>(DefaultSteps[Bathing]);
         if (!IsHairWashDay(date)) selected.Remove("Lavar o cabelo");

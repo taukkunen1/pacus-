@@ -372,7 +372,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ] else if (supportKind == 'mood_board') ...[
                   const SizedBox(height: 8),
-                  const Text('Passos sugeridos: perceber como se sente, escolher uma cor ou desenho, desenhar na lousa e, se quiser, contar algo sobre o desenho. Não é necessário explicar o sentimento.'),
+                  const Text('Cinco etapas: escolher o tema (humor ou imaginação), ver um desafio criativo que muda a cada dia, fazer o primeiro traço, desenhar livremente e finalizar. O desafio é opcional: pode criar sua própria ideia. Não é necessário explicar sentimentos, dar título ou fazer um desenho perfeito.'),
                 ] else if (supportKind != 'none') ...[
                   const SizedBox(height: 8),
                   TextField(

@@ -1156,6 +1156,30 @@ public class DailyRoutineService : IDailyRoutineService
             .Where(pair => completedLabels.Contains(pair.step))
             .Select(pair => pair.index).ToList();
 
+        // Ao migrar a missao da lousa de quatro para cinco passos, preservar
+        // o progresso ja registrado no dia, sem criar pontos nem novos eventos
+        // de conclusao. O desenho pronto cobre o primeiro traco e a criacao.
+        if (task.SupportKind == TaskSupportConfiguration.MoodBoard &&
+            TaskSupportConfiguration.IsLegacyMoodSteps(oldSteps) &&
+            newSteps.Count == 5)
+        {
+            foreach (var previousIndex in task.CompletedSupportSteps)
+            {
+                var nextIndices = previousIndex switch
+                {
+                    0 => new[] { 0 },
+                    1 => new[] { 1 },
+                    2 => new[] { 2, 3 },
+                    3 => new[] { 4 },
+                    _ => Array.Empty<int>(),
+                };
+                foreach (var nextIndex in nextIndices)
+                    if (!remapped.Contains(nextIndex))
+                        remapped.Add(nextIndex);
+            }
+            remapped.Sort();
+        }
+
         if (task.SupportKind == template.SupportKind &&
             oldSteps.SequenceEqual(newSteps) &&
             task.CompletedSupportSteps.SequenceEqual(remapped))

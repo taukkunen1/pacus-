@@ -639,29 +639,11 @@ public class DailyRoutineService : IDailyRoutineService
             .Sum(t => t.Points);
 
         await SyncGameTimerAsync(routine, userId);
-        await _dailyRoutineRepository.UpdateAsync(routine);
-
         var actorRoleEnum = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
             ? UserRole.Adult
             : UserRole.Child;
 
-        if (wasDone)
-        {
-            var delta = newPoints - oldPoints;
-            await _pointsService.RecordAsync(
-                userId,
-                routine.Id,
-                routine.Date,
-                task.Id,
-                task.Title,
-                PointTransactionType.Adjustment,
-                delta,
-                actorId,
-                actorRoleEnum,
-                reason: $"Ajuste de pontos: {task.Title} ({oldPoints} -> {newPoints})");
-        }
-
-        await _taskEventRepository.CreateAsync(new TaskEvent
+        var audit = new TaskEvent
         {
             Id = ObjectId.GenerateNewId(),
             UserId = userId,
@@ -672,7 +654,13 @@ public class DailyRoutineService : IDailyRoutineService
             ActorId = actorId,
             ActorRole = actorRoleEnum,
             CreatedAt = DateTime.UtcNow,
-        });
+        };
+        await CommitTaskLedgerAsync(routine, audit,
+            wasDone
+                ? new TaskLedgerDelta(PointTransactionType.Adjustment,
+                    newPoints - oldPoints,
+                    $"Ajuste de pontos: {task.Title} ({oldPoints} -> {newPoints})")
+                : null);
 
         return routine;
     }

@@ -349,19 +349,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   initialValue: supportKind,
-                  decoration: const InputDecoration(labelText: 'Missão de estudo (V4)'),
+                  decoration: const InputDecoration(labelText: 'Missão dividida em etapas'),
                   items: const [
                     DropdownMenuItem(value: 'none', child: Text('Desativada')),
                     DropdownMenuItem(value: 'reading', child: Text('Leitura do livro')),
                     DropdownMenuItem(value: 'homework', child: Text('Lição de casa')),
                     DropdownMenuItem(value: 'handwriting', child: Text('Caderno de caligrafia')),
+                    DropdownMenuItem(value: 'bathing', child: Text('Tomar banho (cabelo dia sim, dia não)')),
                   ],
                   onChanged: (v) => setDialog(() {
                     if (v != supportKind) supportSteps.clear();
                     supportKind = v ?? 'none';
                   }),
                 ),
-                if (supportKind != 'none') ...[
+                if (supportKind == 'bathing') ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Passos do banho: pegar a toalha, abrir a janela, lavar o cabelo '
+                    '(somente dia sim, dia não), tomar banho, tirar as roupas do chão '
+                    'e guardar a toalha. Em 08/10/2026 deve lavar o cabelo.',
+                  ),
+                ] else if (supportKind != 'none') ...[
                   const SizedBox(height: 8),
                   TextField(
                     controller: supportSteps,
@@ -369,7 +377,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     maxLines: 6,
                     decoration: const InputDecoration(
                       labelText: 'Etapas da missão (uma por linha)',
-                      helperText: 'Em branco: etapas sugeridas. Somente para as três tarefas escolhidas.',
+                      helperText: 'Em branco: usar etapas sugeridas.',
                     ),
                   ),
                 ],

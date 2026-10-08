@@ -728,12 +728,14 @@ public class DailyRoutineService : IDailyRoutineService
         var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
             ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
 
+        var plannedUpdates = new List<DailyRoutine>();
+        ObjectId? templateToDelete = null;
         if (permanent && TryParseObjectId(task.TaskTemplateId) is { } templateId)
         {
             var template = await _taskTemplateRepository.GetByIdAsync(templateId);
             if (template is null || template.FamilyId != userId)
                 throw new NotFoundException("Tarefa permanente nao encontrada.");
-            await _taskTemplateRepository.SoftDeleteAsync(templateId);
+            templateToDelete = templateId;
 
             // Remove future planned occurrences while preserving closed history.
             var routines = await _dailyRoutineRepository.GetAllByFamilyAsync(userId);
@@ -748,7 +750,7 @@ public class DailyRoutineService : IDailyRoutineService
                 }
                 planned.Stats = BuildStats(planned.Tasks);
                 planned.TomorrowPlanConfirmedAt = null;
-                await _dailyRoutineRepository.UpdateAsync(planned);
+                plannedUpdates.Add(planned);
             }
         }
 
@@ -758,22 +760,17 @@ public class DailyRoutineService : IDailyRoutineService
         routine.Stats = BuildStats(routine.Tasks);
         routine.PointsEarned = routine.Tasks.Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null).Sum(t => t.Points);
         await SyncGameTimerAsync(routine, userId);
-        await _dailyRoutineRepository.UpdateAsync(routine);
-
         var role = ParseRole(actorRole);
-        if (wasDone)
-        {
-            await _pointsService.RecordAsync(userId, routine.Id, routine.Date, task.Id, task.Title,
-                PointTransactionType.Reversal, -task.Points, actorId, role,
-                $"Tarefa removida: {task.Title}");
-        }
-
-        await _taskEventRepository.CreateAsync(new TaskEvent
+        var audit = new TaskEvent
         {
             Id = ObjectId.GenerateNewId(), UserId = userId, DailyRoutineId = routine.Id,
             TaskId = task.Id, TaskTemplateId = TryParseObjectId(task.TaskTemplateId),
             EventType = TaskEventType.Deleted, ActorId = actorId, ActorRole = role, CreatedAt = DateTime.UtcNow
-        });
+        };
+        await CommitTaskLedgerAsync(routine, audit,
+            wasDone ? new TaskLedgerDelta(PointTransactionType.Reversal, -task.Points,
+                $"Tarefa removida: {task.Title}") : null,
+            plannedUpdates, templateToDelete);
         return routine;
     }
 

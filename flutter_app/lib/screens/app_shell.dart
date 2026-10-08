@@ -78,7 +78,9 @@ class _PacusShellState extends State<PacusShell> {
   // Com a pagina fechada, push exigiria service worker e permissao explicita.
   Future<void> _checkWaterReminder() async {
     if (!mounted || widget.session.isAdult ||
-        waterReminderOpen || waterReminderChecking) return;
+        waterReminderOpen || waterReminderChecking) {
+      return;
+    }
     waterReminderChecking = true;
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -89,7 +91,9 @@ class _PacusShellState extends State<PacusShell> {
         return;
       }
       if (now.difference(DateTime.fromMillisecondsSinceEpoch(last)) <
-          waterReminderInterval) return;
+          waterReminderInterval) {
+        return;
+      }
       if (!mounted || waterReminderOpen) return;
 
       waterReminderOpen = true;

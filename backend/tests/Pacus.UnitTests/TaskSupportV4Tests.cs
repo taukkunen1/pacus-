@@ -117,9 +117,60 @@ public class TaskSupportV4Tests
         Assert.Empty(pointRepo.Transactions);
     }
 
+    [Fact]
+    public async Task LicaoDeCasa_UnicaParaEscolaEIngles_MantemUmPonto()
+    {
+        var (templates, routines, points) = BuildSystem();
+        var family = ObjectId.GenerateNewId();
+        await templates.CreateAsync(family, family,
+            new CreateTaskRequest("Lição de casa", null, "mandatory", "morning", 1,
+                SupportKind: "homework"));
+        var day = await routines.CreateRoutineForDateAsync(
+            family, "2026-10-08", "America/Sao_Paulo");
+        var task = Assert.Single(day.Tasks);
+        Assert.Equal(6, task.SupportSteps.Count);
+        Assert.Contains("escola ou do ingles", task.SupportSteps[0]);
+        Assert.Equal(1, task.Points);
+        Assert.Empty(points.Transactions);
+    }
+
+    [Fact]
+    public async Task LicaoDeCasa_AplicarEtapasHoje_PreservaPontosEProgresso()
+    {
+        var templateRepo = new FakeTaskTemplateRepository();
+        var routineRepo = new FakeDailyRoutineRepository();
+        var pointRepo = new FakePointTransactionRepository();
+        var templates = new TaskTemplateService(templateRepo, new FakeAuditLogRepository());
+        var routines = new DailyRoutineService(routineRepo, templateRepo,
+            new FakeTaskEventRepository(), new PointsService(pointRepo),
+            new FakeSettingsRepository());
+        var family = ObjectId.GenerateNewId();
+        await templates.CreateAsync(family, family,
+            new CreateTaskRequest("Lição de casa", null, "mandatory", "morning", 1,
+                SupportKind: "homework"));
+        var day = await routines.CreateRoutineForDateAsync(
+            family, "2026-10-08", "America/Sao_Paulo");
+        var taskId = Assert.Single(day.Tasks).Id;
+        var legacy = await routineRepo.GetByUserAndDateAsync(family, "2026-10-08");
+        Assert.NotNull(legacy);
+        legacy.Tasks.Single().SupportSteps = new List<string>
+        {
+            "Abrir o caderno", "Ler a primeira questao",
+            "Resolver a primeira questao", "Concluir a licao prevista",
+        };
+        legacy.Tasks.Single().CompletedSupportSteps = new List<int> { 0, 2 };
+        await routineRepo.UpdateAsync(legacy);
+        var updated = await routines.ApplyTemplateSupportToTodayAsync(
+            family, taskId, family, "adult");
+        Assert.Equal(6, updated.Tasks.Single().SupportSteps.Count);
+        Assert.Equal(new List<int> { 0, 3 }, updated.Tasks.Single().CompletedSupportSteps);
+        Assert.Equal(1, updated.Tasks.Single().Points);
+        Assert.Empty(pointRepo.Transactions);
+    }
+
     [Theory]
     [InlineData("reading", 3)]
-    [InlineData("homework", 4)]
+    [InlineData("homework", 6)]
     [InlineData("handwriting", 3)]
     [InlineData("mood_board", 4)]
     public async Task Template_HabilitadoPeloAdulto_GeraEtapasEmCopiaDiaria(string kind, int count)

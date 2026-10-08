@@ -370,6 +370,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     '(somente dia sim, dia não), tomar banho, tirar as roupas do chão '
                     'e guardar a toalha. Em 08/10/2026 deve lavar o cabelo.',
                   ),
+                ] else if (supportKind == 'homework') ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Lição de casa da escola e do inglês é uma missão só: '
+                    'separar o material, ver o que foi pedido, escolher por onde começar, '
+                    'fazer a primeira atividade, continuar com pausas se necessário '
+                    'e conferir/guardar. Sugestão flexível: 15–25 minutos, '
+                    'sem cronômetro obrigatório e sem pontos por etapa.',
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: supportSteps,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      labelText: 'Etapas personalizadas (uma por linha)',
+                      helperText: 'Em branco: usar as seis etapas sugeridas.',
+                    ),
+                  ),
                 ] else if (supportKind == 'mood_board') ...[
                   const SizedBox(height: 8),
                   const Text('Passos sugeridos: perceber como se sente, escolher uma cor ou desenho, desenhar na lousa e, se quiser, contar algo sobre o desenho. Não é necessário explicar o sentimento.'),

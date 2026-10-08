@@ -429,9 +429,10 @@ public class DailyRoutineService : IDailyRoutineService
             CreatedAt = DateTime.UtcNow,
         };
         await CommitTaskLedgerAsync(routine, audit,
-            new TaskLedgerDelta(
-                completed ? PointTransactionType.Award : PointTransactionType.Reversal,
-                completed ? task.Points : -task.Points));
+            task.Points == 0 ? null
+                : new TaskLedgerDelta(
+                    completed ? PointTransactionType.Award : PointTransactionType.Reversal,
+                    completed ? task.Points : -task.Points));
 
         return routine;
     }
@@ -768,7 +769,7 @@ public class DailyRoutineService : IDailyRoutineService
             EventType = TaskEventType.Deleted, ActorId = actorId, ActorRole = role, CreatedAt = DateTime.UtcNow
         };
         await CommitTaskLedgerAsync(routine, audit,
-            wasDone ? new TaskLedgerDelta(PointTransactionType.Reversal, -task.Points,
+            wasDone && task.Points != 0 ? new TaskLedgerDelta(PointTransactionType.Reversal, -task.Points,
                 $"Tarefa removida: {task.Title}") : null,
             plannedUpdates, templateToDelete);
         return routine;

@@ -10,6 +10,7 @@ public static class TaskSupportConfiguration
     public const string Homework = "homework";
     public const string Handwriting = "handwriting";
     public const string Bathing = "bathing";
+    public const string MoodBoard = "mood_board";
     // 08/10/2026 e o primeiro dia de lavar o cabelo; 07/10 foi dia sem lavar.
     private static readonly DateOnly HairWashAnchor = new(2026, 10, 8);
 
@@ -20,6 +21,7 @@ public static class TaskSupportConfiguration
             [Homework] = new[] { "Abrir o caderno", "Ler a primeira questao", "Resolver a primeira questao", "Concluir a licao prevista" },
             [Handwriting] = new[] { "Separar o caderno e lapis", "Escrever a primeira linha", "Concluir a quantidade combinada" },
             [Bathing] = new[] { "Pegar a toalha", "Abrir a janela do banheiro", "Lavar o cabelo", "Tomar banho", "Tirar as roupas do chao", "Guardar a toalha" },
+            [MoodBoard] = new[] { "Pensar em como estou me sentindo hoje", "Escolher uma cor ou um desenho que combine com esse sentimento", "Desenhar na lousa", "Olhar meu desenho e, se quiser, contar algo sobre ele" },
         };
 
     public static bool IsHairWashDay(string date)

@@ -89,10 +89,12 @@ public class TaskSupportV4Tests
         var taskId = active.Tasks.Single().Id;
         await actionRoutines.RecordSupportActionAsync(actionFamily, taskId,
             new("step", 0), actionFamily, "child");
-        await actionRoutines.RecordSupportActionAsync(actionFamily, taskId,
+        var updated = await actionRoutines.RecordSupportActionAsync(actionFamily, taskId,
             new("step", 2), actionFamily, "child");
         Assert.Empty(actionPoints.Transactions);
-        Assert.Equal(2, active.Tasks.Single().CompletedSupportSteps.Count);
+        // O fake retorna snapshots clonados; a instancia 'active' e anterior
+        // as acoes. Conferir a rotina atualizada retornada pelo servico.
+        Assert.Equal(2, updated.Tasks.Single().CompletedSupportSteps.Count);
     }
 
     [Fact]

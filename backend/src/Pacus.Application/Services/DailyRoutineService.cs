@@ -15,20 +15,57 @@ public class DailyRoutineService : IDailyRoutineService
     private readonly ITaskEventRepository _taskEventRepository;
     private readonly IPointsService _pointsService;
     private readonly ISettingsRepository _settingsRepository;
+    private readonly ITaskLedgerCommitter? _atomicLedger;
 
     public DailyRoutineService(
         IDailyRoutineRepository dailyRoutineRepository,
         ITaskTemplateRepository taskTemplateRepository,
         ITaskEventRepository taskEventRepository,
         IPointsService pointsService,
-        ISettingsRepository settingsRepository)
+        ISettingsRepository settingsRepository,
+        ITaskLedgerCommitter? atomicLedger = null)
     {
         _dailyRoutineRepository = dailyRoutineRepository;
         _taskTemplateRepository = taskTemplateRepository;
         _taskEventRepository = taskEventRepository;
         _pointsService = pointsService;
         _settingsRepository = settingsRepository;
+        _atomicLedger = atomicLedger;
     }
+
+    // A API registra obrigatoriamente o committer transacional na DI.
+    // O caminho sem committer existe somente para compatibilidade de testes unitarios antigos.
+    private async Task CommitTaskLedgerAsync(
+        DailyRoutine routine,
+        TaskEvent audit,
+        TaskLedgerDelta? delta = null,
+        IReadOnlyList<DailyRoutine>? plannedUpdates = null,
+        ObjectId? softDeleteTemplateId = null)
+    {
+        if (_atomicLedger is not null)
+        {
+            await _atomicLedger.CommitAsync(routine, audit, delta, plannedUpdates, softDeleteTemplateId);
+            return;
+        }
+
+        // Compatibilidade com os fakes em memoria, nao utilizado em producao.
+        if (softDeleteTemplateId is ObjectId templateId)
+            await _taskTemplateRepository.SoftDeleteAsync(templateId);
+        if (plannedUpdates is not null)
+            foreach (var planned in plannedUpdates)
+                await _dailyRoutineRepository.UpdateAsync(planned);
+
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        if (delta is not null)
+        {
+            var task = routine.Tasks.First(t => t.Id == audit.TaskId);
+            await _pointsService.RecordAsync(
+                routine.FamilyId, routine.Id, routine.Date, task.Id, task.Title,
+                delta.Type, delta.Points, audit.ActorId, audit.ActorRole, delta.Reason);
+        }
+        await _taskEventRepository.CreateAsync(audit);
+    }
+
 
     public async Task<DailyRoutine> GetOrCreateTodayAsync(ObjectId userId, string timezone)
     {
@@ -358,7 +395,7 @@ public class DailyRoutineService : IDailyRoutineService
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
             ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
 
-        var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId)
+        var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
             ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
 
         var wasCompleted = task.Status == TaskItemStatus.Done;
@@ -375,24 +412,11 @@ public class DailyRoutineService : IDailyRoutineService
             .Sum(t => t.Points);
 
         await SyncGameTimerAsync(routine, userId);
-        await _dailyRoutineRepository.UpdateAsync(routine);
-
         var actorRoleEnum = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
             ? UserRole.Adult
             : UserRole.Child;
 
-        await _pointsService.RecordAsync(
-            userId,
-            routine.Id,
-            routine.Date,
-            task.Id,
-            task.Title,
-            completed ? PointTransactionType.Award : PointTransactionType.Reversal,
-            completed ? task.Points : -task.Points,
-            actorId,
-            actorRoleEnum);
-
-        await _taskEventRepository.CreateAsync(new TaskEvent
+        var audit = new TaskEvent
         {
             Id = ObjectId.GenerateNewId(),
             UserId = userId,
@@ -403,7 +427,12 @@ public class DailyRoutineService : IDailyRoutineService
             ActorId = actorId,
             ActorRole = actorRoleEnum,
             CreatedAt = DateTime.UtcNow,
-        });
+        };
+        await CommitTaskLedgerAsync(routine, audit,
+            task.Points == 0 ? null
+                : new TaskLedgerDelta(
+                    completed ? PointTransactionType.Award : PointTransactionType.Reversal,
+                    completed ? task.Points : -task.Points));
 
         return routine;
     }
@@ -611,29 +640,11 @@ public class DailyRoutineService : IDailyRoutineService
             .Sum(t => t.Points);
 
         await SyncGameTimerAsync(routine, userId);
-        await _dailyRoutineRepository.UpdateAsync(routine);
-
         var actorRoleEnum = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
             ? UserRole.Adult
             : UserRole.Child;
 
-        if (wasDone)
-        {
-            var delta = newPoints - oldPoints;
-            await _pointsService.RecordAsync(
-                userId,
-                routine.Id,
-                routine.Date,
-                task.Id,
-                task.Title,
-                PointTransactionType.Adjustment,
-                delta,
-                actorId,
-                actorRoleEnum,
-                reason: $"Ajuste de pontos: {task.Title} ({oldPoints} -> {newPoints})");
-        }
-
-        await _taskEventRepository.CreateAsync(new TaskEvent
+        var audit = new TaskEvent
         {
             Id = ObjectId.GenerateNewId(),
             UserId = userId,
@@ -644,7 +655,13 @@ public class DailyRoutineService : IDailyRoutineService
             ActorId = actorId,
             ActorRole = actorRoleEnum,
             CreatedAt = DateTime.UtcNow,
-        });
+        };
+        await CommitTaskLedgerAsync(routine, audit,
+            wasDone
+                ? new TaskLedgerDelta(PointTransactionType.Adjustment,
+                    newPoints - oldPoints,
+                    $"Ajuste de pontos: {task.Title} ({oldPoints} -> {newPoints})")
+                : null);
 
         return routine;
     }
@@ -687,22 +704,19 @@ public class DailyRoutineService : IDailyRoutineService
         routine.Stats = BuildStats(routine.Tasks);
         routine.PointsEarned = routine.Tasks.Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null).Sum(t => t.Points);
         await SyncGameTimerAsync(routine, userId);
-        await _dailyRoutineRepository.UpdateAsync(routine);
-
         var role = ParseRole(actorRole);
-        if (task.Status == TaskItemStatus.Done && oldPoints != requestedPoints)
-        {
-            await _pointsService.RecordAsync(userId, routine.Id, routine.Date, task.Id, task.Title,
-                PointTransactionType.Adjustment, requestedPoints - oldPoints, actorId, role,
-                $"Ajuste de pontos: {task.Title} ({oldPoints} -> {requestedPoints})");
-        }
-
-        await _taskEventRepository.CreateAsync(new TaskEvent
+        var audit = new TaskEvent
         {
             Id = ObjectId.GenerateNewId(), UserId = userId, DailyRoutineId = routine.Id,
             TaskId = task.Id, TaskTemplateId = TryParseObjectId(task.TaskTemplateId),
             EventType = TaskEventType.Updated, ActorId = actorId, ActorRole = role, CreatedAt = DateTime.UtcNow
-        });
+        };
+        await CommitTaskLedgerAsync(routine, audit,
+            task.Status == TaskItemStatus.Done && oldPoints != requestedPoints
+                ? new TaskLedgerDelta(PointTransactionType.Adjustment,
+                    requestedPoints - oldPoints,
+                    $"Ajuste de pontos: {task.Title} ({oldPoints} -> {requestedPoints})")
+                : null);
         return routine;
     }
 
@@ -715,12 +729,14 @@ public class DailyRoutineService : IDailyRoutineService
         var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
             ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
 
+        var plannedUpdates = new List<DailyRoutine>();
+        ObjectId? templateToDelete = null;
         if (permanent && TryParseObjectId(task.TaskTemplateId) is { } templateId)
         {
             var template = await _taskTemplateRepository.GetByIdAsync(templateId);
             if (template is null || template.FamilyId != userId)
                 throw new NotFoundException("Tarefa permanente nao encontrada.");
-            await _taskTemplateRepository.SoftDeleteAsync(templateId);
+            templateToDelete = templateId;
 
             // Remove future planned occurrences while preserving closed history.
             var routines = await _dailyRoutineRepository.GetAllByFamilyAsync(userId);
@@ -735,7 +751,7 @@ public class DailyRoutineService : IDailyRoutineService
                 }
                 planned.Stats = BuildStats(planned.Tasks);
                 planned.TomorrowPlanConfirmedAt = null;
-                await _dailyRoutineRepository.UpdateAsync(planned);
+                plannedUpdates.Add(planned);
             }
         }
 
@@ -745,22 +761,17 @@ public class DailyRoutineService : IDailyRoutineService
         routine.Stats = BuildStats(routine.Tasks);
         routine.PointsEarned = routine.Tasks.Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null).Sum(t => t.Points);
         await SyncGameTimerAsync(routine, userId);
-        await _dailyRoutineRepository.UpdateAsync(routine);
-
         var role = ParseRole(actorRole);
-        if (wasDone)
-        {
-            await _pointsService.RecordAsync(userId, routine.Id, routine.Date, task.Id, task.Title,
-                PointTransactionType.Reversal, -task.Points, actorId, role,
-                $"Tarefa removida: {task.Title}");
-        }
-
-        await _taskEventRepository.CreateAsync(new TaskEvent
+        var audit = new TaskEvent
         {
             Id = ObjectId.GenerateNewId(), UserId = userId, DailyRoutineId = routine.Id,
             TaskId = task.Id, TaskTemplateId = TryParseObjectId(task.TaskTemplateId),
             EventType = TaskEventType.Deleted, ActorId = actorId, ActorRole = role, CreatedAt = DateTime.UtcNow
-        });
+        };
+        await CommitTaskLedgerAsync(routine, audit,
+            wasDone && task.Points != 0 ? new TaskLedgerDelta(PointTransactionType.Reversal, -task.Points,
+                $"Tarefa removida: {task.Title}") : null,
+            plannedUpdates, templateToDelete);
         return routine;
     }
 
@@ -1160,8 +1171,7 @@ public class DailyRoutineService : IDailyRoutineService
         }
 
         task.UpdatedAt = now;
-        await _dailyRoutineRepository.UpdateAsync(routine);
-        await _taskEventRepository.CreateAsync(new TaskEvent
+        var audit = new TaskEvent
         {
             Id = ObjectId.GenerateNewId(),
             UserId = userId,
@@ -1177,7 +1187,8 @@ public class DailyRoutineService : IDailyRoutineService
             ActorId = actorId,
             ActorRole = ParseRole(actorRole),
             CreatedAt = now,
-        });
+        };
+        await CommitTaskLedgerAsync(routine, audit);
         return routine;
     }
 
@@ -1198,28 +1209,9 @@ public class DailyRoutineService : IDailyRoutineService
         var alreadyInformed = task.Initiative is not null;
         task.Initiative = initiative;
         task.UpdatedAt = DateTime.UtcNow;
-        await _dailyRoutineRepository.UpdateAsync(routine);
-
         var actorRoleEnum = ParseRole(actorRole);
 
-        // So concede o bonus na primeira vez que a crianca informa (evita farmar pontos
-        // reabrindo o chip varias vezes pra mesma tarefa).
-        if (!alreadyInformed)
-        {
-            await _pointsService.RecordAsync(
-                userId,
-                routine.Id,
-                routine.Date,
-                task.Id,
-                task.Title,
-                PointTransactionType.Award,
-                InitiativeBonusPoints,
-                actorId,
-                actorRoleEnum,
-                reason: "Bonus de autonomia: iniciativa registrada");
-        }
-
-        await _taskEventRepository.CreateAsync(new TaskEvent
+        var audit = new TaskEvent
         {
             Id = ObjectId.GenerateNewId(),
             UserId = userId,
@@ -1230,7 +1222,11 @@ public class DailyRoutineService : IDailyRoutineService
             ActorId = actorId,
             ActorRole = actorRoleEnum,
             CreatedAt = DateTime.UtcNow,
-        });
+        };
+        await CommitTaskLedgerAsync(routine, audit,
+            alreadyInformed ? null
+                : new TaskLedgerDelta(PointTransactionType.Award, InitiativeBonusPoints,
+                    "Bonus de autonomia: iniciativa registrada"));
 
         return routine;
     }

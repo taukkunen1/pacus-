@@ -38,6 +38,73 @@ public class TaskSupportV4Tests
         Assert.Equal(count, day.Tasks.Single().SupportSteps.Count);
     }
 
+    [Theory]
+    [InlineData("2026-10-07", false)]
+    [InlineData("2026-10-08", true)]
+    [InlineData("2026-10-09", false)]
+    [InlineData("2026-10-10", true)]
+    [InlineData("2026-10-11", false)]
+    public void AlternanciaCabelo_UsaDataDaRotina(string date, bool expected)
+    {
+        Assert.Equal(expected, TaskSupportConfiguration.IsHairWashDay(date));
+    }
+
+    [Fact]
+    public async Task Banho_Diario_MantemUmaTarefaEPontosSemRecompensaPorEtapa()
+    {
+        var (templates, routines, points) = BuildSystem();
+        var family = ObjectId.GenerateNewId();
+        await templates.CreateAsync(family, family,
+            new CreateTaskRequest("Tomar banho", null, "mandatory", "evening", 1,
+                SupportKind: "bathing"));
+
+        var yesterday = await routines.CreateRoutineForDateAsync(
+            family, "2026-10-07", "America/Sao_Paulo");
+        var today = await routines.CreateRoutineForDateAsync(
+            family, "2026-10-08", "America/Sao_Paulo");
+        var tomorrow = await routines.CreateRoutineForDateAsync(
+            family, "2026-10-09", "America/Sao_Paulo");
+
+        Assert.Single(yesterday.Tasks);
+        Assert.Single(today.Tasks);
+        Assert.Single(tomorrow.Tasks);
+        Assert.DoesNotContain("Lavar o cabelo", yesterday.Tasks.Single().SupportSteps);
+        Assert.Contains("Lavar o cabelo", today.Tasks.Single().SupportSteps);
+        Assert.DoesNotContain("Lavar o cabelo", tomorrow.Tasks.Single().SupportSteps);
+        Assert.Equal(5, yesterday.Tasks.Single().SupportSteps.Count);
+        Assert.Equal(6, today.Tasks.Single().SupportSteps.Count);
+        Assert.Equal(5, tomorrow.Tasks.Single().SupportSteps.Count);
+        Assert.Equal(1, today.Tasks.Single().Points);
+
+        // RecordSupportActionAsync opera sobre a ultima rotina aberta. Os
+        // snapshots historicos acima sao testados separadamente; aqui criamos
+        // a rotina de hoje como a mais recente para exercitar as acoes.
+        var (actionTemplates, actionRoutines, actionPoints) = BuildSystem();
+        var actionFamily = ObjectId.GenerateNewId();
+        await actionTemplates.CreateAsync(actionFamily, actionFamily,
+            new CreateTaskRequest("Tomar banho", null, "mandatory", "evening", 1,
+                SupportKind: "bathing"));
+        var active = await actionRoutines.CreateRoutineForDateAsync(
+            actionFamily, "2026-10-08", "America/Sao_Paulo");
+        var taskId = active.Tasks.Single().Id;
+        await actionRoutines.RecordSupportActionAsync(actionFamily, taskId,
+            new("step", 0), actionFamily, "child");
+        var updated = await actionRoutines.RecordSupportActionAsync(actionFamily, taskId,
+            new("step", 2), actionFamily, "child");
+        Assert.Empty(actionPoints.Transactions);
+        // O fake retorna snapshots clonados; a instancia 'active' e anterior
+        // as acoes. Conferir a rotina atualizada retornada pelo servico.
+        Assert.Equal(2, updated.Tasks.Single().CompletedSupportSteps.Count);
+    }
+
+    [Fact]
+    public void Banho_NaoPermiteRemoverRegraDeAlternanciaComEtapasPersonalizadas()
+    {
+        Assert.Throws<ValidationException>(() =>
+            TaskSupportConfiguration.Parse("bathing",
+                new List<string> { "Pegar toalha", "Tomar banho" }));
+    }
+
     [Fact]
     public void Configuracao_Invalida_NaoEPermitida()
     {

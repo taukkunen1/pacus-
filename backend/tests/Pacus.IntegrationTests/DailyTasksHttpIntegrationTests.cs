@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using MongoDB.Driver;
+using MongoDB.Bson;
 
 namespace Pacus.IntegrationTests;
 
@@ -557,6 +558,167 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
         Assert.Equal(
             HttpStatusCode.OK,
             deleteResponse.StatusCode);
+    }
+
+
+    // A2: conta de teste (adulto e membro) isolada em database temporario,
+    // com transacoes reais no replica set da fixture. Nunca usa producao.
+    [Fact]
+    public async Task V4_ContaFicticia_PassoAjudaIniciativaEConclusao_GeramLedgerCorreto()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+
+        var create = await client.PostAsJsonAsync("/api/v1/tasks", new
+        {
+            title = "Leitura do livro",
+            description = "Leitura de teste",
+            type = "mandatory",
+            period = "evening",
+            points = 1,
+            recurrence = "daily",
+            supportKind = "reading"
+        });
+        Assert.Equal(HttpStatusCode.OK, create.StatusCode);
+
+        var day = await EnsureTodayRoutineAsync(client);
+        var task = day.GetProperty("tasks").EnumerateArray()
+            .Single(x => x.GetProperty("title").GetString() == "Leitura do livro");
+        var taskId = task.GetProperty("id").GetString()!;
+        Assert.Equal("reading", task.GetProperty("supportKind").GetString());
+        Assert.Equal(3, task.GetProperty("supportSteps").GetArrayLength());
+
+        await LoginChildAsync(client, family);
+        foreach (var action in new object[]
+        {
+            new { action = "start" },
+            new { action = "step", stepIndex = 0 },
+            new { action = "help" },
+            new { action = "postpone" },
+            new { action = "resume" },
+        })
+        {
+            var response = await client.PutAsJsonAsync(
+                $"/api/v1/daily-tasks/{taskId}/support", action);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        var initiative = await client.PutAsJsonAsync(
+            $"/api/v1/daily-tasks/{taskId}/initiative",
+            new { initiative = "promptedByAdult" });
+        Assert.Equal(HttpStatusCode.OK, initiative.StatusCode);
+
+        // Alterar a autodeclaracao nao gera um segundo bonus.
+        var again = await client.PutAsJsonAsync(
+            $"/api/v1/daily-tasks/{taskId}/initiative",
+            new { initiative = "selfStarted" });
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+
+        var complete = await client.PostAsync($"/api/v1/daily-tasks/{taskId}/complete", null);
+        Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
+        var repeat = await client.PostAsync($"/api/v1/daily-tasks/{taskId}/complete", null);
+        Assert.Equal(HttpStatusCode.OK, repeat.StatusCode);
+
+        var db = new MongoClient(_mongo.ConnectionString).GetDatabase(factory.DatabaseName);
+        var ledger = db.GetCollection<BsonDocument>("point_transactions");
+        var events = db.GetCollection<BsonDocument>("task_events");
+        var entries = await ledger.Find(new BsonDocument("taskId", taskId)).ToListAsync();
+        Assert.Equal(2, entries.Count);
+        Assert.Equal(2, entries.Sum(e => e["points"].ToInt32()));
+        Assert.Equal(1, entries.Count(e => e["points"].ToInt32() == 1 &&
+            e.TryGetValue("reason", out var reason) && reason.IsString &&
+            reason.AsString.Contains("autonomia")));
+
+        var auditCount = await events.CountDocumentsAsync(new BsonDocument("taskId", taskId));
+        Assert.True(auditCount >= 7);
+
+        var today = await EnsureTodayRoutineAsync(client);
+        var updated = FindTask(today, taskId);
+        Assert.Equal("done", updated.GetProperty("status").GetString());
+        Assert.Equal(1, updated.GetProperty("supportPostponeCount").GetInt32());
+        Assert.Equal(1, updated.GetProperty("supportHelpCount").GetInt32());
+
+        var weeklyResponse = await client.GetAsync("/api/v1/autonomy/weekly");
+        Assert.Equal(HttpStatusCode.OK, weeklyResponse.StatusCode);
+        var weekly = await weeklyResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(weekly.GetProperty("postponements").GetInt32() >= 1);
+        Assert.True(weekly.GetProperty("helpRequests").GetInt32() >= 1);
+    }
+
+    [Fact]
+    public async Task A2_ConcorrenciaDuasConclusoes_NaoDuplicaPontosNemEventos()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+        await EnsureTodayRoutineAsync(client);
+        var taskId = await CreateTaskAndGetIdAsync(client);
+
+        var responses = await Task.WhenAll(
+            client.PostAsync($"/api/v1/daily-tasks/{taskId}/complete", null),
+            client.PostAsync($"/api/v1/daily-tasks/{taskId}/complete", null));
+
+        foreach (var response in responses)
+            Assert.True(response.StatusCode is HttpStatusCode.OK or HttpStatusCode.Conflict,
+                $"Resposta inesperada: {response.StatusCode}");
+
+        var db = new MongoClient(_mongo.ConnectionString).GetDatabase(factory.DatabaseName);
+        var entries = await db.GetCollection<BsonDocument>("point_transactions")
+            .Find(new BsonDocument("taskId", taskId)).ToListAsync();
+        Assert.Single(entries);
+        Assert.Equal(2, entries.Sum(t => t["points"].ToInt32()));
+
+        var audits = await db.GetCollection<BsonDocument>("task_events")
+            .Find(new BsonDocument("taskId", taskId)).ToListAsync();
+        // Um evento de criacao e exatamente um de conclusao.
+        Assert.Equal(2, audits.Count);
+
+        var routine = await EnsureTodayRoutineAsync(client);
+        Assert.Equal("done", FindTask(routine, taskId).GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task A2_FalhaAoGravarAuditoria_DesfazConclusaoEPontos_PermiteRepetir()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+        await EnsureTodayRoutineAsync(client);
+        var taskId = await CreateTaskAndGetIdAsync(client);
+        var db = new MongoClient(_mongo.ConnectionString).GetDatabase(factory.DatabaseName);
+
+        // Colecao ja existe pela criacao da tarefa. O validador exige um campo
+        // inexistente somente neste banco descartavel, provocando falha do INSERT.
+        await db.RunCommandAsync<BsonDocument>(new BsonDocument
+        {
+            { "collMod", "task_events" },
+            { "validator", new BsonDocument("$jsonSchema",
+                new BsonDocument("required", new BsonArray { "__campo_impossivel__" })) },
+            { "validationAction", "error" },
+        });
+
+        var failed = await client.PostAsync($"/api/v1/daily-tasks/{taskId}/complete", null);
+        Assert.False(failed.IsSuccessStatusCode);
+
+        var afterFailure = await EnsureTodayRoutineAsync(client);
+        Assert.Equal("pending", FindTask(afterFailure, taskId).GetProperty("status").GetString());
+        var ledger = db.GetCollection<BsonDocument>("point_transactions");
+        Assert.Equal(0, await ledger.CountDocumentsAsync(new BsonDocument("taskId", taskId)));
+
+        // Retira a falha simulada e repete a MESMA requisicao.
+        await db.RunCommandAsync<BsonDocument>(new BsonDocument
+        {
+            { "collMod", "task_events" }, { "validator", new BsonDocument() }
+        });
+        var retried = await client.PostAsync($"/api/v1/daily-tasks/{taskId}/complete", null);
+        Assert.Equal(HttpStatusCode.OK, retried.StatusCode);
+        Assert.Equal(1, await ledger.CountDocumentsAsync(new BsonDocument("taskId", taskId)));
+        var afterSuccess = await EnsureTodayRoutineAsync(client);
+        Assert.Equal("done", FindTask(afterSuccess, taskId).GetProperty("status").GetString());
     }
 
     private async Task<string> CreateTaskAndGetIdAsync(HttpClient client)

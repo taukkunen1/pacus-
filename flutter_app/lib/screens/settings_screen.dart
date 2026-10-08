@@ -410,7 +410,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'supportKind': supportKind == 'none' ? null : supportKind,
                 'supportSteps': supportKind == 'none' || supportSteps.text.trim().isEmpty
                     ? null
-                    : supportSteps.text.split('\\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+                    : supportSteps.text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
               }),
               child: const Text('Salvar'),
             ),

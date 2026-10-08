@@ -89,12 +89,12 @@ public class AutonomyPlanningTests
 
         Assert.Equal(TaskInitiativeLevel.SelfStarted, updated.Tasks.Single().Initiative);
         Assert.Equal(
-            DailyRoutineService.InitiativeBonusSelfStarted,
+            DailyRoutineService.InitiativeBonusPoints,
             points.Transactions.Sum(t => t.Points));
     }
 
     [Fact]
-    public async Task SetTaskInitiativeAsync_PromptedByAdult_NaoConcedeBonus()
+    public async Task SetTaskInitiativeAsync_PromptedByAdult_ConcedeUmPonto()
     {
         var (service, points) = BuildSystem();
         var userId = ObjectId.GenerateNewId();
@@ -112,7 +112,7 @@ public class AutonomyPlanningTests
             userId, taskId, TaskInitiativeLevel.PromptedByAdult, actorId, "adult");
 
         Assert.Equal(TaskInitiativeLevel.PromptedByAdult, updated.Tasks.Single().Initiative);
-        Assert.Empty(points.Transactions);
+        Assert.Equal(1, points.Transactions.Sum(t => t.Points));
     }
 
     [Fact]

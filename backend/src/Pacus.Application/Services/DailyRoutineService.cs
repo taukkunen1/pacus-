@@ -1156,6 +1156,26 @@ public class DailyRoutineService : IDailyRoutineService
             .Where(pair => completedLabels.Contains(pair.step))
             .Select(pair => pair.index).ToList();
 
+        // Atualizar as etapas da licao sem apagar progresso anterior.
+        if (task.SupportKind == TaskSupportConfiguration.Homework &&
+            TaskSupportConfiguration.IsLegacyHomeworkSteps(oldSteps) && newSteps.Count == 6)
+        {
+            foreach (var previousIndex in task.CompletedSupportSteps)
+            {
+                var nextIndices = previousIndex switch
+                {
+                    0 => new[] { 0 },
+                    1 => new[] { 1, 2 },
+                    2 => new[] { 3 },
+                    3 => new[] { 4, 5 },
+                    _ => Array.Empty<int>(),
+                };
+                foreach (var nextIndex in nextIndices)
+                    if (!remapped.Contains(nextIndex)) remapped.Add(nextIndex);
+            }
+            remapped.Sort();
+        }
+
         if (task.SupportKind == template.SupportKind &&
             oldSteps.SequenceEqual(newSteps) &&
             task.CompletedSupportSteps.SequenceEqual(remapped))

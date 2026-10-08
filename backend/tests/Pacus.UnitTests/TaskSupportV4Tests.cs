@@ -106,7 +106,7 @@ public class TaskSupportV4Tests
         var updated = await routines.ApplyTemplateSupportToTodayAsync(
             family, taskId, family, "adult");
         Assert.Equal("mood_board", updated.Tasks.Single().SupportKind);
-        Assert.Equal(4, updated.Tasks.Single().SupportSteps.Count);
+        Assert.Equal(5, updated.Tasks.Single().SupportSteps.Count);
         Assert.Equal(1, updated.Tasks.Single().Points);
         Assert.Empty(pointRepo.Transactions);
         await routines.RecordSupportActionAsync(
@@ -117,11 +117,90 @@ public class TaskSupportV4Tests
         Assert.Empty(pointRepo.Transactions);
     }
 
+    [Fact]
+    public void LousaDoHumor_DesafioTrocaNaDataLocalEPermiteIdeiaPropria()
+    {
+        var steps = TaskSupportConfiguration.Parse("mood_board", null).Steps;
+        var today = TaskSupportConfiguration.StepsForDay("mood_board", steps, "2026-10-08");
+        var sameDay = TaskSupportConfiguration.StepsForDay("mood_board", steps, "2026-10-08");
+        var tomorrow = TaskSupportConfiguration.StepsForDay("mood_board", steps, "2026-10-09");
+
+        Assert.Equal(5, today.Count);
+        Assert.Equal(today, sameDay);
+        Assert.NotEqual(today[1], tomorrow[1]);
+        Assert.Contains("ou escolha sua propria ideia", today[1]);
+        Assert.Equal(today[0], tomorrow[0]);
+        Assert.Equal(steps[0], today[0]);
+    }
+
+    [Fact]
+    public void LousaDoHumor_ConfiguracaoAntigaMigraENaoAlteraPersonalizacoes()
+    {
+        var legacySteps = new List<string>
+        {
+            "Pensar em como estou me sentindo hoje",
+            "Escolher uma cor ou um desenho que combine com esse sentimento",
+            "Desenhar na lousa",
+            "Olhar meu desenho e, se quiser, contar algo sobre ele",
+        };
+        Assert.True(TaskSupportConfiguration.IsLegacyMoodSteps(legacySteps));
+        var upgraded = TaskSupportConfiguration.StepsForDay("mood_board", legacySteps, "2026-10-08");
+        Assert.Equal(5, upgraded.Count);
+        Assert.Equal(4, legacySteps.Count);
+
+        var custom = new List<string> { "Pegar um giz", "Desenhar livremente", "Guardar o giz" };
+        var selected = TaskSupportConfiguration.StepsForDay("mood_board", custom, "2026-10-09");
+        Assert.Equal(custom, selected);
+        Assert.NotSame(custom, selected);
+    }
+
+    [Fact]
+    public async Task LousaDoHumor_MigracaoDasEtapasPreservaProgressoDoDia()
+    {
+        var templateRepo = new FakeTaskTemplateRepository();
+        var routineRepo = new FakeDailyRoutineRepository();
+        var pointRepo = new FakePointTransactionRepository();
+        var templates = new TaskTemplateService(templateRepo, new FakeAuditLogRepository());
+        var routines = new DailyRoutineService(routineRepo, templateRepo,
+            new FakeTaskEventRepository(), new PointsService(pointRepo),
+            new FakeSettingsRepository());
+        var family = ObjectId.GenerateNewId();
+        await templates.CreateAsync(family, family,
+            new CreateTaskRequest("Desenhar na lousa - o humor de hoje", null,
+                "mandatory", "evening", 1, SupportKind: "mood_board"));
+        var day = await routines.CreateRoutineForDateAsync(
+            family, "2026-10-08", "America/Sao_Paulo");
+        var taskId = day.Tasks.Single().Id;
+
+        var previous = await routineRepo.GetByUserAndDateAsync(family, "2026-10-08");
+        Assert.NotNull(previous);
+        previous.Tasks.Single().SupportKind = "mood_board";
+        previous.Tasks.Single().SupportSteps = new List<string>
+        {
+            "Pensar em como estou me sentindo hoje",
+            "Escolher uma cor ou um desenho que combine com esse sentimento",
+            "Desenhar na lousa",
+            "Olhar meu desenho e, se quiser, contar algo sobre ele",
+        };
+        previous.Tasks.Single().CompletedSupportSteps = new List<int> { 1, 2 };
+        await routineRepo.UpdateAsync(previous);
+
+        var updated = await routines.ApplyTemplateSupportToTodayAsync(
+            family, taskId, family, "adult");
+        Assert.Equal(5, updated.Tasks.Single().SupportSteps.Count);
+        Assert.Equal(new List<int> { 1, 2, 3 }, updated.Tasks.Single().CompletedSupportSteps);
+        Assert.Equal(1, updated.Tasks.Single().Points);
+        Assert.Empty(pointRepo.Transactions);
+        var repeated = await routines.ApplyTemplateSupportToTodayAsync(
+            family, taskId, family, "adult");
+        Assert.Equal(new List<int> { 1, 2, 3 }, repeated.Tasks.Single().CompletedSupportSteps);
+    }
+
     [Theory]
     [InlineData("reading", 3)]
     [InlineData("homework", 4)]
     [InlineData("handwriting", 3)]
-    [InlineData("mood_board", 4)]
+    [InlineData("mood_board", 5)]
     public async Task Template_HabilitadoPeloAdulto_GeraEtapasEmCopiaDiaria(string kind, int count)
     {
         var (templates, routines, _) = BuildSystem();

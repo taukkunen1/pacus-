@@ -49,15 +49,57 @@ e valida índices de etapa no servidor. Todas as ações emitem um
 `postponements`, `helpRequests`, `previousPostponements`,
 `previousHelpRequests`.
 
-## Limitações para liberação
+## A2 — consistência transacional (PR #69)
 
-1. As novas configurações são materializadas em dias **novos**, não são
-   retroaplicadas a tarefas já criadas no dia atual.
-2. A estrutura legada atualiza `daily_routines`, `point_transactions` e
-   `task_events` em operações separadas. O endurecimento transacional do
-   ledger (A2) deve ocorrer antes do merge para produção; esta V4 não
-   introduz nenhuma nova operação de pontos no fluxo de etapas, mas altera
-   o bônus de iniciativa existente.
-3. Aplicar a alteração somente com testes de CI verdes e validação funcional
-   em conta de teste. O PR permanece como *draft* e não deve ser integrado
-   automaticamente à branch `main`.
+O PR #68 foi integrado à `main` antes desta correção. O PR #69 altera
+exclusivamente a camada de consistência, sem reprocessar pontos históricos.
+
+`MongoTaskLedgerCommitter` utiliza uma transação MongoDB para confirmar,
+em uma única operação lógica:
+
+- a alteração de `daily_routines` com comparação de `Version` (inclusive
+  documentos antigos sem o campo);
+- a transação de pontos em `point_transactions`, quando houver delta;
+- o evento correspondente de `task_events`;
+- no caso de exclusão permanente, a inativação do `task_template` e
+  as tarefas futuras na rotina planejada.
+
+Os fluxos protegidos incluem conclusão, reabertura, ajuste de pontos,
+edição de tarefa concluída, exclusão, bônus único de iniciativa (+1 PP)
+e ações V4 de suporte. Falha em qualquer escrita aborta a transação.
+
+A API constrói `DailyRoutineService` com `ITaskLedgerCommitter`
+obrigatório; não existe fallback não transacional na DI de produção.
+O construtor sem committer permanece apenas para os testes unitários
+antigos, que usam repositórios fictícios.
+
+O saldo oficial é a soma do ledger. `balanceAfter` permanece um snapshot
+informativo, que pode ser defasado em escritas concorrentes de **outras**
+fontes de pontos (loja/água/ajustes manuais) ainda fora deste committer.
+Esses fluxos são independentes e precisam de sua própria revisão.
+
+### Testes funcionais isolados
+
+A suíte `Pacus.IntegrationTests` cria um replica set MongoDB em container e,
+para cada `PacusApiFactory`, um database aleatório `pacus_api_test_*`.
+Ela cria conta de adulto e membro fictícios, obtém tokens JWT e testa
+os endpoints HTTP, inclusive as transações reais. Casos incluídos:
+
+1. Missão de leitura com etapas, ajuda, adiamento, iniciativa +1
+   e conclusão, com verificação de ledger e auditoria.
+2. Duas conclusões simultâneas; apenas um prêmio é lançado.
+3. Validador Mongo temporário que rejeita `task_events`; tanto
+   estado quanto pontos sofrem rollback e a repetição posterior funciona.
+4. Ciclo de conclusão, ajustes, reabertura, nova conclusão e exclusão:
+   a soma final dos lançamentos da tarefa retorna a zero.
+
+## Cuidados para liberação
+
+1. As novas configurações V4 são materializadas apenas em dias **novos**;
+   não são retroaplicadas a tarefas anteriores, nem alteram histórico.
+2. O Mongo de produção precisa suportar transações multi-documento em
+   replica set (MongoDB Atlas é compatível). Se não suportar, a operação
+   falha de maneira explícita, sem confirmar parte dos dados.
+3. A correção A2 do PR #69 deve ser revisada e integrada somente após CI
+   verde e validação dos testes HTTP isolados. Testes manuais de interface
+   e deploy de produção são etapas separadas.

@@ -46,6 +46,15 @@ public class DailyTask
     // tarefa sem meta minima definida (comportamento normal).
     public string? MinimumGoalLabel { get; set; }
 
+    // V4: estado da missao restrito a esta ocorrencia diaria; sem influencia em Points.
+    public string? SupportKind { get; set; }
+    public List<string> SupportSteps { get; set; } = new();
+    public List<int> CompletedSupportSteps { get; set; } = new();
+    public DateTime? SupportStartedAt { get; set; }
+    public DateTime? SupportPostponedUntil { get; set; }
+    public int SupportPostponeCount { get; set; }
+    public int SupportHelpCount { get; set; }
+
     // Autodeclarado pela crianca ao iniciar ou concluir a tarefa (chip rapido,
     // "Como voce comecou?"): sozinha, com uma sugestao do proprio PACUS, ou com
     // lembrete de um adulto. Null enquanto nao informado -- nunca obrigatorio,

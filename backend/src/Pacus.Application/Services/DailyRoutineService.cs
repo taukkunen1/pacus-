@@ -703,22 +703,19 @@ public class DailyRoutineService : IDailyRoutineService
         routine.Stats = BuildStats(routine.Tasks);
         routine.PointsEarned = routine.Tasks.Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null).Sum(t => t.Points);
         await SyncGameTimerAsync(routine, userId);
-        await _dailyRoutineRepository.UpdateAsync(routine);
-
         var role = ParseRole(actorRole);
-        if (task.Status == TaskItemStatus.Done && oldPoints != requestedPoints)
-        {
-            await _pointsService.RecordAsync(userId, routine.Id, routine.Date, task.Id, task.Title,
-                PointTransactionType.Adjustment, requestedPoints - oldPoints, actorId, role,
-                $"Ajuste de pontos: {task.Title} ({oldPoints} -> {requestedPoints})");
-        }
-
-        await _taskEventRepository.CreateAsync(new TaskEvent
+        var audit = new TaskEvent
         {
             Id = ObjectId.GenerateNewId(), UserId = userId, DailyRoutineId = routine.Id,
             TaskId = task.Id, TaskTemplateId = TryParseObjectId(task.TaskTemplateId),
             EventType = TaskEventType.Updated, ActorId = actorId, ActorRole = role, CreatedAt = DateTime.UtcNow
-        });
+        };
+        await CommitTaskLedgerAsync(routine, audit,
+            task.Status == TaskItemStatus.Done && oldPoints != requestedPoints
+                ? new TaskLedgerDelta(PointTransactionType.Adjustment,
+                    requestedPoints - oldPoints,
+                    $"Ajuste de pontos: {task.Title} ({oldPoints} -> {requestedPoints})")
+                : null);
         return routine;
     }
 

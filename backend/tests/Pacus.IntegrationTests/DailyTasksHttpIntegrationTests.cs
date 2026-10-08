@@ -561,6 +561,50 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
     }
 
 
+    [Fact]
+    public async Task A2_ConcluirAjustarReabrirExcluir_PreservaSomaDoLedger()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+        var family = await BootstrapAsync(client);
+        await LoginAdultAsync(client, family);
+        await EnsureTodayRoutineAsync(client);
+        var taskId = await CreateTaskAndGetIdAsync(client);
+
+        // 2 -> 3 -> 4 pontos, reabertura (-4), nova conclusao (+4)
+        // e remocao (-4): soma final deve ser zero e a rotina nao pode contar a tarefa.
+        Assert.Equal(HttpStatusCode.OK,
+            (await client.PostAsync($"/api/v1/daily-tasks/{taskId}/complete", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK,
+            (await client.PutAsJsonAsync($"/api/v1/daily-tasks/{taskId}/points",
+                new { points = 3 })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK,
+            (await client.PutAsJsonAsync($"/api/v1/daily-tasks/{taskId}",
+                new { title = "Ajustada", description = "Nova meta",
+                    type = "expected", period = "afternoon", points = 4 })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK,
+            (await client.PostAsync($"/api/v1/daily-tasks/{taskId}/reopen", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK,
+            (await client.PostAsync($"/api/v1/daily-tasks/{taskId}/complete", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK,
+            (await client.DeleteAsync($"/api/v1/daily-tasks/{taskId}")).StatusCode);
+
+        var db = new MongoClient(_mongo.ConnectionString).GetDatabase(factory.DatabaseName);
+        var entries = await db.GetCollection<BsonDocument>("point_transactions")
+            .Find(new BsonDocument("taskId", taskId)).ToListAsync();
+        Assert.Equal(6, entries.Count);
+        Assert.Equal(0, entries.Sum(t => t["points"].ToInt32()));
+
+        var audits = await db.GetCollection<BsonDocument>("task_events")
+            .Find(new BsonDocument("taskId", taskId)).ToListAsync();
+        Assert.Equal(7, audits.Count); // created + seis mudancas auditadas
+
+        var today = await EnsureTodayRoutineAsync(client);
+        var deleted = FindTask(today, taskId);
+        Assert.NotEqual(JsonValueKind.Null, deleted.GetProperty("deletedAt").ValueKind);
+        Assert.Equal(0, today.GetProperty("pointsEarned").GetInt32());
+    }
+
     // A2: conta de teste (adulto e membro) isolada em database temporario,
     // com transacoes reais no replica set da fixture. Nunca usa producao.
     [Fact]

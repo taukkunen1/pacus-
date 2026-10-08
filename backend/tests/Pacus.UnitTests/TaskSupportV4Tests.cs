@@ -76,13 +76,23 @@ public class TaskSupportV4Tests
         Assert.Equal(5, tomorrow.Tasks.Single().SupportSteps.Count);
         Assert.Equal(1, today.Tasks.Single().Points);
 
-        var taskId = today.Tasks.Single().Id;
-        await routines.RecordSupportActionAsync(family, taskId,
-            new("step", 0), family, "child");
-        await routines.RecordSupportActionAsync(family, taskId,
-            new("step", 2), family, "child");
-        Assert.Empty(points.Transactions);
-        Assert.Equal(2, today.Tasks.Single().CompletedSupportSteps.Count);
+        // RecordSupportActionAsync opera sobre a ultima rotina aberta. Os
+        // snapshots historicos acima sao testados separadamente; aqui criamos
+        // a rotina de hoje como a mais recente para exercitar as acoes.
+        var (actionTemplates, actionRoutines, actionPoints) = BuildSystem();
+        var actionFamily = ObjectId.GenerateNewId();
+        await actionTemplates.CreateAsync(actionFamily, actionFamily,
+            new CreateTaskRequest("Tomar banho", null, "mandatory", "evening", 1,
+                SupportKind: "bathing"));
+        var active = await actionRoutines.CreateRoutineForDateAsync(
+            actionFamily, "2026-10-08", "America/Sao_Paulo");
+        var taskId = active.Tasks.Single().Id;
+        await actionRoutines.RecordSupportActionAsync(actionFamily, taskId,
+            new("step", 0), actionFamily, "child");
+        await actionRoutines.RecordSupportActionAsync(actionFamily, taskId,
+            new("step", 2), actionFamily, "child");
+        Assert.Empty(actionPoints.Transactions);
+        Assert.Equal(2, active.Tasks.Single().CompletedSupportSteps.Count);
     }
 
     [Fact]

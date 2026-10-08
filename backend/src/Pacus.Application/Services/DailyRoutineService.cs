@@ -1208,28 +1208,9 @@ public class DailyRoutineService : IDailyRoutineService
         var alreadyInformed = task.Initiative is not null;
         task.Initiative = initiative;
         task.UpdatedAt = DateTime.UtcNow;
-        await _dailyRoutineRepository.UpdateAsync(routine);
-
         var actorRoleEnum = ParseRole(actorRole);
 
-        // So concede o bonus na primeira vez que a crianca informa (evita farmar pontos
-        // reabrindo o chip varias vezes pra mesma tarefa).
-        if (!alreadyInformed)
-        {
-            await _pointsService.RecordAsync(
-                userId,
-                routine.Id,
-                routine.Date,
-                task.Id,
-                task.Title,
-                PointTransactionType.Award,
-                InitiativeBonusPoints,
-                actorId,
-                actorRoleEnum,
-                reason: "Bonus de autonomia: iniciativa registrada");
-        }
-
-        await _taskEventRepository.CreateAsync(new TaskEvent
+        var audit = new TaskEvent
         {
             Id = ObjectId.GenerateNewId(),
             UserId = userId,
@@ -1240,7 +1221,11 @@ public class DailyRoutineService : IDailyRoutineService
             ActorId = actorId,
             ActorRole = actorRoleEnum,
             CreatedAt = DateTime.UtcNow,
-        });
+        };
+        await CommitTaskLedgerAsync(routine, audit,
+            alreadyInformed ? null
+                : new TaskLedgerDelta(PointTransactionType.Award, InitiativeBonusPoints,
+                    "Bonus de autonomia: iniciativa registrada"));
 
         return routine;
     }

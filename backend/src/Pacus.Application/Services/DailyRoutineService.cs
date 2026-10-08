@@ -395,7 +395,7 @@ public class DailyRoutineService : IDailyRoutineService
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
             ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
 
-        var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId)
+        var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
             ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
 
         var wasCompleted = task.Status == TaskItemStatus.Done;
@@ -412,24 +412,11 @@ public class DailyRoutineService : IDailyRoutineService
             .Sum(t => t.Points);
 
         await SyncGameTimerAsync(routine, userId);
-        await _dailyRoutineRepository.UpdateAsync(routine);
-
         var actorRoleEnum = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
             ? UserRole.Adult
             : UserRole.Child;
 
-        await _pointsService.RecordAsync(
-            userId,
-            routine.Id,
-            routine.Date,
-            task.Id,
-            task.Title,
-            completed ? PointTransactionType.Award : PointTransactionType.Reversal,
-            completed ? task.Points : -task.Points,
-            actorId,
-            actorRoleEnum);
-
-        await _taskEventRepository.CreateAsync(new TaskEvent
+        var audit = new TaskEvent
         {
             Id = ObjectId.GenerateNewId(),
             UserId = userId,
@@ -440,7 +427,11 @@ public class DailyRoutineService : IDailyRoutineService
             ActorId = actorId,
             ActorRole = actorRoleEnum,
             CreatedAt = DateTime.UtcNow,
-        });
+        };
+        await CommitTaskLedgerAsync(routine, audit,
+            new TaskLedgerDelta(
+                completed ? PointTransactionType.Award : PointTransactionType.Reversal,
+                completed ? task.Points : -task.Points));
 
         return routine;
     }

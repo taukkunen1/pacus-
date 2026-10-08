@@ -106,7 +106,7 @@ public class TaskSupportV4Tests
         var updated = await routines.ApplyTemplateSupportToTodayAsync(
             family, taskId, family, "adult");
         Assert.Equal("mood_board", updated.Tasks.Single().SupportKind);
-        Assert.Equal(4, updated.Tasks.Single().SupportSteps.Count);
+        Assert.Equal(5, updated.Tasks.Single().SupportSteps.Count);
         Assert.Equal(1, updated.Tasks.Single().Points);
         Assert.Empty(pointRepo.Transactions);
         await routines.RecordSupportActionAsync(
@@ -121,7 +121,7 @@ public class TaskSupportV4Tests
     [InlineData("reading", 3)]
     [InlineData("homework", 4)]
     [InlineData("handwriting", 3)]
-    [InlineData("mood_board", 4)]
+    [InlineData("mood_board", 5)]
     public async Task Template_HabilitadoPeloAdulto_GeraEtapasEmCopiaDiaria(string kind, int count)
     {
         var (templates, routines, _) = BuildSystem();

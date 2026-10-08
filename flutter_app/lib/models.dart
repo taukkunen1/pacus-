@@ -1,11 +1,11 @@
 class DailyTask {
-  const DailyTask({required this.id, required this.title, required this.period, required this.type, required this.status, required this.points, this.order = 0, this.description, this.minimumGoalLabel, this.deletedAt, this.options = const [], this.selectedOption, this.reason, this.plannedBy, this.createdByMember = false, this.planCue, this.requiresAdultApproval = false, this.supportKind, this.supportSteps = const [], this.completedSupportSteps = const [], this.supportStartedAt, this.supportPostponedUntil, this.supportPostponeCount = 0, this.supportHelpCount = 0});
+  const DailyTask({required this.id, required this.title, required this.period, required this.type, required this.status, required this.points, this.order = 0, this.description, this.minimumGoalLabel, this.deletedAt, this.options = const [], this.selectedOption, this.reason, this.plannedBy, this.createdByMember = false, this.planCue, this.requiresAdultApproval = false, this.initiative, this.supportKind, this.supportSteps = const [], this.completedSupportSteps = const [], this.supportStartedAt, this.supportPostponedUntil, this.supportPostponeCount = 0, this.supportHelpCount = 0});
   final String id, title, period, type, status;
   final int points, order;
   final String? description, minimumGoalLabel, selectedOption, reason, plannedBy, planCue;
   final bool createdByMember, requiresAdultApproval;
   final List<String> options;
-  final String? supportKind;
+  final String? initiative, supportKind;
   final List<String> supportSteps;
   final List<int> completedSupportSteps;
   final DateTime? supportStartedAt, supportPostponedUntil;
@@ -24,6 +24,7 @@ class DailyTask {
     selectedOption: json['selectedOption']?.toString(), reason: json['reason']?.toString(),
     plannedBy: json['plannedBy']?.toString(), createdByMember: json['createdByMember'] == true,
     planCue: json['planCue']?.toString(), requiresAdultApproval: json['requiresAdultApproval'] == true,
+    initiative: json['initiative']?.toString(),
     supportKind: json['supportKind']?.toString(),
     supportSteps: ((json['supportSteps'] as List?) ?? const []).map((e) => e.toString()).toList(),
     completedSupportSteps: ((json['completedSupportSteps'] as List?) ?? const []).whereType<num>().map((e) => e.toInt()).toList(),

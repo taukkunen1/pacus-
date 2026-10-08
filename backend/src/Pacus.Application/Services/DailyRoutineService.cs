@@ -1170,8 +1170,7 @@ public class DailyRoutineService : IDailyRoutineService
         }
 
         task.UpdatedAt = now;
-        await _dailyRoutineRepository.UpdateAsync(routine);
-        await _taskEventRepository.CreateAsync(new TaskEvent
+        var audit = new TaskEvent
         {
             Id = ObjectId.GenerateNewId(),
             UserId = userId,
@@ -1187,7 +1186,8 @@ public class DailyRoutineService : IDailyRoutineService
             ActorId = actorId,
             ActorRole = ParseRole(actorRole),
             CreatedAt = now,
-        });
+        };
+        await CommitTaskLedgerAsync(routine, audit);
         return routine;
     }
 

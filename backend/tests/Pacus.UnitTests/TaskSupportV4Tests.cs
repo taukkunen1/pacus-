@@ -79,10 +79,49 @@ public class TaskSupportV4Tests
                 family, day.Tasks.Single().Id, family, "child"));
     }
 
+    [Fact]
+    public async Task LousaDoHumor_AplicaEtapasHojeSemAlterarPontosOuHistorico()
+    {
+        var templateRepo = new FakeTaskTemplateRepository();
+        var routineRepo = new FakeDailyRoutineRepository();
+        var pointRepo = new FakePointTransactionRepository();
+        var templates = new TaskTemplateService(templateRepo, new FakeAuditLogRepository());
+        var routines = new DailyRoutineService(routineRepo, templateRepo,
+            new FakeTaskEventRepository(), new PointsService(pointRepo),
+            new FakeSettingsRepository());
+        var family = ObjectId.GenerateNewId();
+        await templates.CreateAsync(family, family,
+            new CreateTaskRequest("Desenhar na lousa - o humor de hoje", null,
+                "mandatory", "evening", 1, SupportKind: "mood_board"));
+        var day = await routines.CreateRoutineForDateAsync(
+            family, "2026-10-08", "America/Sao_Paulo");
+        var taskId = day.Tasks.Single().Id;
+
+        var legacy = await routineRepo.GetByUserAndDateAsync(family, "2026-10-08");
+        Assert.NotNull(legacy);
+        legacy.Tasks.Single().SupportKind = null;
+        legacy.Tasks.Single().SupportSteps.Clear();
+        await routineRepo.UpdateAsync(legacy);
+
+        var updated = await routines.ApplyTemplateSupportToTodayAsync(
+            family, taskId, family, "adult");
+        Assert.Equal("mood_board", updated.Tasks.Single().SupportKind);
+        Assert.Equal(4, updated.Tasks.Single().SupportSteps.Count);
+        Assert.Equal(1, updated.Tasks.Single().Points);
+        Assert.Empty(pointRepo.Transactions);
+        await routines.RecordSupportActionAsync(
+            family, taskId, new("step", 1), family, "child");
+        var again = await routines.ApplyTemplateSupportToTodayAsync(
+            family, taskId, family, "adult");
+        Assert.Contains(1, again.Tasks.Single().CompletedSupportSteps);
+        Assert.Empty(pointRepo.Transactions);
+    }
+
     [Theory]
     [InlineData("reading", 3)]
     [InlineData("homework", 4)]
     [InlineData("handwriting", 3)]
+    [InlineData("mood_board", 4)]
     public async Task Template_HabilitadoPeloAdulto_GeraEtapasEmCopiaDiaria(string kind, int count)
     {
         var (templates, routines, _) = BuildSystem();

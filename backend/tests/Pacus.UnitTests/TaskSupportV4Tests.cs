@@ -22,6 +22,53 @@ public class TaskSupportV4Tests
             points);
     }
 
+    [Fact]
+    public async Task AplicarEtapasHoje_PreservaPontosEProgressoSemRecompensar()
+    {
+        var (templates, routines, points) = BuildSystem();
+        var family = ObjectId.GenerateNewId();
+        await templates.CreateAsync(family, family,
+            new CreateTaskRequest("Tomar banho", null, "mandatory", "evening", 1,
+                SupportKind: "bathing"));
+        var day = await routines.CreateRoutineForDateAsync(
+            family, "2026-10-08", "America/Sao_Paulo");
+        var task = day.Tasks.Single();
+
+        // Simula a copia antiga, criada antes de habilitar a missao.
+        task.SupportKind = null;
+        task.SupportSteps = new List<string>();
+        task.CompletedSupportSteps = new List<int>();
+        var updated = await routines.ApplyTemplateSupportToTodayAsync(
+            family, task.Id, family, "adult");
+        Assert.Equal("bathing", updated.Tasks.Single().SupportKind);
+        Assert.Equal(6, updated.Tasks.Single().SupportSteps.Count);
+        Assert.Equal(1, updated.Tasks.Single().Points);
+        Assert.Empty(points.Transactions);
+
+        var withProgress = await routines.RecordSupportActionAsync(
+            family, task.Id, new("step", 0), family, "child");
+        var again = await routines.ApplyTemplateSupportToTodayAsync(
+            family, task.Id, family, "adult");
+        Assert.Contains(0, again.Tasks.Single().CompletedSupportSteps);
+        Assert.Equal(withProgress.Tasks.Single().Points, again.Tasks.Single().Points);
+        Assert.Empty(points.Transactions);
+    }
+
+    [Fact]
+    public async Task AplicarEtapasHoje_ProibeMembro()
+    {
+        var (templates, routines, _) = BuildSystem();
+        var family = ObjectId.GenerateNewId();
+        await templates.CreateAsync(family, family,
+            new CreateTaskRequest("Tomar banho", null, "mandatory", "evening", 1,
+                SupportKind: "bathing"));
+        var day = await routines.CreateRoutineForDateAsync(
+            family, "2026-10-08", "America/Sao_Paulo");
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            routines.ApplyTemplateSupportToTodayAsync(
+                family, day.Tasks.Single().Id, family, "child"));
+    }
+
     [Theory]
     [InlineData("reading", 3)]
     [InlineData("homework", 4)]

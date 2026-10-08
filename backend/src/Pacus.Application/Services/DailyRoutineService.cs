@@ -1051,13 +1051,9 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
-    // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md). Bonus pequeno e
-    // deliberadamente menor que a maioria dos Points de tarefa -- o ponto nao e pagar
-    // pela iniciativa, e so reconhece-la um pouco mais que o "so terminei" normal.
-    // Nenhum bonus quando um adulto precisou lembrar (a tarefa em si continua valendo
-    // os Points normais via ToggleTaskAsync).
-    public const int InitiativeBonusSelfStarted = 2;
-    public const int InitiativeBonusPromptedByPacus = 1;
+    // V4: toda primeira declaracao de iniciativa concede exatamente +1 ponto,
+    // independentemente de quem lembrou o membro. Niveis servem para relatorio.
+    public const int InitiativeBonusPoints = 1;
 
     // A crianca monta o "combinado" da tarde/noite -- ver docs/ESTADO_ATUAL.md, item 1.
     // Substitui qualquer plano anterior do mesmo dia (nao acumula); items vazio limpa o
@@ -1132,27 +1128,17 @@ public class DailyRoutineService : IDailyRoutineService
         // reabrindo o chip varias vezes pra mesma tarefa).
         if (!alreadyInformed)
         {
-            var bonus = initiative switch
-            {
-                TaskInitiativeLevel.SelfStarted => InitiativeBonusSelfStarted,
-                TaskInitiativeLevel.PromptedByPacus => InitiativeBonusPromptedByPacus,
-                _ => 0,
-            };
-
-            if (bonus > 0)
-            {
-                await _pointsService.RecordAsync(
-                    userId,
-                    routine.Id,
-                    routine.Date,
-                    task.Id,
-                    task.Title,
-                    PointTransactionType.Award,
-                    bonus,
-                    actorId,
-                    actorRoleEnum,
-                    reason: "Bonus de autonomia: iniciativa propria");
-            }
+            await _pointsService.RecordAsync(
+                userId,
+                routine.Id,
+                routine.Date,
+                task.Id,
+                task.Title,
+                PointTransactionType.Award,
+                InitiativeBonusPoints,
+                actorId,
+                actorRoleEnum,
+                reason: "Bonus de autonomia: iniciativa registrada");
         }
 
         await _taskEventRepository.CreateAsync(new TaskEvent

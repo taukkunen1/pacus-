@@ -127,6 +127,15 @@ public class DailyTasksController : ControllerBase
         return Ok(routine.ToResponse());
     }
 
+    [RequireRole(UserRole.Adult)]
+    [HttpPost("{id}/apply-template-support")]
+    public async Task<IActionResult> ApplyTemplateSupport(string id)
+    {
+        var routine = await _dailyRoutineService.ApplyTemplateSupportToTodayAsync(
+            _currentUser.FamilyId, id, _currentUser.UserId, _currentUser.Role.ToString());
+        return Ok(routine.ToResponse());
+    }
+
     // V4: passo, inicio, adiamento, ajuda e retomada — sem alterar pontos.
     [HttpPut("{id}/support")]
     public async Task<IActionResult> RecordSupportAction(string id, [FromBody] TaskSupportActionRequest request)

@@ -836,6 +836,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ]),
           ),
           actions: [
+            if (widget.session.isAdult)
+              TextButton.icon(
+                onPressed: () => Navigator.pop(context, {'applyTemplateSupport': true}),
+                icon: const Icon(Icons.sync),
+                label: const Text('Aplicar etapas permanentes a hoje'),
+              ),
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
             FilledButton(
               onPressed: () => Navigator.pop(context, {
@@ -855,6 +861,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
     title.dispose(); description.dispose(); points.dispose();
     if (payload == null) return;
+    if (payload['applyTemplateSupport'] == true) {
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Atualizar etapas de hoje?'),
+          content: const Text(
+            'Usar as etapas da tarefa permanente somente no dia atual. '
+            'Os pontos, a conclusão e as etapas já marcadas que ainda existirem '
+            'serão preservados. O histórico não será alterado.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(context, true),
+                child: const Text('Aplicar')),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      try {
+        await widget.api.request(
+          '/daily-tasks/${task.id}/apply-template-support', method: 'POST');
+        final updated = await widget.api.getToday();
+        if (mounted) setState(() { routine = updated; error = null; });
+      } catch (e) {
+        if (mounted) setState(() => error = e.toString());
+      }
+      return;
+    }
     try {
       await widget.api.request('/daily-tasks/' + task.id, method: 'PUT', body: payload);
       final updated = await widget.api.getToday();

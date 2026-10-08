@@ -22,6 +22,63 @@ public class TaskSupportV4Tests
             points);
     }
 
+    [Fact]
+    public async Task AplicarEtapasHoje_PreservaPontosEProgressoSemRecompensar()
+    {
+        var templateRepo = new FakeTaskTemplateRepository();
+        var routineRepo = new FakeDailyRoutineRepository();
+        var pointRepo = new FakePointTransactionRepository();
+        var templates = new TaskTemplateService(templateRepo, new FakeAuditLogRepository());
+        var routines = new DailyRoutineService(routineRepo, templateRepo,
+            new FakeTaskEventRepository(), new PointsService(pointRepo),
+            new FakeSettingsRepository());
+        var family = ObjectId.GenerateNewId();
+        await templates.CreateAsync(family, family,
+            new CreateTaskRequest("Tomar banho", null, "mandatory", "evening", 1,
+                SupportKind: "bathing"));
+        var day = await routines.CreateRoutineForDateAsync(
+            family, "2026-10-08", "America/Sao_Paulo");
+        var task = day.Tasks.Single();
+
+        // Persistir uma copia da rotina no formato anterior a V4.
+        var legacy = await routineRepo.GetByUserAndDateAsync(family, "2026-10-08");
+        Assert.NotNull(legacy);
+        legacy.Tasks.Single().SupportKind = null;
+        legacy.Tasks.Single().SupportSteps.Clear();
+        legacy.Tasks.Single().CompletedSupportSteps.Clear();
+        await routineRepo.UpdateAsync(legacy);
+
+        var updated = await routines.ApplyTemplateSupportToTodayAsync(
+            family, task.Id, family, "adult");
+        Assert.Equal("bathing", updated.Tasks.Single().SupportKind);
+        Assert.Equal(6, updated.Tasks.Single().SupportSteps.Count);
+        Assert.Equal(1, updated.Tasks.Single().Points);
+        Assert.Empty(pointRepo.Transactions);
+
+        await routines.RecordSupportActionAsync(
+            family, task.Id, new("step", 0), family, "child");
+        var again = await routines.ApplyTemplateSupportToTodayAsync(
+            family, task.Id, family, "adult");
+        Assert.Contains(0, again.Tasks.Single().CompletedSupportSteps);
+        Assert.Equal(1, again.Tasks.Single().Points);
+        Assert.Empty(pointRepo.Transactions);
+    }
+
+    [Fact]
+    public async Task AplicarEtapasHoje_ProibeMembro()
+    {
+        var (templates, routines, _) = BuildSystem();
+        var family = ObjectId.GenerateNewId();
+        await templates.CreateAsync(family, family,
+            new CreateTaskRequest("Tomar banho", null, "mandatory", "evening", 1,
+                SupportKind: "bathing"));
+        var day = await routines.CreateRoutineForDateAsync(
+            family, "2026-10-08", "America/Sao_Paulo");
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            routines.ApplyTemplateSupportToTodayAsync(
+                family, day.Tasks.Single().Id, family, "child"));
+    }
+
     [Theory]
     [InlineData("reading", 3)]
     [InlineData("homework", 4)]

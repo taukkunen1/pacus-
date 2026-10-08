@@ -1118,6 +1118,76 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
+    // Atualiza somente a missao da rotina aberta. Nunca regrava template,
+    // pontos, conclusao da tarefa, rotinas fechadas ou eventos anteriores.
+    public async Task<DailyRoutine> ApplyTemplateSupportToTodayAsync(
+        ObjectId userId, string taskId, ObjectId actorId, string actorRole)
+    {
+        if (!actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase))
+            throw new UnauthorizedAccessException("Somente um adulto pode aplicar etapas permanentes.");
+
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
+        var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
+            ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
+
+        if (TryParseObjectId(task.TaskTemplateId) is not ObjectId templateId)
+            throw new ValidationException("Esta tarefa nao possui modelo permanente.");
+        var template = await _taskTemplateRepository.GetByIdAsync(templateId)
+            ?? throw new NotFoundException("Modelo permanente nao encontrado.");
+        if (template.FamilyId != userId || !template.Active || template.DeletedAt is not null)
+            throw new ValidationException("Modelo permanente indisponivel para esta familia.");
+        if (string.IsNullOrWhiteSpace(template.SupportKind))
+            throw new ValidationException("Habilite primeiro as etapas na tarefa permanente.");
+
+        var newSteps = TaskSupportConfiguration.StepsForDay(
+            template.SupportKind, template.SupportSteps, routine.Date);
+        if (newSteps.Count == 0)
+            throw new ValidationException("Modelo permanente sem etapas configuradas.");
+
+        // Indices sao relativos a lista antiga; preservar somente as etapas
+        // cujo texto ainda existe, inclusive quando a lavagem do cabelo muda de dia.
+        var oldSteps = task.SupportSteps.ToList();
+        var completedLabels = task.CompletedSupportSteps
+            .Where(i => i >= 0 && i < oldSteps.Count)
+            .Select(i => oldSteps[i])
+            .ToHashSet(StringComparer.Ordinal);
+        var remapped = newSteps.Select((step, index) => (step, index))
+            .Where(pair => completedLabels.Contains(pair.step))
+            .Select(pair => pair.index).ToList();
+
+        if (task.SupportKind == template.SupportKind &&
+            oldSteps.SequenceEqual(newSteps) &&
+            task.CompletedSupportSteps.SequenceEqual(remapped))
+            return routine;
+
+        task.SupportKind = template.SupportKind;
+        task.SupportSteps = newSteps;
+        task.CompletedSupportSteps = remapped;
+        task.UpdatedAt = DateTime.UtcNow;
+
+        var audit = new TaskEvent
+        {
+            Id = ObjectId.GenerateNewId(),
+            UserId = userId,
+            DailyRoutineId = routine.Id,
+            TaskId = task.Id,
+            TaskTemplateId = templateId,
+            EventType = TaskEventType.SupportTemplateApplied,
+            Payload = new BsonDocument
+            {
+                { "oldSteps", new BsonArray(oldSteps) },
+                { "newSteps", new BsonArray(newSteps) },
+                { "preservedCompletedSteps", new BsonArray(remapped) },
+            },
+            ActorId = actorId,
+            ActorRole = UserRole.Adult,
+            CreatedAt = task.UpdatedAt,
+        };
+        await CommitTaskLedgerAsync(routine, audit);
+        return routine;
+    }
+
     // Missoes de estudo V4: progresso independente da conclusao e do ledger de pontos.
     // Somente tarefas com suporte habilitado pelo adulto aceitam estas acoes.
     public async Task<DailyRoutine> RecordSupportActionAsync(

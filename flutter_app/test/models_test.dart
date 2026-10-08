@@ -2,6 +2,35 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pacus_flutter/models.dart';
 
 void main() {
+  test('V4 parses opted-in study steps and postponement without altering task points', () {
+    final task = DailyTask.fromJson({
+      'id': 'reading-1',
+      'title': 'Ler livro',
+      'points': 1,
+      'status': 'pending',
+      'supportKind': 'reading',
+      'supportSteps': ['Escolher', 'Ler', 'Contar'],
+      'completedSupportSteps': [0],
+      'supportPostponeCount': 2,
+      'supportHelpCount': 1,
+      'initiative': 'promptedByAdult',
+      'supportPostponedUntil': '2026-10-08T21:10:00Z',
+    });
+    expect(task.hasStudySupport, isTrue);
+    expect(task.completedSupportSteps, [0]);
+    expect(task.supportPostponeCount, 2);
+    expect(task.supportHelpCount, 1);
+    expect(task.initiative, 'promptedByAdult');
+    expect(task.points, 1);
+    expect(task.isDone, isFalse);
+  });
+
+  test('V4 does not activate study missions for legacy tasks', () {
+    final task = DailyTask.fromJson({'id': 'old', 'title': 'Almoço', 'points': 1});
+    expect(task.hasStudySupport, isFalse);
+    expect(task.supportSteps, isEmpty);
+  });
+
   test('DailyTask parses autonomy fields and completion state', () {
     final task = DailyTask.fromJson({
       'id': 't1',

@@ -1,10 +1,16 @@
 class DailyTask {
-  const DailyTask({required this.id, required this.title, required this.period, required this.type, required this.status, required this.points, this.order = 0, this.description, this.minimumGoalLabel, this.deletedAt, this.options = const [], this.selectedOption, this.reason, this.plannedBy, this.createdByMember = false, this.planCue, this.requiresAdultApproval = false});
+  const DailyTask({required this.id, required this.title, required this.period, required this.type, required this.status, required this.points, this.order = 0, this.description, this.minimumGoalLabel, this.deletedAt, this.options = const [], this.selectedOption, this.reason, this.plannedBy, this.createdByMember = false, this.planCue, this.requiresAdultApproval = false, this.initiative, this.skipReason, this.skipReasonNote, this.supportKind, this.supportSteps = const [], this.completedSupportSteps = const [], this.supportStartedAt, this.supportPostponedUntil, this.supportPostponeCount = 0, this.supportHelpCount = 0});
   final String id, title, period, type, status;
   final int points, order;
   final String? description, minimumGoalLabel, selectedOption, reason, plannedBy, planCue;
   final bool createdByMember, requiresAdultApproval;
   final List<String> options;
+  final String? initiative, skipReason, skipReasonNote, supportKind;
+  final List<String> supportSteps;
+  final List<int> completedSupportSteps;
+  final DateTime? supportStartedAt, supportPostponedUntil;
+  final int supportPostponeCount, supportHelpCount;
+  bool get hasStudySupport => supportKind != null && supportSteps.isNotEmpty;
   final DateTime? deletedAt;
   bool get isDone => status.toLowerCase() == 'done';
   bool get isDeleted => deletedAt != null;
@@ -18,6 +24,16 @@ class DailyTask {
     selectedOption: json['selectedOption']?.toString(), reason: json['reason']?.toString(),
     plannedBy: json['plannedBy']?.toString(), createdByMember: json['createdByMember'] == true,
     planCue: json['planCue']?.toString(), requiresAdultApproval: json['requiresAdultApproval'] == true,
+    initiative: json['initiative']?.toString(),
+    skipReason: json['skipReason']?.toString(),
+    skipReasonNote: json['skipReasonNote']?.toString(),
+    supportKind: json['supportKind']?.toString(),
+    supportSteps: ((json['supportSteps'] as List?) ?? const []).map((e) => e.toString()).toList(),
+    completedSupportSteps: ((json['completedSupportSteps'] as List?) ?? const []).whereType<num>().map((e) => e.toInt()).toList(),
+    supportStartedAt: json['supportStartedAt'] == null ? null : DateTime.tryParse(json['supportStartedAt'].toString()),
+    supportPostponedUntil: json['supportPostponedUntil'] == null ? null : DateTime.tryParse(json['supportPostponedUntil'].toString()),
+    supportPostponeCount: (json['supportPostponeCount'] as num?)?.toInt() ?? 0,
+    supportHelpCount: (json['supportHelpCount'] as num?)?.toInt() ?? 0,
     deletedAt: json['deletedAt'] == null ? null : DateTime.tryParse(json['deletedAt'].toString()),
   );
 }

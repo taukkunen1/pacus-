@@ -76,7 +76,11 @@ public class AutonomyService : IAutonomyService
             currentWindowTasks.Count(t => t.CreatedByMember),
             currentWindowRoutines.Count(r => r.TomorrowPlanConfirmedAt is not null),
             previousWindowTasks.Count(t => t.CreatedByMember),
-            previousWindowRoutines.Count(r => r.TomorrowPlanConfirmedAt is not null));
+            previousWindowRoutines.Count(r => r.TomorrowPlanConfirmedAt is not null),
+            currentWindowTasks.Where(t => t.SupportKind is not null).Sum(t => t.SupportPostponeCount),
+            currentWindowTasks.Where(t => t.SupportKind is not null).Sum(t => t.SupportHelpCount),
+            previousWindowTasks.Where(t => t.SupportKind is not null).Sum(t => t.SupportPostponeCount),
+            previousWindowTasks.Where(t => t.SupportKind is not null).Sum(t => t.SupportHelpCount));
     }
 
     public async Task<List<RoutineSuggestionResponse>> GetRoutineSuggestionsAsync(ObjectId familyId)

@@ -127,6 +127,15 @@ public class DailyTasksController : ControllerBase
         return Ok(routine.ToResponse());
     }
 
+    // V4: passo, inicio, adiamento, ajuda e retomada — sem alterar pontos.
+    [HttpPut("{id}/support")]
+    public async Task<IActionResult> RecordSupportAction(string id, [FromBody] TaskSupportActionRequest request)
+    {
+        var routine = await _dailyRoutineService.RecordSupportActionAsync(
+            _currentUser.FamilyId, id, request, _currentUser.UserId, _currentUser.Role.ToString());
+        return Ok(routine.ToResponse());
+    }
+
     // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md): "Como voce
     // comecou?" -- sem RequireRole aqui de proposito, e a propria crianca quem
     // autodeclara sua iniciativa.

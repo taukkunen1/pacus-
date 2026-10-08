@@ -34,7 +34,9 @@ public record CreateTaskRequest(
     // minima e facil de comecar, pra tarefas que costumam ficar pra tras (ex.:
     // "minimo de 5 minutos"). Texto livre opcional, null = sem meta minima.
     string? MinimumGoalLabel = null,
-    bool Permanent = false
+    bool Permanent = false,
+    string? SupportKind = null,
+    List<string>? SupportSteps = null
 );
 
 public record TaskVariantRequest(

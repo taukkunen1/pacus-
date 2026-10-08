@@ -23,6 +23,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<Map<String, dynamic>> members = [];
   List<Map<String, dynamic>> growth = [];
   List<Map<String, dynamic>> tasks = [];
+  Map<String, dynamic> autonomyWeekly = {};
   bool loading = true;
   String? error;
 
@@ -39,6 +40,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final rawMembers = await widget.api.getList('/family/children');
       final rawGrowth = await widget.api.getList('/settings/growth-stages');
       final rawTasks = await widget.api.getList('/tasks');
+      Map<String, dynamic> weekly = {};
+      try { weekly = await widget.api.getMap('/autonomy/weekly'); } catch (_) { /* Indicadores sao opcionais. */ }
       if (!mounted) return;
       setState(() {
         familyCode = code['familyCode']?.toString() ?? '';
@@ -51,6 +54,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         members = rawMembers.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         growth = rawGrowth.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         tasks = rawTasks.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        autonomyWeekly = weekly;
         loading = false;
         error = null;
       });
@@ -230,6 +234,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final description = TextEditingController(text: task?['description']?.toString() ?? '');
     final points = TextEditingController(text: (task?['points'] ?? 1).toString());
     final minimum = TextEditingController(text: task?['minimumGoalLabel']?.toString() ?? '');
+    String supportKind = task?['supportKind']?.toString() ?? 'none';
+    final supportSteps = TextEditingController(
+      text: ((task?['supportSteps'] as List?) ?? const []).join('\n'));
     final options = TextEditingController(text: ((task?['options'] as List?) ?? []).join(', '));
     final reasons = TextEditingController(text: ((task?['reasons'] as List?) ?? []).join(' | '));
     String period = task?['period']?.toString().toLowerCase() ?? 'morning';
@@ -340,6 +347,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 8),
                 TextField(controller: minimum, decoration: const InputDecoration(labelText: 'Meta mínima opcional')),
                 const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: supportKind,
+                  decoration: const InputDecoration(labelText: 'Missão de estudo (V4)'),
+                  items: const [
+                    DropdownMenuItem(value: 'none', child: Text('Desativada')),
+                    DropdownMenuItem(value: 'reading', child: Text('Leitura do livro')),
+                    DropdownMenuItem(value: 'homework', child: Text('Lição de casa')),
+                    DropdownMenuItem(value: 'handwriting', child: Text('Caderno de caligrafia')),
+                  ],
+                  onChanged: (v) => setDialog(() {
+                    if (v != supportKind) supportSteps.clear();
+                    supportKind = v ?? 'none';
+                  }),
+                ),
+                if (supportKind != 'none') ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: supportSteps,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      labelText: 'Etapas da missão (uma por linha)',
+                      helperText: 'Em branco: etapas sugeridas. Somente para as três tarefas escolhidas.',
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
                 TextField(controller: options, decoration: const InputDecoration(labelText: 'Opções, separadas por vírgula')),
                 const SizedBox(height: 8),
                 TextField(controller: reasons, decoration: const InputDecoration(labelText: 'Motivos, separados por |')),
@@ -373,6 +407,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'options': options.text.trim().isEmpty ? null : options.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
                 'reasons': reasons.text.trim().isEmpty ? null : reasons.text.split('|').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
                 'minimumGoalLabel': minimum.text.trim().isEmpty ? null : minimum.text.trim(),
+                'supportKind': supportKind == 'none' ? null : supportKind,
+                'supportSteps': supportKind == 'none' || supportSteps.text.trim().isEmpty
+                    ? null
+                    : supportSteps.text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
               }),
               child: const Text('Salvar'),
             ),
@@ -380,7 +418,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
-    title.dispose(); description.dispose(); points.dispose(); minimum.dispose(); options.dispose(); reasons.dispose(); anchorDate.dispose(); intervalDays.dispose(); for (final controller in weekdayTitles.values) { controller.dispose(); }
+    title.dispose(); description.dispose(); points.dispose(); minimum.dispose(); supportSteps.dispose(); options.dispose(); reasons.dispose(); anchorDate.dispose(); intervalDays.dispose(); for (final controller in weekdayTitles.values) { controller.dispose(); }
     if (payload == null || (payload['title']?.toString() ?? '').isEmpty) return;
     try {
       if (task == null) {
@@ -508,6 +546,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (growth.isEmpty) const Text('Nenhum estágio personalizado.'),
           for (final g in growth) ListTile(title: Text(g['stage']?.toString() ?? ''), trailing: Text(g['date']?.toString() ?? '')),
           const SizedBox(height: 18),
+          if (autonomyWeekly.isNotEmpty)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Missões de estudo · últimos 7 dias',
+                      style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    Text('Adiamentos: ${autonomyWeekly['postponements'] ?? 0} · Pedidos de ajuda: ${autonomyWeekly['helpRequests'] ?? 0}'),
+                    Text('Iniciativa própria: ${autonomyWeekly['selfStarted'] ?? 0} · Com PACUS: ${autonomyWeekly['promptedByPacus'] ?? 0} · Com adulto: ${autonomyWeekly['promptedByAdult'] ?? 0}'),
+                    const SizedBox(height: 4),
+                    const Text('Acompanhamento sem punição ou desconto de pontos.'),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 18),
           Row(children: [
             const Expanded(child: Text('Tarefas permanentes', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900))),
             IconButton(onPressed: () => _editTask(), icon: const Icon(Icons.add_task), tooltip: 'Nova tarefa'),
@@ -521,6 +578,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text((task['period'] ?? '').toString() + ' · ' + (task['points'] ?? 0).toString() + ' PP'),
+                    if (task['supportKind'] != null)
+                      const Padding(padding: EdgeInsets.only(top: 4), child: Text('Missão de estudo V4 habilitada')),
                     if (task['lastModifiedByMember'] == true)
                       const Padding(
                         padding: EdgeInsets.only(top: 4),

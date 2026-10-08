@@ -114,6 +114,11 @@ public class TaskTemplate
     // igual Reason/Options.
     public string? MinimumGoalLabel { get; set; }
 
+    // Ativado pelo adulto SOMENTE nos modelos das missoes de estudo escolhidas.
+    // Null desliga a V4; copiado como snapshot para cada dia novo.
+    public string? SupportKind { get; set; }
+    public List<string> SupportSteps { get; set; } = new();
+
     // Fase de autonomia: mudancas feitas pelo membro entram em vigor imediatamente.
     // O adulto pode revisar depois no painel, sem fluxo de aprovacao.
     public bool LastModifiedByMember { get; set; }

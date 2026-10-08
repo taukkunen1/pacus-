@@ -273,6 +273,8 @@ public class DailyRoutineService : IDailyRoutineService
                 Options = new List<string>(template.Options),
                 Reason = PickReason(template.EffectiveReasons),
                 MinimumGoalLabel = template.MinimumGoalLabel,
+                SupportKind = template.SupportKind,
+                SupportSteps = new List<string>(template.SupportSteps),
                 CompletedAt = null,
                 CreatedBy = userId.ToString(),
                 Origin = "template",
@@ -322,6 +324,8 @@ public class DailyRoutineService : IDailyRoutineService
                 Options = new List<string>(pair.Template.Options),
                 Reason = PickReason(pair.Template.EffectiveReasons),
                 MinimumGoalLabel = pair.Template.MinimumGoalLabel,
+                SupportKind = pair.Template.SupportKind,
+                SupportSteps = new List<string>(pair.Template.SupportSteps),
                 CompletedAt = null,
                 CreatedBy = userId.ToString(),
                 Origin = "template",
@@ -1051,13 +1055,9 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
-    // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md). Bonus pequeno e
-    // deliberadamente menor que a maioria dos Points de tarefa -- o ponto nao e pagar
-    // pela iniciativa, e so reconhece-la um pouco mais que o "so terminei" normal.
-    // Nenhum bonus quando um adulto precisou lembrar (a tarefa em si continua valendo
-    // os Points normais via ToggleTaskAsync).
-    public const int InitiativeBonusSelfStarted = 2;
-    public const int InitiativeBonusPromptedByPacus = 1;
+    // V4: toda primeira declaracao de iniciativa concede exatamente +1 ponto,
+    // independentemente de quem lembrou o membro. Niveis servem para relatorio.
+    public const int InitiativeBonusPoints = 1;
 
     // A crianca monta o "combinado" da tarde/noite -- ver docs/ESTADO_ATUAL.md, item 1.
     // Substitui qualquer plano anterior do mesmo dia (nao acumula); items vazio limpa o
@@ -1107,6 +1107,80 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
+    // Missoes de estudo V4: progresso independente da conclusao e do ledger de pontos.
+    // Somente tarefas com suporte habilitado pelo adulto aceitam estas acoes.
+    public async Task<DailyRoutine> RecordSupportActionAsync(
+        ObjectId userId, string taskId, TaskSupportActionRequest request, ObjectId actorId, string actorRole)
+    {
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
+
+        var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
+            ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
+
+        if (task.SupportKind is null || task.SupportSteps.Count == 0)
+            throw new ValidationException("Esta tarefa nao possui missao de estudo habilitada.");
+        if (task.Status == TaskItemStatus.Done)
+            throw new ValidationException("Uma tarefa concluida nao aceita novas etapas.");
+
+        var action = request.Action?.Trim().ToLowerInvariant();
+        var now = DateTime.UtcNow;
+        switch (action)
+        {
+            case "start":
+            case "resume":
+                task.SupportStartedAt ??= now;
+                task.SupportPostponedUntil = null;
+                break;
+            case "postpone":
+                task.SupportPostponeCount++;
+                task.SupportPostponedUntil = now.AddMinutes(10);
+                break;
+            case "help":
+                task.SupportHelpCount++;
+                break;
+            case "step":
+            case "undo-step":
+                if (request.StepIndex is not int index || index < 0 || index >= task.SupportSteps.Count)
+                    throw new ValidationException("Etapa invalida para esta missao.");
+                if (action == "step")
+                {
+                    task.SupportStartedAt ??= now;
+                    task.SupportPostponedUntil = null;
+                    if (!task.CompletedSupportSteps.Contains(index))
+                        task.CompletedSupportSteps.Add(index);
+                }
+                else
+                {
+                    task.CompletedSupportSteps.Remove(index);
+                }
+                break;
+            default:
+                throw new ValidationException("Acao de missao invalida.");
+        }
+
+        task.UpdatedAt = now;
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        await _taskEventRepository.CreateAsync(new TaskEvent
+        {
+            Id = ObjectId.GenerateNewId(),
+            UserId = userId,
+            DailyRoutineId = routine.Id,
+            TaskId = task.Id,
+            TaskTemplateId = TryParseObjectId(task.TaskTemplateId),
+            EventType = TaskEventType.SupportAction,
+            Payload = new BsonDocument
+            {
+                { "action", action! },
+                { "stepIndex", request.StepIndex is int step ? new BsonInt32(step) : BsonNull.Value },
+            },
+            ActorId = actorId,
+            ActorRole = ParseRole(actorRole),
+            CreatedAt = now,
+        });
+        return routine;
+    }
+
     // Autodeclaracao de como a tarefa foi comecada (item 4 da spec: "Incentivar
     // iniciativa"). Concede um pequeno bonus de pontos via PointsService quando a
     // iniciativa nao dependeu de um adulto -- reaproveita o mesmo mecanismo de
@@ -1132,27 +1206,17 @@ public class DailyRoutineService : IDailyRoutineService
         // reabrindo o chip varias vezes pra mesma tarefa).
         if (!alreadyInformed)
         {
-            var bonus = initiative switch
-            {
-                TaskInitiativeLevel.SelfStarted => InitiativeBonusSelfStarted,
-                TaskInitiativeLevel.PromptedByPacus => InitiativeBonusPromptedByPacus,
-                _ => 0,
-            };
-
-            if (bonus > 0)
-            {
-                await _pointsService.RecordAsync(
-                    userId,
-                    routine.Id,
-                    routine.Date,
-                    task.Id,
-                    task.Title,
-                    PointTransactionType.Award,
-                    bonus,
-                    actorId,
-                    actorRoleEnum,
-                    reason: "Bonus de autonomia: iniciativa propria");
-            }
+            await _pointsService.RecordAsync(
+                userId,
+                routine.Id,
+                routine.Date,
+                task.Id,
+                task.Title,
+                PointTransactionType.Award,
+                InitiativeBonusPoints,
+                actorId,
+                actorRoleEnum,
+                reason: "Bonus de autonomia: iniciativa registrada");
         }
 
         await _taskEventRepository.CreateAsync(new TaskEvent

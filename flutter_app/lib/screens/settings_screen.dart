@@ -54,6 +54,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         members = rawMembers.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         growth = rawGrowth.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         tasks = rawTasks.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        autonomyWeekly = weekly;
         loading = false;
         error = null;
       });

@@ -356,6 +356,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     DropdownMenuItem(value: 'homework', child: Text('Lição de casa')),
                     DropdownMenuItem(value: 'handwriting', child: Text('Caderno de caligrafia')),
                     DropdownMenuItem(value: 'bathing', child: Text('Tomar banho (cabelo dia sim, dia não)')),
+                    DropdownMenuItem(value: 'mood_board', child: Text('Desenhar na lousa — o humor de hoje')),
                   ],
                   onChanged: (v) => setDialog(() {
                     if (v != supportKind) supportSteps.clear();
@@ -369,6 +370,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     '(somente dia sim, dia não), tomar banho, tirar as roupas do chão '
                     'e guardar a toalha. Em 08/10/2026 deve lavar o cabelo.',
                   ),
+                ] else if (supportKind == 'mood_board') ...[
+                  const SizedBox(height: 8),
+                  const Text('Passos sugeridos: perceber como se sente, escolher uma cor ou desenho, desenhar na lousa e, se quiser, contar algo sobre o desenho. Não é necessário explicar o sentimento.'),
                 ] else if (supportKind != 'none') ...[
                   const SizedBox(height: 8),
                   TextField(

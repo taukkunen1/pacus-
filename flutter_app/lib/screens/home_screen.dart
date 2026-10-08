@@ -862,6 +862,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     title.dispose(); description.dispose(); points.dispose();
     if (payload == null) return;
     if (payload['applyTemplateSupport'] == true) {
+      if (!mounted) return;
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(

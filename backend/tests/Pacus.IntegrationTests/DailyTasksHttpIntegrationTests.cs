@@ -562,6 +562,39 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
 
 
     [Fact]
+    public async Task A2_MembroCriaTarefaSemPontos_ConcluiSemTransacaoFinanceira()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+        var family = await BootstrapAsync(client);
+        await LoginChildAsync(client, family);
+        await EnsureTodayRoutineAsync(client);
+
+        var created = await client.PostAsJsonAsync("/api/v1/daily-tasks", new
+        {
+            title = "Tarefa livre do membro", description = "Sem premio automatico",
+            type = "expected", period = "evening", points = 3
+        });
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        var day = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var task = day.GetProperty("tasks").EnumerateArray()
+            .Single(x => x.GetProperty("title").GetString() == "Tarefa livre do membro");
+        Assert.Equal(0, task.GetProperty("points").GetInt32());
+        var taskId = task.GetProperty("id").GetString()!;
+
+        var done = await client.PostAsync($"/api/v1/daily-tasks/{taskId}/complete", null);
+        Assert.Equal(HttpStatusCode.OK, done.StatusCode);
+        var current = await EnsureTodayRoutineAsync(client);
+        Assert.Equal("done", FindTask(current, taskId).GetProperty("status").GetString());
+
+        var db = new MongoClient(_mongo.ConnectionString).GetDatabase(factory.DatabaseName);
+        Assert.Equal(0, await db.GetCollection<BsonDocument>("point_transactions")
+            .CountDocumentsAsync(new BsonDocument("taskId", taskId)));
+        Assert.Equal(2, await db.GetCollection<BsonDocument>("task_events")
+            .CountDocumentsAsync(new BsonDocument("taskId", taskId)));
+    }
+
+    [Fact]
     public async Task A2_ConcluirAjustarReabrirExcluir_PreservaSomaDoLedger()
     {
         using var factory = new PacusApiFactory(_mongo.ConnectionString);

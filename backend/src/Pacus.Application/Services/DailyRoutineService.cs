@@ -1107,6 +1107,80 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
+    // Missoes de estudo V4: progresso independente da conclusao e do ledger de pontos.
+    // Somente tarefas com suporte habilitado pelo adulto aceitam estas acoes.
+    public async Task<DailyRoutine> RecordSupportActionAsync(
+        ObjectId userId, string taskId, TaskSupportActionRequest request, ObjectId actorId, string actorRole)
+    {
+        var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
+            ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
+
+        var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
+            ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
+
+        if (task.SupportKind is null || task.SupportSteps.Count == 0)
+            throw new ValidationException("Esta tarefa nao possui missao de estudo habilitada.");
+        if (task.Status == TaskItemStatus.Done)
+            throw new ValidationException("Uma tarefa concluida nao aceita novas etapas.");
+
+        var action = request.Action?.Trim().ToLowerInvariant();
+        var now = DateTime.UtcNow;
+        switch (action)
+        {
+            case "start":
+            case "resume":
+                task.SupportStartedAt ??= now;
+                task.SupportPostponedUntil = null;
+                break;
+            case "postpone":
+                task.SupportPostponeCount++;
+                task.SupportPostponedUntil = now.AddMinutes(10);
+                break;
+            case "help":
+                task.SupportHelpCount++;
+                break;
+            case "step":
+            case "undo-step":
+                if (request.StepIndex is not int index || index < 0 || index >= task.SupportSteps.Count)
+                    throw new ValidationException("Etapa invalida para esta missao.");
+                if (action == "step")
+                {
+                    task.SupportStartedAt ??= now;
+                    task.SupportPostponedUntil = null;
+                    if (!task.CompletedSupportSteps.Contains(index))
+                        task.CompletedSupportSteps.Add(index);
+                }
+                else
+                {
+                    task.CompletedSupportSteps.Remove(index);
+                }
+                break;
+            default:
+                throw new ValidationException("Acao de missao invalida.");
+        }
+
+        task.UpdatedAt = now;
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        await _taskEventRepository.CreateAsync(new TaskEvent
+        {
+            Id = ObjectId.GenerateNewId(),
+            UserId = userId,
+            DailyRoutineId = routine.Id,
+            TaskId = task.Id,
+            TaskTemplateId = TryParseObjectId(task.TaskTemplateId),
+            EventType = TaskEventType.SupportAction,
+            Payload = new BsonDocument
+            {
+                { "action", action! },
+                { "stepIndex", request.StepIndex is int step ? new BsonInt32(step) : BsonNull.Value },
+            },
+            ActorId = actorId,
+            ActorRole = ParseRole(actorRole),
+            CreatedAt = now,
+        });
+        return routine;
+    }
+
     // Autodeclaracao de como a tarefa foi comecada (item 4 da spec: "Incentivar
     // iniciativa"). Concede um pequeno bonus de pontos via PointsService quando a
     // iniciativa nao dependeu de um adulto -- reaproveita o mesmo mecanismo de

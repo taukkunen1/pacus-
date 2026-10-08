@@ -23,6 +23,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<Map<String, dynamic>> members = [];
   List<Map<String, dynamic>> growth = [];
   List<Map<String, dynamic>> tasks = [];
+  Map<String, dynamic> autonomyWeekly = {};
   bool loading = true;
   String? error;
 
@@ -39,6 +40,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final rawMembers = await widget.api.getList('/family/children');
       final rawGrowth = await widget.api.getList('/settings/growth-stages');
       final rawTasks = await widget.api.getList('/tasks');
+      Map<String, dynamic> weekly = {};
+      try { weekly = await widget.api.getMap('/autonomy/weekly'); } catch (_) { /* Indicadores sao opcionais. */ }
       if (!mounted) return;
       setState(() {
         familyCode = code['familyCode']?.toString() ?? '';
@@ -541,6 +544,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ]),
           if (growth.isEmpty) const Text('Nenhum estágio personalizado.'),
           for (final g in growth) ListTile(title: Text(g['stage']?.toString() ?? ''), trailing: Text(g['date']?.toString() ?? '')),
+          const SizedBox(height: 18),
+          if (autonomyWeekly.isNotEmpty)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Missões de estudo · últimos 7 dias',
+                      style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    Text('Adiamentos: ${autonomyWeekly['postponements'] ?? 0} · Pedidos de ajuda: ${autonomyWeekly['helpRequests'] ?? 0}'),
+                    Text('Iniciativa própria: ${autonomyWeekly['selfStarted'] ?? 0} · Com PACUS: ${autonomyWeekly['promptedByPacus'] ?? 0} · Com adulto: ${autonomyWeekly['promptedByAdult'] ?? 0}'),
+                    const SizedBox(height: 4),
+                    const Text('Acompanhamento sem punição ou desconto de pontos.'),
+                  ],
+                ),
+              ),
+            ),
           const SizedBox(height: 18),
           Row(children: [
             const Expanded(child: Text('Tarefas permanentes', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900))),

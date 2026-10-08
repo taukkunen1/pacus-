@@ -176,7 +176,16 @@ builder.Services.AddScoped<IBootstrapService, BootstrapService>();
 
 // Services
 builder.Services.AddScoped<IPointsService, PointsService>();
-builder.Services.AddScoped<IDailyRoutineService, DailyRoutineService>();
+builder.Services.AddScoped<ITaskLedgerCommitter, MongoTaskLedgerCommitter>();
+// Construcao explicita: se o committer transacional estiver ausente a API falha ao
+// iniciar/resolver a dependencia, em vez de voltar a gravacoes parciais.
+builder.Services.AddScoped<IDailyRoutineService>(services => new DailyRoutineService(
+    services.GetRequiredService<IDailyRoutineRepository>(),
+    services.GetRequiredService<ITaskTemplateRepository>(),
+    services.GetRequiredService<ITaskEventRepository>(),
+    services.GetRequiredService<IPointsService>(),
+    services.GetRequiredService<ISettingsRepository>(),
+    services.GetRequiredService<ITaskLedgerCommitter>()));
 builder.Services.AddScoped<IDayClosingService, DayClosingService>();
 builder.Services.AddScoped<IStoreService, StoreService>();
 builder.Services.AddScoped<ITaskTemplateService, TaskTemplateService>();

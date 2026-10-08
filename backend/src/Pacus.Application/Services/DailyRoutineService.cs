@@ -15,20 +15,57 @@ public class DailyRoutineService : IDailyRoutineService
     private readonly ITaskEventRepository _taskEventRepository;
     private readonly IPointsService _pointsService;
     private readonly ISettingsRepository _settingsRepository;
+    private readonly ITaskLedgerCommitter? _atomicLedger;
 
     public DailyRoutineService(
         IDailyRoutineRepository dailyRoutineRepository,
         ITaskTemplateRepository taskTemplateRepository,
         ITaskEventRepository taskEventRepository,
         IPointsService pointsService,
-        ISettingsRepository settingsRepository)
+        ISettingsRepository settingsRepository,
+        ITaskLedgerCommitter? atomicLedger = null)
     {
         _dailyRoutineRepository = dailyRoutineRepository;
         _taskTemplateRepository = taskTemplateRepository;
         _taskEventRepository = taskEventRepository;
         _pointsService = pointsService;
         _settingsRepository = settingsRepository;
+        _atomicLedger = atomicLedger;
     }
+
+    // A API registra obrigatoriamente o committer transacional na DI.
+    // O caminho sem committer existe somente para compatibilidade de testes unitarios antigos.
+    private async Task CommitTaskLedgerAsync(
+        DailyRoutine routine,
+        TaskEvent audit,
+        TaskLedgerDelta? delta = null,
+        IReadOnlyList<DailyRoutine>? plannedUpdates = null,
+        ObjectId? softDeleteTemplateId = null)
+    {
+        if (_atomicLedger is not null)
+        {
+            await _atomicLedger.CommitAsync(routine, audit, delta, plannedUpdates, softDeleteTemplateId);
+            return;
+        }
+
+        // Compatibilidade com os fakes em memoria, nao utilizado em producao.
+        if (softDeleteTemplateId is ObjectId templateId)
+            await _taskTemplateRepository.SoftDeleteAsync(templateId);
+        if (plannedUpdates is not null)
+            foreach (var planned in plannedUpdates)
+                await _dailyRoutineRepository.UpdateAsync(planned);
+
+        await _dailyRoutineRepository.UpdateAsync(routine);
+        if (delta is not null)
+        {
+            var task = routine.Tasks.First(t => t.Id == audit.TaskId);
+            await _pointsService.RecordAsync(
+                routine.FamilyId, routine.Id, routine.Date, task.Id, task.Title,
+                delta.Type, delta.Points, audit.ActorId, audit.ActorRole, delta.Reason);
+        }
+        await _taskEventRepository.CreateAsync(audit);
+    }
+
 
     public async Task<DailyRoutine> GetOrCreateTodayAsync(ObjectId userId, string timezone)
     {

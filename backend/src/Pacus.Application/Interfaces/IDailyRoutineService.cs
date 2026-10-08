@@ -84,6 +84,8 @@ public interface IDailyRoutineService
 
     // V4: primeira declaracao de iniciativa concede +1 ponto independentemente do nivel.
     // Pode ser chamada antes ou depois da conclusao da tarefa.
+    Task<DailyRoutine> RecordSupportActionAsync(ObjectId userId, string taskId, TaskSupportActionRequest request, ObjectId actorId, string actorRole);
+
     Task<DailyRoutine> SetTaskInitiativeAsync(ObjectId userId, string taskId, TaskInitiativeLevel initiative, ObjectId actorId, string actorRole);
 
     // Autodeclaracao de por que uma tarefa nao foi feita -- nunca afeta pontos nem

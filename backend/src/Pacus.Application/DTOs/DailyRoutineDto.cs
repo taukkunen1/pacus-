@@ -63,7 +63,14 @@ public record DailyTaskResponse(
     string? PlannedBy,
     bool CreatedByMember,
     string? PlanCue,
-    bool RequiresAdultApproval
+    bool RequiresAdultApproval,
+    string? SupportKind,
+    List<string> SupportSteps,
+    List<int> CompletedSupportSteps,
+    DateTime? SupportStartedAt,
+    DateTime? SupportPostponedUntil,
+    int SupportPostponeCount,
+    int SupportHelpCount
 );
 
 public record DailyRoutineResponse(
@@ -122,7 +129,14 @@ public static class DailyRoutineMappingExtensions
         task.PlannedBy,
         task.CreatedByMember,
         task.PlanCue,
-        task.RequiresAdultApproval);
+        task.RequiresAdultApproval,
+        task.SupportKind,
+        task.SupportSteps,
+        task.CompletedSupportSteps,
+        task.SupportStartedAt,
+        task.SupportPostponedUntil,
+        task.SupportPostponeCount,
+        task.SupportHelpCount);
 
     public static DailyRoutineResponse ToResponse(this DailyRoutine routine) => new(
         routine.Id.ToString(),

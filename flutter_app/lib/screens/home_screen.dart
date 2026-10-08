@@ -864,6 +864,154 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  // V4: seletor de missao; a ordem da rotina nao e alterada.
+  Future<void> _openStudyMission(DailyTask task) async {
+    DailyTask active = task;
+    bool busy = false;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheet) {
+          Future<void> save(String path, Map<String, dynamic> body) async {
+            if (busy) return;
+            setSheet(() => busy = true);
+            try {
+              await widget.api.request(path, method: 'PUT', body: body);
+              final updated = await widget.api.getToday();
+              if (!mounted || !sheetContext.mounted) return;
+              setState(() => routine = updated);
+              setSheet(() {
+                active = updated.tasks.firstWhere((t) => t.id == task.id);
+                busy = false;
+              });
+            } catch (e) {
+              if (sheetContext.mounted) {
+                setSheet(() => busy = false);
+                ScaffoldMessenger.of(sheetContext).showSnackBar(
+                  SnackBar(content: Text('Não foi possível salvar: $e')),
+                );
+              }
+            }
+          }
+
+          Future<void> action(String kind, {int? index}) => save(
+                '/daily-tasks/${task.id}/support',
+                {'action': kind, if (index != null) 'stepIndex': index},
+              );
+
+          Future<void> chooseDifficulty() async {
+            final selected = await showDialog<String>(
+              context: sheetContext,
+              builder: (dialogContext) => AlertDialog(
+                title: const Text('Não quero fazer agora'),
+                content: const Text('Tudo bem contar como está se sentindo. Que tal escolher um próximo passo?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, 'postpone'),
+                    child: const Text('Adiar 10 minutos'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, 'help'),
+                    child: const Text('Preciso de ajuda'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(dialogContext, 'start'),
+                    child: const Text('Começar pequeno'),
+                  ),
+                ],
+              ),
+            );
+            if (selected != null && sheetContext.mounted) await action(selected);
+          }
+
+          final progress = active.completedSupportSteps.length;
+          final isPaused = active.supportPostponedUntil != null &&
+              active.supportPostponedUntil!.isAfter(DateTime.now());
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                20, 8, 20, MediaQuery.viewInsetsOf(sheetContext).bottom + 20),
+              child: SizedBox(
+                height: MediaQuery.sizeOf(sheetContext).height * 0.72,
+                child: ListView(
+                  children: [
+                    Text(active.title, style: Theme.of(sheetContext).textTheme.headlineSmall),
+                    const SizedBox(height: 6),
+                    Text('$progress de ${active.supportSteps.length} etapas. Cada etapa é um avanço; os pontos da tarefa só vêm quando ela estiver concluída.'),
+                    if (isPaused) ...[
+                      const SizedBox(height: 8),
+                      const Text('Você combinou uma pausa de 10 minutos. Pode retomar antes, se quiser.'),
+                    ],
+                    const SizedBox(height: 12),
+                    if (active.supportStartedAt == null)
+                      FilledButton.icon(
+                        onPressed: busy ? null : () => action('start'),
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: const Text('Começar missão'),
+                      ),
+                    if (active.supportStartedAt != null && isPaused)
+                      FilledButton.tonal(
+                        onPressed: busy ? null : () => action('resume'),
+                        child: const Text('Retomar agora'),
+                      ),
+                    for (var i = 0; i < active.supportSteps.length; i++)
+                      CheckboxListTile(
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(active.supportSteps[i]),
+                        value: active.completedSupportSteps.contains(i),
+                        onChanged: busy ? null : (checked) =>
+                            action(checked == true ? 'step' : 'undo-step', index: i),
+                      ),
+                    const SizedBox(height: 10),
+                    if (active.initiative == null) ...[
+                      Text('Como você começou?', style: Theme.of(sheetContext).textTheme.titleMedium),
+                      const SizedBox(height: 6),
+                      Wrap(spacing: 8, runSpacing: 8, children: [
+                        ActionChip(
+                          label: const Text('Sozinho'),
+                          onPressed: busy ? null : () => save('/daily-tasks/${task.id}/initiative', {'initiative': 'selfStarted'}),
+                        ),
+                        ActionChip(
+                          label: const Text('Com o PACUS'),
+                          onPressed: busy ? null : () => save('/daily-tasks/${task.id}/initiative', {'initiative': 'promptedByPacus'}),
+                        ),
+                        ActionChip(
+                          label: const Text('Com um adulto'),
+                          onPressed: busy ? null : () => save('/daily-tasks/${task.id}/initiative', {'initiative': 'promptedByAdult'}),
+                        ),
+                      ]),
+                      const SizedBox(height: 8),
+                      const Text('Registrar como começou vale +1 ponto, seja qual for a resposta.'),
+                    ] else
+                      const Text('Seu início já foi registrado.'),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: busy ? null : chooseDifficulty,
+                      icon: const Icon(Icons.sentiment_dissatisfied_outlined),
+                      label: const Text('Não quero fazer agora'),
+                    ),
+                    const SizedBox(height: 6),
+                    FilledButton.tonalIcon(
+                      onPressed: busy ? null : () async {
+                        Navigator.pop(sheetContext);
+                        await _toggleTask(active);
+                      },
+                      icon: const Icon(Icons.check_circle_outline),
+                      label: const Text('Concluí a tarefa inteira'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _setInitiative(DailyTask task) async {
     final value = await showDialog<String>(
       context: context,
@@ -1293,6 +1441,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ],
         ),
         const SizedBox(height: 12),
+        if (tasks.any((t) => t.hasStudySupport && !t.isDone)) ...[
+          Text('Escolha sua próxima missão de estudo',
+            style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final mission in tasks.where((t) => t.hasStudySupport && !t.isDone))
+                ActionChip(
+                  avatar: const Icon(Icons.menu_book_outlined, size: 18),
+                  label: Text(mission.title),
+                  onPressed: () => _openStudyMission(mission),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+        ],
         _periodSection(
           title: 'Manhã',
           icon: Icons.wb_sunny_outlined,
@@ -1423,6 +1589,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
             ],
           ),
+          if (task.hasStudySupport && !task.isDone) ...[
+            const SizedBox(height: 9),
+            OutlinedButton.icon(
+              onPressed: () => _openStudyMission(task),
+              icon: const Icon(Icons.auto_stories_outlined),
+              label: Text('Abrir missão · ${task.completedSupportSteps.length}/${task.supportSteps.length} etapas'),
+            ),
+          ],
           if (description.isNotEmpty) ...[
             const SizedBox(height: 9),
             Text(

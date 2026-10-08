@@ -9,6 +9,9 @@ public static class TaskSupportConfiguration
     public const string Reading = "reading";
     public const string Homework = "homework";
     public const string Handwriting = "handwriting";
+    public const string Bathing = "bathing";
+    // 08/10/2026 e o primeiro dia de lavar o cabelo; 07/10 foi dia sem lavar.
+    private static readonly DateOnly HairWashAnchor = new(2026, 10, 8);
 
     public static readonly IReadOnlyDictionary<string, string[]> DefaultSteps =
         new Dictionary<string, string[]>(StringComparer.Ordinal)
@@ -16,7 +19,23 @@ public static class TaskSupportConfiguration
             [Reading] = new[] { "Escolher o livro", "Ler o trecho combinado", "Contar algo sobre a leitura" },
             [Homework] = new[] { "Abrir o caderno", "Ler a primeira questao", "Resolver a primeira questao", "Concluir a licao prevista" },
             [Handwriting] = new[] { "Separar o caderno e lapis", "Escrever a primeira linha", "Concluir a quantidade combinada" },
+            [Bathing] = new[] { "Pegar a toalha", "Abrir a janela do banheiro", "Lavar o cabelo", "Tomar banho", "Tirar as roupas do chao", "Guardar a toalha" },
         };
+
+    public static bool IsHairWashDay(string date)
+    {
+        var day = DateOnly.ParseExact(date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        // Ancoragem na data local da rotina, nao no relogio UTC.
+        return (day.DayNumber - HairWashAnchor.DayNumber) % 2 == 0;
+    }
+
+    public static List<string> StepsForDay(string? kind, List<string> steps, string date)
+    {
+        if (kind != Bathing) return new List<string>(steps);
+        var selected = new List<string>(DefaultSteps[Bathing]);
+        if (!IsHairWashDay(date)) selected.Remove("Lavar o cabelo");
+        return selected;
+    }
 
     public static (string? Kind, List<string> Steps) Parse(string? kind, List<string>? steps)
     {
@@ -30,6 +49,10 @@ public static class TaskSupportConfiguration
         kind = kind.Trim().ToLowerInvariant();
         if (!DefaultSteps.TryGetValue(kind, out var defaults))
             throw new ValidationException("Tipo de missao invalido.");
+
+        if (kind == Bathing && steps is { Count: > 0 } &&
+            !steps.SequenceEqual(defaults))
+            throw new ValidationException("O roteiro do banho e fixo para preservar a alternancia do cabelo.");
 
         var cleaned = steps is { Count: > 0 }
             ? steps.Select(s => s?.Trim() ?? "").ToList()

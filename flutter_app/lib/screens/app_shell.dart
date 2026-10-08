@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api.dart';
 import '../brand.dart';
@@ -42,11 +43,23 @@ class _PacusShellState extends State<PacusShell> {
   int chatUnread = 0;
   bool refreshingBadges = false;
   Timer? badgeTimer;
+  Timer? waterReminderTimer;
+  bool waterReminderOpen = false;
+  bool waterReminderChecking = false;
+  static const waterReminderInterval = Duration(hours: 3);
+
+  String get _waterReminderKey =>
+      'pacus.water.reminder.v1:${widget.session.userId}';
 
   @override
   void initState() {
     super.initState();
     _refreshBadges();
+    _checkWaterReminder();
+    waterReminderTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _checkWaterReminder(),
+    );
     badgeTimer = Timer.periodic(
       const Duration(seconds: 10),
       (_) => _refreshBadges(),
@@ -56,7 +69,104 @@ class _PacusShellState extends State<PacusShell> {
   @override
   void dispose() {
     badgeTimer?.cancel();
+    waterReminderTimer?.cancel();
     super.dispose();
+  }
+
+
+  // O aviso nao gera PP. A proxima verificacao persiste por conta no navegador.
+  // Com a pagina fechada, push exigiria service worker e permissao explicita.
+  Future<void> _checkWaterReminder() async {
+    if (!mounted || widget.session.isAdult ||
+        waterReminderOpen || waterReminderChecking) {
+      return;
+    }
+    waterReminderChecking = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now();
+      final last = prefs.getInt(_waterReminderKey);
+      if (last == null || last > now.millisecondsSinceEpoch) {
+        await prefs.setInt(_waterReminderKey, now.millisecondsSinceEpoch);
+        return;
+      }
+      if (now.difference(DateTime.fromMillisecondsSinceEpoch(last)) <
+          waterReminderInterval) {
+        return;
+      }
+      if (!mounted || waterReminderOpen) return;
+
+      waterReminderOpen = true;
+      await prefs.setInt(_waterReminderKey, now.millisecondsSinceEpoch);
+      if (!mounted) return;
+      await _showWaterReminder();
+    } catch (_) {
+      // Falha de preferencias nao bloqueia o aplicativo.
+    } finally {
+      waterReminderChecking = false;
+      waterReminderOpen = false;
+    }
+  }
+
+  Future<void> _showWaterReminder() async {
+    final amount = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.water_drop_outlined),
+            SizedBox(width: 8),
+            Expanded(child: Text('Hora de beber água!')),
+          ],
+        ),
+        content: const Text(
+          'Que tal fazer uma pausa para beber água? '
+          'Se já bebeu, escolha quanto tomou para registrar no PACUS.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Ainda não tomei'),
+          ),
+          PopupMenuButton<int>(
+            tooltip: 'Já tomei água',
+            onSelected: (ml) => Navigator.of(dialogContext).pop(ml),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 150, child: Text('Já tomei 150 mL')),
+              PopupMenuItem(value: 250, child: Text('Já tomei 250 mL')),
+              PopupMenuItem(value: 300, child: Text('Já tomei 300 mL')),
+              PopupMenuItem(value: 500, child: Text('Já tomei 500 mL')),
+            ],
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Text('Já tomei água'),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || amount == null) return;
+
+    try {
+      final eventId =
+          '${widget.session.userId}-reminder-${DateTime.now().microsecondsSinceEpoch}';
+      await widget.api.postMap('/water', {
+        'amountMl': amount,
+        'eventId': eventId,
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$amount mL registrados!')),
+      );
+      _refreshBadges();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível registrar a água. Tente pela tela Hoje.'),
+        ),
+      );
+    }
   }
 
   Future<void> _refreshBadges() async {

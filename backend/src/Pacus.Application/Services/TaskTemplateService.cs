@@ -97,6 +97,7 @@ public class TaskTemplateService : ITaskTemplateService
         var (recurrence, variants, customDays, anchorDate, intervalDays) = ParseRecurrenceAndVariants(request);
         var options = ParseOptions(request.Options);
         var reasons = ParseReasons(request.Reasons, request.Reason);
+        var (supportKind, supportSteps) = TaskSupportConfiguration.Parse(request.SupportKind, request.SupportSteps);
 
         template.Title = request.Title;
         template.Description = request.Description;

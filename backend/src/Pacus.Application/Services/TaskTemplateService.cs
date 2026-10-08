@@ -43,6 +43,7 @@ public class TaskTemplateService : ITaskTemplateService
         var (recurrence, variants, customDays, anchorDate, intervalDays) = ParseRecurrenceAndVariants(request);
         var options = ParseOptions(request.Options);
         var reasons = ParseReasons(request.Reasons, request.Reason);
+        var (supportKind, supportSteps) = TaskSupportConfiguration.Parse(request.SupportKind, request.SupportSteps);
 
         var existing = await _taskTemplateRepository.GetActiveByUserAsync(familyId);
 
@@ -65,6 +66,8 @@ public class TaskTemplateService : ITaskTemplateService
             Options = options,
             Reasons = reasons,
             MinimumGoalLabel = request.MinimumGoalLabel,
+            SupportKind = supportKind,
+            SupportSteps = supportSteps,
             CreatedBy = createdBy,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -113,6 +116,8 @@ public class TaskTemplateService : ITaskTemplateService
         template.Reasons = reasons;
         template.Reason = null;
         template.MinimumGoalLabel = request.MinimumGoalLabel;
+        template.SupportKind = supportKind;
+        template.SupportSteps = supportSteps;
         template.UpdatedAt = DateTime.UtcNow;
 
         await _taskTemplateRepository.UpdateAsync(template);

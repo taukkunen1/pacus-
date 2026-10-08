@@ -581,7 +581,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
             recurrence = "daily",
             supportKind = "reading"
         });
-        Assert.Equal(HttpStatusCode.OK, create.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
 
         var day = await EnsureTodayRoutineAsync(client);
         var task = day.GetProperty("tasks").EnumerateArray()

@@ -677,7 +677,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         title: const Text('Enviar reconhecimento'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(labelText: 'Mensagem opcional'),
+          decoration: const InputDecoration(
+            labelText: 'O que você observou? (opcional)',
+            hintText: 'Ex.: começou sem lembrete, pediu ajuda, tentou de novo',
+          ),
           maxLines: 3,
         ),
         actions: [
@@ -732,7 +735,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 onChanged: (v) => setDialog(() => repetition = v ?? 'today'),
               ),
               const SizedBox(height: 10),
-              TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos')),
+              TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos (1–10; sem desconto)')),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 initialValue: period,
@@ -749,16 +752,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-            FilledButton(onPressed: () => Navigator.pop(context, {
-              'title': title.text.trim(),
-              'description': description.text.trim().isEmpty ? null : description.text.trim(),
-              'permanent': repetition != 'today',
-              'recurrence': repetition == 'interval' ? 'interval' : 'daily',
-              'intervalDays': repetition == 'interval' ? 2 : null,
-              'type': 'mandatory',
-              'period': period,
-              'points': int.tryParse(points.text) ?? 1,
-            }), child: const Text('Adicionar')),
+            FilledButton(onPressed: () {
+              final value = int.tryParse(points.text);
+              if (value == null || value < 1 || value > 10) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Use de 1 a 10 pontos. Tarefas não descontam pontos.')),
+                );
+                return;
+              }
+              Navigator.pop(context, {
+                'title': title.text.trim(),
+                'description': description.text.trim().isEmpty ? null : description.text.trim(),
+                'permanent': repetition != 'today',
+                'recurrence': repetition == 'interval' ? 'interval' : 'daily',
+                'intervalDays': repetition == 'interval' ? 2 : null,
+                'type': 'mandatory',
+                'period': period,
+                'points': value,
+              });
+            }, child: const Text('Adicionar')),
           ],
         ),
       ),
@@ -812,7 +824,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _editDailyTask(DailyTask task) async {
     final title = TextEditingController(text: task.title);
     final description = TextEditingController(text: task.description ?? '');
-    final points = TextEditingController(text: task.points.toString());
+    final points = TextEditingController(text: task.points > 0 ? task.points.toString() : '1');
     String period = task.period;
     final payload = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -850,15 +862,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
             FilledButton(
-              onPressed: () => Navigator.pop(context, {
-                'title': title.text.trim(),
-                'description': description.text.trim().isEmpty ? null : description.text.trim(),
-                'type': 'mandatory',
-                'period': period,
-                'points': int.tryParse(points.text) ?? task.points,
-                'options': task.options,
-                'reason': task.reason,
-              }),
+              onPressed: () {
+                final value = int.tryParse(points.text);
+                if (value == null || value < 1 || value > 10) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Use de 1 a 10 pontos. Tarefas não descontam pontos.')),
+                  );
+                  return;
+                }
+                Navigator.pop(context, {
+                  'title': title.text.trim(),
+                  'description': description.text.trim().isEmpty ? null : description.text.trim(),
+                  'type': 'mandatory',
+                  'period': period,
+                  'points': value,
+                  'options': task.options,
+                  'reason': task.reason,
+                });
+              },
               child: const Text('Salvar'),
             ),
           ],
@@ -1042,7 +1063,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                       ]),
                       const SizedBox(height: 8),
-                      const Text('Registrar como começou vale +1 ponto, seja qual for a resposta.'),
+                      const Text('Registrar como começou ajuda a entender o que funciona. Qualquer resposta está tudo bem e não altera os pontos.'),
                     ] else
                       const Text('Seu início já foi registrado.'),
                     const SizedBox(height: 10),
@@ -1582,7 +1603,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Reconhecimento do dia', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
         const SizedBox(height: 8),
-        const Text('Envie uma reação positiva para aparecer na rotina de hoje.'),
+        const Text('Reconheça uma ação concreta que você observou: começar, pedir ajuda, tentar de novo ou concluir uma etapa.'),
         const SizedBox(height: 10),
         Wrap(spacing: 8, children: [
           FilledButton.tonal(onPressed: () => _setReaction('heart'), child: const Text('❤️')),
@@ -1837,10 +1858,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             spacing: 7,
             runSpacing: 7,
             children: [
-              PacusBadge(
-                label: '${task.points} ${task.points == 1 ? 'ponto' : 'pontos'}',
-                icon: Icons.stars_rounded,
-              ),
+              if (task.points > 0)
+                PacusBadge(
+                  label: '${task.points} ${task.points == 1 ? 'ponto' : 'pontos'}',
+                  icon: Icons.stars_rounded,
+                )
+              else
+                const PacusBadge(
+                  label: 'Sem pontos associados',
+                  icon: Icons.stars_rounded,
+                ),
               if (task.createdByMember)
                 const PacusBadge(
                   label: 'Criado por mim',

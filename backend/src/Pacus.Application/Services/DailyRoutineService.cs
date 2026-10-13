@@ -88,7 +88,10 @@ public class DailyRoutineService : IDailyRoutineService
             }
 
             if (existing.Status == RoutineStatus.Open)
+            {
+                await NormalizeLegacyPenaltiesAsync(existing);
                 await SyncMissingTemplatesAsync(existing, userId);
+            }
 
             routine = existing;
         }
@@ -332,7 +335,7 @@ public class DailyRoutineService : IDailyRoutineService
             .Where(t =>
                 t.Status == TaskItemStatus.Done &&
                 t.DeletedAt is null)
-            .Sum(t => t.Points);
+            .Sum(t => Math.Max(0, t.Points));
 
         await _dailyRoutineRepository.UpdateAsync(routine);
     }
@@ -409,7 +412,7 @@ public class DailyRoutineService : IDailyRoutineService
         routine.Stats = BuildStats(routine.Tasks);
         routine.PointsEarned = routine.Tasks
             .Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null)
-            .Sum(t => t.Points);
+            .Sum(t => Math.Max(0, t.Points));
 
         await SyncGameTimerAsync(routine, userId);
         var actorRoleEnum = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
@@ -1357,6 +1360,58 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
+    // Remove qualquer penalidade legada de tarefas ainda ativas. Se uma tarefa
+    // negativa já havia sido concluída, um ajuste positivo neutraliza o desconto antigo
+    // no ledger; a tarefa é zerada na mesma transação, evitando correção duplicada.
+    private async Task NormalizeLegacyPenaltiesAsync(DailyRoutine routine)
+    {
+        var legacyTasks = routine.Tasks
+            .Where(task => task.DeletedAt is null && task.Points < 0)
+            .ToList();
+
+        foreach (var task in legacyTasks)
+        {
+            var oldPoints = task.Points;
+            var wasDone = task.Status == TaskItemStatus.Done;
+            task.Points = 0;
+            task.UpdatedAt = DateTime.UtcNow;
+            routine.Stats = BuildStats(routine.Tasks);
+            routine.PointsEarned = routine.Tasks
+                .Where(item => item.Status == TaskItemStatus.Done && item.DeletedAt is null)
+                .Sum(item => Math.Max(0, item.Points));
+
+            var now = DateTime.UtcNow;
+            var audit = new TaskEvent
+            {
+                Id = ObjectId.GenerateNewId(),
+                UserId = routine.FamilyId,
+                DailyRoutineId = routine.Id,
+                TaskId = task.Id,
+                TaskTemplateId = TryParseObjectId(task.TaskTemplateId),
+                EventType = TaskEventType.PointsAdjusted,
+                Payload = new BsonDocument
+                {
+                    { "previousPoints", oldPoints },
+                    { "newPoints", 0 },
+                    { "reason", "legacy behavioral penalty removed" },
+                },
+                ActorId = routine.FamilyId,
+                ActorRole = UserRole.Adult,
+                CreatedAt = now,
+            };
+
+            await CommitTaskLedgerAsync(
+                routine,
+                audit,
+                wasDone
+                    ? new TaskLedgerDelta(
+                        PointTransactionType.Adjustment,
+                        -oldPoints,
+                        $"Correção automática: penalidade antiga removida de '{task.Title}'")
+                    : null);
+        }
+    }
+
     private static void ClearGameTimerSession(DailyRoutine routine)
     {
         routine.GameTimerSessionMinutes = null;
@@ -1425,7 +1480,7 @@ public class DailyRoutineService : IDailyRoutineService
 
         if (template.Recurrence.Equals(TaskTemplate.RecurrenceWeekday, StringComparison.OrdinalIgnoreCase))
         {
-            return isWeekend ? null : new ResolvedTemplateContent(template.Title, template.Description, template.Points);
+            return isWeekend ? null : new ResolvedTemplateContent(template.Title, template.Description, Math.Max(0, template.Points));
         }
 
         if (template.Recurrence.Equals(TaskTemplate.RecurrenceWeekend, StringComparison.OrdinalIgnoreCase))
@@ -1438,7 +1493,7 @@ public class DailyRoutineService : IDailyRoutineService
             var variant = template.Variants.FirstOrDefault(v => v.DayOfWeek == dayOfWeek);
             return variant is null
                 ? null
-                : new ResolvedTemplateContent(variant.Title, variant.Description, variant.Points ?? template.Points);
+                : new ResolvedTemplateContent(variant.Title, variant.Description, Math.Max(0, variant.Points ?? template.Points));
         }
 
         if (template.Recurrence.Equals(TaskTemplate.RecurrenceCustom, StringComparison.OrdinalIgnoreCase))

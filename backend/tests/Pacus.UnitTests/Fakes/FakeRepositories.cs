@@ -676,7 +676,9 @@ public class FakeStoreRepository
         ObjectId familyId, DateTime sinceUtc) =>
         Task.FromResult(
             _redemptions
-                .Where(r => r.FamilyId == familyId && r.RequestedAt >= sinceUtc)
+                .Where(r => r.FamilyId == familyId
+                    && (r.RequestedAt >= sinceUtc
+                        || (r.ReviewedAt.HasValue && r.ReviewedAt.Value >= sinceUtc)))
                 .ToList());
 
     public Task<List<Redemption>> GetPendingRedemptionsByFamilyAsync(

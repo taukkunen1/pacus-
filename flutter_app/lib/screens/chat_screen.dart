@@ -398,7 +398,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Precisa de apoio? Pedir ajuda nao tira pontos.',
+                      'Precisa de apoio? Pedir ajuda não tira pontos.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 8),

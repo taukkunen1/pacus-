@@ -164,7 +164,8 @@ public class StoreService : IStoreService
     }
 
     // Soma recompensas pendentes e aprovadas de todos os itens de tela no dia operacional.
-    private async Task EnsureDailyScreenTimeLimitNotReachedAsync(ObjectId familyId, int requestedMinutes)
+    private async Task EnsureDailyScreenTimeLimitNotReachedAsync(
+        ObjectId familyId, int requestedMinutes, ObjectId? excludeRedemptionId = null)
     {
         var timezone = await _familyTimezoneService.GetTimezoneAsync(familyId);
         var today = TimezoneHelper.GetOperationalDate(timezone);
@@ -174,8 +175,13 @@ public class StoreService : IStoreService
 
         foreach (var redemption in recent)
         {
-            if (redemption.Status == RedemptionStatus.Rejected
-                || TimezoneHelper.GetOperationalDate(timezone, redemption.RequestedAt) != today)
+            if (redemption.Id == excludeRedemptionId || redemption.Status == RedemptionStatus.Rejected)
+                continue;
+
+            var relevantAt = redemption.Status == RedemptionStatus.Approved
+                ? redemption.ReviewedAt ?? redemption.RequestedAt
+                : redemption.RequestedAt;
+            if (TimezoneHelper.GetOperationalDate(timezone, relevantAt) != today)
                 continue;
 
             var minutes = redemption.ScreenTimeMinutes;
@@ -210,6 +216,11 @@ public class StoreService : IStoreService
         }
 
         var timezone = await _familyTimezoneService.GetTimezoneAsync(familyId);
+        if (grantedScreenTimeMinutes is int minutesToGrant)
+        {
+            await EnsureDailyScreenTimeLimitNotReachedAsync(
+                familyId, minutesToGrant, redemption.Id);
+        }
 
         // Se o item concede tempo de tela, garante que a rotina de hoje existe ANTES de
         // debitar qualquer ponto — AdjustGameTimerAsync exige uma rotina em aberto e nao a

@@ -232,7 +232,11 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(approve ? 'Pedido aprovado.' : 'Pedido recusado.'),
+            content: Text(
+              chatRequestNeedsSupport(message['requestType']?.toString())
+                  ? 'Pedido recebido. Converse pelo chat para oferecer apoio.'
+                  : (approve ? 'Pedido aprovado.' : 'Pedido recusado.'),
+            ),
           ),
         );
       }
@@ -389,44 +393,61 @@ class _ChatScreenState extends State<ChatScreen> {
             if (!widget.session.isAdult)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    ActionChip(
-                      avatar: const Icon(Icons.help_outline, size: 18),
-                      label: const Text('Preciso de ajuda'),
-                      onPressed: _sending
-                          ? null
-                          : () => _sendQuickRequest('help'),
+                    Text(
+                      'Precisa de apoio? Pedir ajuda nao tira pontos.',
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
-                    ActionChip(
-                      avatar: const Icon(Icons.swap_horiz, size: 18),
-                      label: const Text('Mudar tarefa'),
-                      onPressed: _sending
-                          ? null
-                          : () => _sendQuickRequest('change_task'),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton.tonalIcon(
+                          onPressed: _sending
+                              ? null
+                              : () => _sendQuickRequest('help'),
+                          icon: const Icon(Icons.volunteer_activism_outlined),
+                          label: const Text('Preciso de ajuda'),
+                        ),
+                        ActionChip(
+                          avatar: const Icon(Icons.swap_horiz, size: 18),
+                          label: const Text('Conversar sobre uma tarefa'),
+                          onPressed: _sending
+                              ? null
+                              : () => _sendQuickRequest('change_task'),
+                        ),
+                      ],
                     ),
-                    ActionChip(
-                      avatar: const Icon(Icons.timer_outlined, size: 18),
-                      label: const Text('+10 min'),
-                      onPressed: _sending
-                          ? null
-                          : () => _sendQuickRequest(
-                                'extra_time',
-                                minutes: 10,
-                              ),
-                    ),
-                    ActionChip(
-                      avatar: const Icon(Icons.timer_outlined, size: 18),
-                      label: const Text('+20 min'),
-                      onPressed: _sending
-                          ? null
-                          : () => _sendQuickRequest(
-                                'extra_time',
-                                minutes: 20,
-                              ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ActionChip(
+                          avatar: const Icon(Icons.timer_outlined, size: 18),
+                          label: const Text('Pedir +10 min de tela'),
+                          onPressed: _sending
+                              ? null
+                              : () => _sendQuickRequest(
+                                    'extra_time',
+                                    minutes: 10,
+                                  ),
+                        ),
+                        ActionChip(
+                          avatar: const Icon(Icons.timer_outlined, size: 18),
+                          label: const Text('Pedir +20 min de tela'),
+                          onPressed: _sending
+                              ? null
+                              : () => _sendQuickRequest(
+                                    'extra_time',
+                                    minutes: 20,
+                                  ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -599,7 +620,7 @@ class _RequestBubble extends StatelessWidget {
                     ),
                     Chip(
                       visualDensity: VisualDensity.compact,
-                      label: Text(chatRequestStatusLabel(status)),
+                      label: Text(chatRequestStatusLabel(status, type: type)),
                     ),
                   ],
                 ),
@@ -612,17 +633,19 @@ class _RequestBubble extends StatelessWidget {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: onReject,
-                          child: const Text('Recusar'),
+                      if (!chatRequestNeedsSupport(type)) ...[
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: onReject,
+                            child: const Text('Recusar'),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
+                        const SizedBox(width: 8),
+                      ],
                       Expanded(
                         child: FilledButton(
                           onPressed: onApprove,
-                          child: const Text('Aprovar'),
+                          child: Text(chatRequestApproveLabel(type)),
                         ),
                       ),
                     ],

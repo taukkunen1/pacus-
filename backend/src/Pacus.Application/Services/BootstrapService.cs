@@ -115,23 +115,21 @@ public class BootstrapService : IBootstrapService
 
         await _pacusRepository.CreateAsync(pacus);
 
-        // Item padrao da loja de Pacus Points para toda familia nova -- pedido do dono do
-        // produto: "1 hora de tela = 100 pontos", 1 resgate por dia, credita 60min no game
-        // timer do dia ao ser aprovado (StoreService.ApproveRedemptionAsync). O adulto pode
-        // editar/desativar depois pela tela de loja como qualquer outro item.
+        // Recompensa de tela opcional para famílias que decidirem usá-la. Começa com
+        // 30 minutos, um resgate por dia; o backend limita o total adicional a 60 min/dia.
         var screenTimeItem = new StoreItem
         {
             Id = ObjectId.GenerateNewId(),
             FamilyId = familyId,
-            Title = "1 hora de tela",
-            Description = "Resgata até 1 hora extra de tempo de tela para hoje. Recompensa opcional, combinada em família.",
+            Title = "30 minutos de tela",
+            Description = "Resgata 30 minutos extras de tempo de tela para hoje. Recompensa opcional, combinada em família.",
             Cost = 100,
             Category = "screen_time",
             Icon = "🎮",
             Active = true,
             Stock = null,
             DailyLimit = 1,
-            ScreenTimeMinutes = 60,
+            ScreenTimeMinutes = 30,
             CreatedBy = adult.Id,
             CreatedAt = now,
             UpdatedAt = now,

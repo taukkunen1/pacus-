@@ -30,8 +30,7 @@ public static class TaskValidation
                 $"A descricao da tarefa deve ter no maximo {MaxDescriptionLength} caracteres.");
     }
 
-    // Mensagem mantida identica a regra historica (DailyRoutineService.ValidatePoints)
-    // -- ver DailyTasksHttpIntegrationTests, que confere este texto literalmente.
+    // Regra não punitiva compartilhada por tarefas permanentes e diárias.
     public static void ValidatePoints(int points)
     {
         if (points < 1 || points > 10)

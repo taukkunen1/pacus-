@@ -287,28 +287,70 @@ public class TaskSupportV4Tests
 
         await routines.SetTaskInitiativeAsync(family, taskId, TaskInitiativeLevel.PromptedByAdult, family, "adult");
         await routines.SetTaskInitiativeAsync(family, taskId, TaskInitiativeLevel.SelfStarted, family, "child");
-        Assert.Equal(1, points.Transactions.Sum(p => p.Points));
+        Assert.Empty(points.Transactions);
 
         await routines.ToggleTaskAsync(family, taskId, true, family, "child");
-        Assert.Equal(2, points.Transactions.Sum(p => p.Points));
+        Assert.Equal(1, points.Transactions.Sum(p => p.Points));
     }
 
     [Fact]
-    public async Task Acao_EmTarefaNaoHabilitada_OuIndiceInvalido_Rejeitada()
+    public async Task PenalidadeLegadaEmTarefaAtivaEAnuladaSemDeixarSaldoNegativo()
     {
-        var (templates, routines, _) = BuildSystem();
+        var templateRepo = new FakeTaskTemplateRepository();
+        var routineRepo = new FakeDailyRoutineRepository();
+        var pointRepo = new FakePointTransactionRepository();
+        var templates = new TaskTemplateService(templateRepo, new FakeAuditLogRepository());
+        var pointsService = new PointsService(pointRepo);
+        var routines = new DailyRoutineService(
+            routineRepo, templateRepo, new FakeTaskEventRepository(),
+            pointsService, new FakeSettingsRepository());
+        var family = ObjectId.GenerateNewId();
+
+        await templates.CreateAsync(family, family,
+            new CreateTaskRequest("Tarefa antiga", null, "mandatory", "morning", 1));
+        var routine = await routines.GetOrCreateTodayAsync(family, "America/Sao_Paulo");
+        var task = Assert.Single(routine.Tasks);
+        task.Points = -2;
+        task.Status = Pacus.Domain.Enums.TaskItemStatus.Done;
+        await routineRepo.UpdateAsync(routine);
+        await pointsService.RecordAsync(
+            family, routine.Id, routine.Date, task.Id, task.Title,
+            PointTransactionType.Award, -2, family, UserRole.Adult, "Penalidade legada");
+
+        Assert.Equal(-2, await pointsService.GetBalanceAsync(family));
+
+        var normalized = await routines.GetOrCreateTodayAsync(family, "America/Sao_Paulo");
+        Assert.Equal(0, Assert.Single(normalized.Tasks).Points);
+        Assert.Equal(0, normalized.PointsEarned);
+        Assert.Equal(0, await pointsService.GetBalanceAsync(family));
+        Assert.Equal(0, pointRepo.Transactions.Sum(transaction => transaction.Points));
+    }
+
+    [Fact]
+    public async Task TarefaComumRecebeEtapasEAdiamentoSemDescontarPontos()
+    {
+        var (templates, routines, points) = BuildSystem();
         var family = ObjectId.GenerateNewId();
         await templates.CreateAsync(family, family,
-            new CreateTaskRequest("Comum", null, "mandatory", "morning", 1));
-        await templates.CreateAsync(family, family,
-            new CreateTaskRequest("Caligrafia", null, "mandatory", "evening", 1, SupportKind: "handwriting"));
+            new CreateTaskRequest("Arrumar a mochila", null, "mandatory", "morning", 2));
 
         var day = await routines.CreateRoutineForDateAsync(family, "2026-10-08", "America/Sao_Paulo");
-        var regular = day.Tasks.Single(t => t.Title == "Comum");
-        var study = day.Tasks.Single(t => t.Title == "Caligrafia");
+        var regular = Assert.Single(day.Tasks);
+
+        var started = await routines.RecordSupportActionAsync(
+            family, regular.Id, new("start"), family, "child");
+        Assert.Equal("general", started.Tasks.Single().SupportKind);
+        Assert.Equal(4, started.Tasks.Single().SupportSteps.Count);
+
+        await routines.RecordSupportActionAsync(family, regular.Id, new("step", 0), family, "child");
+        var postponed = await routines.RecordSupportActionAsync(
+            family, regular.Id, new("postpone"), family, "child");
+        Assert.Contains(0, postponed.Tasks.Single().CompletedSupportSteps);
+        Assert.NotNull(postponed.Tasks.Single().SupportPostponedUntil);
+        Assert.Equal(2, postponed.Tasks.Single().Points);
+        Assert.Empty(points.Transactions);
+
         await Assert.ThrowsAsync<ValidationException>(() =>
-            routines.RecordSupportActionAsync(family, regular.Id, new("start"), family, "child"));
-        await Assert.ThrowsAsync<ValidationException>(() =>
-            routines.RecordSupportActionAsync(family, study.Id, new("step", 99), family, "child"));
+            routines.RecordSupportActionAsync(family, regular.Id, new("step", 99), family, "child"));
     }
 }

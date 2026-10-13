@@ -5,9 +5,8 @@ namespace Pacus.Domain.Enums;
 // na hora de iniciar/concluir -- ver docs/ESTADO_ATUAL.md), ja que o app hoje nao
 // tem nenhuma notificacao push que permitiria inferir isso automaticamente.
 //
-// Usado tanto para o bonus de pontos (DailyRoutineService.InitiativeBonusPoints)
-// quanto para o relatorio semanal de autonomia (IAutonomyService) -- o principio
-// central e valorizar "percebi sozinho e comecei", nao so "terminei".
+// Usado somente para o relatorio semanal de autonomia (IAutonomyService).
+// O autorrelato nao altera pontos, para nao incentivar respostas estrategicas.
 public enum TaskInitiativeLevel
 {
     // A crianca percebeu que precisava fazer e comecou por conta propria.

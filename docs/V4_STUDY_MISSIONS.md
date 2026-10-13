@@ -2,26 +2,23 @@
 
 ## Escopo
 
-Recurso **opt-in por tarefa permanente** para as três atividades escolhidas pelo adulto:
-leitura do livro (`reading`), lição de casa (`homework`) e caderno de caligrafia
-(`handwriting`). Não há detecção automática por título; o adulto seleciona
-explicitamente cada modelo de tarefa em Configurações > Tarefas permanentes.
+O PACUS oferece etapas, ajuda e adiamento para qualquer tarefa diária. Tarefas
+comuns recebem um roteiro geral na primeira interação; quando o adulto configura
+um tipo específico (por exemplo, leitura, lição de casa, caligrafia, banho ou lousa
+do humor), o app usa esse roteiro. Não há detecção automática por título.
 
-As demais tarefas mantêm o comportamento anterior, inclusive pontuação,
-recorrência, horários e histórico.
+As ações de autorregulação não alteram a pontuação, recorrência, horários ou histórico.
 
 ## Regras
 
-- A configuração `supportKind` do template é `null` por padrão (desativada).
+- A configuração `supportKind` do template é `null` por padrão; a primeira interação de apoio em uma tarefa comum cria um roteiro geral apenas para aquela ocorrência.
 - `supportSteps` possui 2–6 rótulos, de 1–140 caracteres; vazio usa o roteiro padrão do perfil.
 - No novo dia, a configuração é copiada para a `DailyTask`. Dia fechado não é reprocessado.
 - `completedSupportSteps`, `supportStartedAt`, `supportPostponedUntil`,
   `supportPostponeCount` e `supportHelpCount` pertencem apenas à ocorrência diária.
 - Pausar, pedir ajuda, avançar ou desfazer etapas **não concede nem desconta pontos**.
 - A conclusão continua pelo endpoint existente; não exige marcar todas as etapas.
-- O primeiro registro de iniciativa de cada tarefa diária concede **+1 PP**,
-  para todos os níveis: `selfStarted`, `promptedByPacus`, `promptedByAdult`.
-  Alterações subsequentes não geram novo bônus; registros anteriores não são alterados.
+- Registrar como a tarefa começou serve apenas para compreender qual apoio funcionou; não concede nem desconta pontos.
 - Botão "Não quero fazer agora" oferece adiar 10 minutos, pedir ajuda ou começar.
   Adiar não remove a tarefa nem bloqueia sua retomada antecipada.
 - O seletor visual de missões muda apenas a sequência de abertura; não reordena
@@ -41,7 +38,7 @@ Exemplos de payload:
 - `{"action":"resume"}`
 
 O endpoint exige autenticação, verifica a família autenticada via
-`GetLatestOpenAsync`, rejeita tarefas excluídas, concluídas ou sem opt-in,
+`GetLatestOpenAsync`, rejeita tarefas excluídas ou concluídas,
 e valida índices de etapa no servidor. Todas as ações emitem um
 `TaskEventType.SupportAction`, sem chamar `PointsService`.
 
@@ -65,8 +62,7 @@ em uma única operação lógica:
   as tarefas futuras na rotina planejada.
 
 Os fluxos protegidos incluem conclusão, reabertura, ajuste de pontos,
-edição de tarefa concluída, exclusão, bônus único de iniciativa (+1 PP)
-e ações V4 de suporte. Falha em qualquer escrita aborta a transação.
+edição de tarefa concluída, exclusão e ações V4 de suporte. Falha em qualquer escrita aborta a transação.
 
 A API constrói `DailyRoutineService` com `ITaskLedgerCommitter`
 obrigatório; não existe fallback não transacional na DI de produção.
@@ -85,7 +81,7 @@ para cada `PacusApiFactory`, um database aleatório `pacus_api_test_*`.
 Ela cria conta de adulto e membro fictícios, obtém tokens JWT e testa
 os endpoints HTTP, inclusive as transações reais. Casos incluídos:
 
-1. Missão de leitura com etapas, ajuda, adiamento, iniciativa +1
+1. Missão de leitura com etapas, ajuda, adiamento, autorrelato sem pontos
    e conclusão, com verificação de ledger e auditoria.
 2. Duas conclusões simultâneas; apenas um prêmio é lançado.
 3. Validador Mongo temporário que rejeita `task_events`; tanto

@@ -35,8 +35,8 @@ public class StoreService : IStoreService
         if (request.DailyLimit is not null && request.DailyLimit <= 0)
             throw new ValidationException("O limite diario, quando informado, deve ser maior que zero.");
 
-        if (request.ScreenTimeMinutes is not null && request.ScreenTimeMinutes <= 0)
-            throw new ValidationException("Os minutos de tempo de tela, quando informados, devem ser maiores que zero.");
+        if (request.ScreenTimeMinutes is int screenMinutes && (screenMinutes < 1 || screenMinutes > 60))
+            throw new ValidationException("A recompensa de tempo de tela deve ser de 1 a 60 minutos por item.");
 
         var item = new StoreItem
         {
@@ -68,8 +68,8 @@ public class StoreService : IStoreService
         if (request.DailyLimit is not null && request.DailyLimit <= 0)
             throw new ValidationException("O limite diario, quando informado, deve ser maior que zero.");
 
-        if (request.ScreenTimeMinutes is not null && request.ScreenTimeMinutes <= 0)
-            throw new ValidationException("Os minutos de tempo de tela, quando informados, devem ser maiores que zero.");
+        if (request.ScreenTimeMinutes is int screenMinutes && (screenMinutes < 1 || screenMinutes > 60))
+            throw new ValidationException("A recompensa de tempo de tela deve ser de 1 a 60 minutos por item.");
 
         item.Title = request.Title;
         item.Description = request.Description;
@@ -120,6 +120,13 @@ public class StoreService : IStoreService
         if (item.DailyLimit is not null)
             await EnsureDailyLimitNotReachedAsync(familyId, item);
 
+        if (item.ScreenTimeMinutes is int screenMinutes)
+        {
+            if (screenMinutes < 1 || screenMinutes > 60)
+                throw new ValidationException("A recompensa de tempo de tela deve ser de 1 a 60 minutos por item.");
+            await EnsureDailyScreenTimeLimitNotReachedAsync(familyId, screenMinutes);
+        }
+
         var redemption = new Redemption
         {
             Id = ObjectId.GenerateNewId(),
@@ -127,6 +134,7 @@ public class StoreService : IStoreService
             StoreItemId = item.Id,
             ItemTitle = item.Title,
             Cost = item.Cost,
+            ScreenTimeMinutes = item.ScreenTimeMinutes,
             Status = RedemptionStatus.Pending,
             RequestedBy = childId,
             RequestedAt = DateTime.UtcNow,
@@ -155,6 +163,44 @@ public class StoreService : IStoreService
                 $"Limite diario deste item ja atingido ({item.DailyLimit}x por dia). Tente novamente amanha.");
     }
 
+    // Soma recompensas pendentes e aprovadas de todos os itens de tela no dia operacional.
+    private async Task EnsureDailyScreenTimeLimitNotReachedAsync(
+        ObjectId familyId, int requestedMinutes, ObjectId? excludeRedemptionId = null,
+        bool includePending = true)
+    {
+        var timezone = await _familyTimezoneService.GetTimezoneAsync(familyId);
+        var today = TimezoneHelper.GetOperationalDate(timezone);
+        var recent = await _storeRepository.GetRedemptionsSinceAsync(
+            familyId, DateTime.UtcNow.AddDays(-2));
+        var usedToday = 0;
+
+        foreach (var redemption in recent)
+        {
+            if ((excludeRedemptionId.HasValue && redemption.Id == excludeRedemptionId.Value)
+                || redemption.Status == RedemptionStatus.Rejected
+                || (!includePending && redemption.Status != RedemptionStatus.Approved))
+                continue;
+
+            var relevantAt = redemption.Status == RedemptionStatus.Approved
+                ? redemption.ReviewedAt ?? redemption.RequestedAt
+                : redemption.RequestedAt;
+            if (TimezoneHelper.GetOperationalDate(timezone, relevantAt) != today)
+                continue;
+
+            var minutes = redemption.ScreenTimeMinutes;
+            if (minutes is null)
+            {
+                var oldItem = await _storeRepository.GetItemByIdAsync(redemption.StoreItemId);
+                minutes = oldItem?.ScreenTimeMinutes;
+            }
+            usedToday += minutes ?? 0;
+        }
+
+        if (usedToday + requestedMinutes > 60)
+            throw new ValidationException(
+                "O limite de tempo de tela extra é de 60 minutos por dia.");
+    }
+
     public async Task<Redemption> ApproveRedemptionAsync(ObjectId familyId, string redemptionId, ObjectId reviewedBy)
     {
         var redemption = await GetOwnedPendingRedemptionAsync(familyId, redemptionId);
@@ -164,13 +210,26 @@ public class StoreService : IStoreService
             throw new ValidationException("Saldo de Pacus Points insuficiente para aprovar este resgate.");
 
         var item = await _storeRepository.GetItemByIdAsync(redemption.StoreItemId);
+        var grantedScreenTimeMinutes = redemption.ScreenTimeMinutes ?? item?.ScreenTimeMinutes;
+        if (grantedScreenTimeMinutes is int configuredMinutes
+            && (configuredMinutes < 1 || configuredMinutes > 60))
+        {
+            throw new ValidationException(
+                "Este item antigo ultrapassa o limite de 60 minutos por resgate. Edite o item antes de aprovar.");
+        }
+
         var timezone = await _familyTimezoneService.GetTimezoneAsync(familyId);
+        if (grantedScreenTimeMinutes is int minutesToGrant)
+        {
+            await EnsureDailyScreenTimeLimitNotReachedAsync(
+                familyId, minutesToGrant, redemption.Id, includePending: false);
+        }
 
         // Se o item concede tempo de tela, garante que a rotina de hoje existe ANTES de
         // debitar qualquer ponto — AdjustGameTimerAsync exige uma rotina em aberto e nao a
         // cria sozinho. Fazer isso primeiro evita o cenario de aprovar o resgate (debitar
         // pontos, marcar Approved) e so depois descobrir que o timer nao pode ser ajustado.
-        if (item?.ScreenTimeMinutes is int minutes)
+        if (grantedScreenTimeMinutes is not null)
         {
             await _dailyRoutineService.GetOrCreateTodayAsync(familyId, timezone);
         }
@@ -198,7 +257,7 @@ public class StoreService : IStoreService
         // Concede o tempo de tela comprado -- soma direto no game timer do dia (mesmo
         // mecanismo dos botoes +5/-5 min do adulto). actorRole "adult" porque aprovar
         // resgate ja e uma acao restrita a adulto (RequireRole no controller).
-        if (item?.ScreenTimeMinutes is int screenTimeMinutes)
+        if (grantedScreenTimeMinutes is int screenTimeMinutes)
         {
             await _dailyRoutineService.AdjustGameTimerAsync(familyId, screenTimeMinutes, reviewedBy, "adult");
         }
@@ -215,7 +274,7 @@ public class StoreService : IStoreService
         // Log de auditoria (checklist de seguranca, item A5) — aprovar resgate e uma
         // acao administrativa sensivel (debita pontos da familia), registrada separada
         // do dado em si.
-        var screenTimeNote = item?.ScreenTimeMinutes is int grantedMinutes
+        var screenTimeNote = grantedScreenTimeMinutes is int grantedMinutes
             ? $", +{grantedMinutes}min de tempo de tela"
             : string.Empty;
 

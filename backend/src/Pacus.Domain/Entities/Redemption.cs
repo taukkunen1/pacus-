@@ -15,6 +15,8 @@ public class Redemption
     public ObjectId StoreItemId { get; set; }
     public string ItemTitle { get; set; } = string.Empty;
     public int Cost { get; set; }
+    // Snapshot da recompensa no momento do pedido; editar o item depois não altera o resgate.
+    public int? ScreenTimeMinutes { get; set; }
     public RedemptionStatus Status { get; set; } = RedemptionStatus.Pending;
     public ObjectId RequestedBy { get; set; }
     public ObjectId? ReviewedBy { get; set; }

@@ -15,11 +15,16 @@ namespace Pacus.Api.Controllers;
 public class SettingsController : ControllerBase
 {
     private readonly ISettingsRepository _settingsRepository;
+    private readonly IUserRepository _userRepository;
     private readonly ICurrentUserService _currentUser;
 
-    public SettingsController(ISettingsRepository settingsRepository, ICurrentUserService currentUser)
+    public SettingsController(
+        ISettingsRepository settingsRepository,
+        IUserRepository userRepository,
+        ICurrentUserService currentUser)
     {
         _settingsRepository = settingsRepository;
+        _userRepository = userRepository;
         _currentUser = currentUser;
     }
 
@@ -172,10 +177,31 @@ public class SettingsController : ControllerBase
     public async Task<IActionResult> GetWater()
     {
         var settings = await _settingsRepository.GetByUserIdAsync(_currentUser.FamilyId);
+        var familyMembers = await _userRepository.GetByFamilyAsync(_currentUser.FamilyId);
+        var visibleProfiles = _currentUser.Role == UserRole.Adult
+            ? familyMembers
+            : familyMembers.Where(member => member.Id == _currentUser.UserId).ToList();
+
+        var profiles = visibleProfiles.Select(member =>
+        {
+            var profile = settings?.GetWaterProfile(member.Id) ?? new WaterProfileSettings();
+            return new
+            {
+                profileId = member.Id.ToString(),
+                name = member.Name,
+                role = member.Role.ToString().ToLowerInvariant(),
+                goalMl = profile.GoalMl,
+                rewardPoints = profile.RewardPoints,
+            };
+        }).ToList();
+
+        var current = settings?.GetWaterProfile(_currentUser.UserId) ?? new WaterProfileSettings();
         return Ok(new
         {
-            goalMl = settings?.WaterGoalMl ?? 2000,
-            rewardPoints = settings?.WaterRewardPoints ?? 5
+            profileId = _currentUser.UserId.ToString(),
+            goalMl = current.GoalMl,
+            rewardPoints = current.RewardPoints,
+            profiles,
         });
     }
 
@@ -183,10 +209,21 @@ public class SettingsController : ControllerBase
     [HttpPut("water")]
     public async Task<IActionResult> UpdateWater([FromBody] UpdateWaterGoalRequest request)
     {
-        if (request.GoalMl < 250 || request.GoalMl > 10000)
-            return BadRequest(new { error = "A meta deve estar entre 250 e 10000 mL." });
-        if (request.RewardPoints < 0 || request.RewardPoints > 100)
-            return BadRequest(new { error = "A recompensa deve estar entre 0 e 100 PP." });
+        if (request.GoalMl < 500 || request.GoalMl > 4000)
+            return BadRequest(new { error = "A meta configurada deve estar entre 500 e 4000 mL." });
+        if (request.RewardPoints < 0 || request.RewardPoints > 5)
+            return BadRequest(new { error = "A recompensa de hidratação deve estar entre 0 e 5 PP." });
+
+        var targetProfileId = _currentUser.UserId;
+        if (!string.IsNullOrWhiteSpace(request.ProfileId))
+        {
+            if (!ObjectId.TryParse(request.ProfileId, out targetProfileId))
+                return BadRequest(new { error = "Perfil de hidratação inválido." });
+        }
+
+        var familyMembers = await _userRepository.GetByFamilyAsync(_currentUser.FamilyId);
+        if (!familyMembers.Any(member => member.Id == targetProfileId))
+            return NotFound(new { error = "Perfil não encontrado nesta família." });
 
         var settings = await _settingsRepository.GetByUserIdAsync(_currentUser.FamilyId)
             ?? new Settings
@@ -195,15 +232,19 @@ public class SettingsController : ControllerBase
                 FamilyId = _currentUser.FamilyId,
                 CreatedAt = DateTime.UtcNow,
             };
-        settings.WaterGoalMl = request.GoalMl;
-        settings.WaterRewardPoints = request.RewardPoints;
+
+        settings.WaterProfiles[targetProfileId.ToString()] = new WaterProfileSettings
+        {
+            GoalMl = request.GoalMl,
+            RewardPoints = request.RewardPoints,
+        };
         settings.UpdatedAt = DateTime.UtcNow;
         await _settingsRepository.UpsertAsync(settings);
         return Ok(new
         {
-            goalMl = settings.WaterGoalMl,
-            rewardPoints = settings.WaterRewardPoints
+            profileId = targetProfileId.ToString(),
+            goalMl = request.GoalMl,
+            rewardPoints = request.RewardPoints,
         });
     }
-
 }

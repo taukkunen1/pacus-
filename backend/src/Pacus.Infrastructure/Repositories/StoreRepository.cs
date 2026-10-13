@@ -49,6 +49,12 @@ public class StoreRepository : IStoreRepository
                 r.RequestedAt >= sinceUtc)
             .ToListAsync();
 
+    public Task<List<Redemption>> GetRedemptionsSinceAsync(ObjectId familyId, DateTime sinceUtc) =>
+        _context.Redemptions.Find(r => r.FamilyId == familyId
+            && (r.RequestedAt >= sinceUtc
+                || (r.ReviewedAt.HasValue && r.ReviewedAt.Value >= sinceUtc)))
+            .ToListAsync();
+
     public Task<List<Redemption>> GetPendingRedemptionsByFamilyAsync(ObjectId familyId) =>
         _context.Redemptions.Find(r =>
                 r.FamilyId == familyId &&

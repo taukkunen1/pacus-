@@ -88,7 +88,10 @@ public class DailyRoutineService : IDailyRoutineService
             }
 
             if (existing.Status == RoutineStatus.Open)
+            {
+                await NormalizeLegacyPenaltiesAsync(existing);
                 await SyncMissingTemplatesAsync(existing, userId);
+            }
 
             routine = existing;
         }
@@ -107,7 +110,10 @@ public class DailyRoutineService : IDailyRoutineService
             return await CreateRoutineForDateAsync(userId, tomorrow, timezone, RoutineStatus.Planned);
 
         if (existing.Status == RoutineStatus.Planned)
+        {
+            await NormalizeLegacyPenaltiesAsync(existing);
             await SyncMissingTemplatesAsync(existing, userId);
+        }
 
         return existing;
     }
@@ -332,7 +338,7 @@ public class DailyRoutineService : IDailyRoutineService
             .Where(t =>
                 t.Status == TaskItemStatus.Done &&
                 t.DeletedAt is null)
-            .Sum(t => t.Points);
+            .Sum(t => Math.Max(0, t.Points));
 
         await _dailyRoutineRepository.UpdateAsync(routine);
     }
@@ -394,6 +400,7 @@ public class DailyRoutineService : IDailyRoutineService
     {
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
             ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
+        await NormalizeLegacyPenaltiesAsync(routine);
 
         var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
             ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
@@ -409,7 +416,7 @@ public class DailyRoutineService : IDailyRoutineService
         routine.Stats = BuildStats(routine.Tasks);
         routine.PointsEarned = routine.Tasks
             .Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null)
-            .Sum(t => t.Points);
+            .Sum(t => Math.Max(0, t.Points));
 
         await SyncGameTimerAsync(routine, userId);
         var actorRoleEnum = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
@@ -637,7 +644,7 @@ public class DailyRoutineService : IDailyRoutineService
         routine.Stats = BuildStats(routine.Tasks);
         routine.PointsEarned = routine.Tasks
             .Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null)
-            .Sum(t => t.Points);
+            .Sum(t => Math.Max(0, t.Points));
 
         await SyncGameTimerAsync(routine, userId);
         var actorRoleEnum = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
@@ -702,7 +709,7 @@ public class DailyRoutineService : IDailyRoutineService
             task.SelectedOption = null;
         task.UpdatedAt = DateTime.UtcNow;
         routine.Stats = BuildStats(routine.Tasks);
-        routine.PointsEarned = routine.Tasks.Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null).Sum(t => t.Points);
+        routine.PointsEarned = routine.Tasks.Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null).Sum(t => Math.Max(0, t.Points));
         await SyncGameTimerAsync(routine, userId);
         var role = ParseRole(actorRole);
         var audit = new TaskEvent
@@ -759,7 +766,7 @@ public class DailyRoutineService : IDailyRoutineService
         task.DeletedAt = DateTime.UtcNow;
         task.UpdatedAt = DateTime.UtcNow;
         routine.Stats = BuildStats(routine.Tasks);
-        routine.PointsEarned = routine.Tasks.Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null).Sum(t => t.Points);
+        routine.PointsEarned = routine.Tasks.Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null).Sum(t => Math.Max(0, t.Points));
         await SyncGameTimerAsync(routine, userId);
         var role = ParseRole(actorRole);
         var audit = new TaskEvent
@@ -1066,10 +1073,6 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
-    // V4: toda primeira declaracao de iniciativa concede exatamente +1 ponto,
-    // independentemente de quem lembrou o membro. Niveis servem para relatorio.
-    public const int InitiativeBonusPoints = 1;
-
     // A crianca monta o "combinado" da tarde/noite -- ver docs/ESTADO_ATUAL.md, item 1.
     // Substitui qualquer plano anterior do mesmo dia (nao acumula); items vazio limpa o
     // plano. Sem RequireRole aqui de proposito, igual ReorderTasksAsync -- e autonomia
@@ -1208,8 +1211,8 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
-    // Missoes de estudo V4: progresso independente da conclusao e do ledger de pontos.
-    // Somente tarefas com suporte habilitado pelo adulto aceitam estas acoes.
+    // Autorregulacao: etapas, ajuda e adiamento em qualquer tarefa incompleta,
+    // com progresso independente da conclusao e sem alterar o ledger de pontos.
     public async Task<DailyRoutine> RecordSupportActionAsync(
         ObjectId userId, string taskId, TaskSupportActionRequest request, ObjectId actorId, string actorRole)
     {
@@ -1219,10 +1222,24 @@ public class DailyRoutineService : IDailyRoutineService
         var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
             ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
 
-        if (task.SupportKind is null || task.SupportSteps.Count == 0)
-            throw new ValidationException("Esta tarefa nao possui missao de estudo habilitada.");
         if (task.Status == TaskItemStatus.Done)
             throw new ValidationException("Uma tarefa concluida nao aceita novas etapas.");
+
+        // Qualquer tarefa pode usar etapas, pedir ajuda ou adiar. Missões específicas
+        // continuam usando seu roteiro; tarefas comuns recebem um roteiro geral na
+        // primeira interação. Essas ações nunca alteram pontos.
+        if (task.SupportKind is null || task.SupportSteps.Count == 0)
+        {
+            var kind = task.SupportKind is not null
+                && TaskSupportConfiguration.DefaultSteps.ContainsKey(task.SupportKind)
+                    ? task.SupportKind
+                    : TaskSupportConfiguration.General;
+            task.SupportKind = kind;
+            task.SupportSteps = TaskSupportConfiguration.StepsForDay(
+                kind,
+                TaskSupportConfiguration.DefaultSteps[kind].ToList(),
+                routine.Date);
+        }
 
         var action = request.Action?.Trim().ToLowerInvariant();
         var now = DateTime.UtcNow;
@@ -1235,10 +1252,13 @@ public class DailyRoutineService : IDailyRoutineService
                 break;
             case "postpone":
                 task.SupportPostponeCount++;
+                task.SupportStartedAt ??= now;
                 task.SupportPostponedUntil = now.AddMinutes(10);
                 break;
             case "help":
                 task.SupportHelpCount++;
+                task.SupportStartedAt ??= now;
+                task.SupportPostponedUntil = null;
                 break;
             case "step":
             case "undo-step":
@@ -1282,11 +1302,9 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
-    // Autodeclaracao de como a tarefa foi comecada (item 4 da spec: "Incentivar
-    // iniciativa"). Concede um pequeno bonus de pontos via PointsService quando a
-    // iniciativa nao dependeu de um adulto -- reaproveita o mesmo mecanismo de
-    // PointTransaction usado por ToggleTaskAsync, so com um Reason proprio pra ficar
-    // claro no extrato que aquele credito e sobre iniciativa, nao sobre a tarefa em si.
+    // Autodeclaracao de como a tarefa foi comecada. O registro serve para entender
+    // que tipo de apoio funcionou; nao concede nem retira pontos, para nao incentivar
+    // respostas estrategicas nem transformar autorrelato em penalidade/recompensa.
     public async Task<DailyRoutine> SetTaskInitiativeAsync(
         ObjectId userId, string taskId, TaskInitiativeLevel initiative, ObjectId actorId, string actorRole)
     {
@@ -1296,7 +1314,6 @@ public class DailyRoutineService : IDailyRoutineService
         var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
             ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
 
-        var alreadyInformed = task.Initiative is not null;
         task.Initiative = initiative;
         task.UpdatedAt = DateTime.UtcNow;
         var actorRoleEnum = ParseRole(actorRole);
@@ -1313,10 +1330,7 @@ public class DailyRoutineService : IDailyRoutineService
             ActorRole = actorRoleEnum,
             CreatedAt = DateTime.UtcNow,
         };
-        await CommitTaskLedgerAsync(routine, audit,
-            alreadyInformed ? null
-                : new TaskLedgerDelta(PointTransactionType.Award, InitiativeBonusPoints,
-                    "Bonus de autonomia: iniciativa registrada"));
+        await CommitTaskLedgerAsync(routine, audit);
 
         return routine;
     }
@@ -1355,6 +1369,58 @@ public class DailyRoutineService : IDailyRoutineService
         });
 
         return routine;
+    }
+
+    // Remove qualquer penalidade legada de tarefas ainda ativas ou planejadas. Se uma
+    // tarefa de rotina aberta já havia sido concluída, um ajuste positivo neutraliza o
+    // desconto antigo no ledger; a tarefa é zerada na mesma transação.
+    private async Task NormalizeLegacyPenaltiesAsync(DailyRoutine routine)
+    {
+        var legacyTasks = routine.Tasks
+            .Where(task => task.Points < 0)
+            .ToList();
+
+        foreach (var task in legacyTasks)
+        {
+            var oldPoints = task.Points;
+            var wasDone = routine.Status == RoutineStatus.Open && task.Status == TaskItemStatus.Done;
+            task.Points = 0;
+            task.UpdatedAt = DateTime.UtcNow;
+            routine.Stats = BuildStats(routine.Tasks);
+            routine.PointsEarned = routine.Tasks
+                .Where(item => item.Status == TaskItemStatus.Done && item.DeletedAt is null)
+                .Sum(item => Math.Max(0, item.Points));
+
+            var now = DateTime.UtcNow;
+            var audit = new TaskEvent
+            {
+                Id = ObjectId.GenerateNewId(),
+                UserId = routine.FamilyId,
+                DailyRoutineId = routine.Id,
+                TaskId = task.Id,
+                TaskTemplateId = TryParseObjectId(task.TaskTemplateId),
+                EventType = TaskEventType.PointsAdjusted,
+                Payload = new BsonDocument
+                {
+                    { "previousPoints", oldPoints },
+                    { "newPoints", 0 },
+                    { "reason", "legacy behavioral penalty removed" },
+                },
+                ActorId = routine.FamilyId,
+                ActorRole = UserRole.Adult,
+                CreatedAt = now,
+            };
+
+            await CommitTaskLedgerAsync(
+                routine,
+                audit,
+                wasDone
+                    ? new TaskLedgerDelta(
+                        PointTransactionType.Adjustment,
+                        -oldPoints,
+                        $"Correção automática: penalidade antiga removida de '{task.Title}'")
+                    : null);
+        }
     }
 
     private static void ClearGameTimerSession(DailyRoutine routine)
@@ -1425,12 +1491,12 @@ public class DailyRoutineService : IDailyRoutineService
 
         if (template.Recurrence.Equals(TaskTemplate.RecurrenceWeekday, StringComparison.OrdinalIgnoreCase))
         {
-            return isWeekend ? null : new ResolvedTemplateContent(template.Title, template.Description, template.Points);
+            return isWeekend ? null : new ResolvedTemplateContent(template.Title, template.Description, Math.Max(0, template.Points));
         }
 
         if (template.Recurrence.Equals(TaskTemplate.RecurrenceWeekend, StringComparison.OrdinalIgnoreCase))
         {
-            return isWeekend ? new ResolvedTemplateContent(template.Title, template.Description, template.Points) : null;
+            return isWeekend ? new ResolvedTemplateContent(template.Title, template.Description, Math.Max(0, template.Points)) : null;
         }
 
         if (template.Recurrence.Equals(TaskTemplate.RecurrenceWeekdayRotation, StringComparison.OrdinalIgnoreCase))
@@ -1438,7 +1504,7 @@ public class DailyRoutineService : IDailyRoutineService
             var variant = template.Variants.FirstOrDefault(v => v.DayOfWeek == dayOfWeek);
             return variant is null
                 ? null
-                : new ResolvedTemplateContent(variant.Title, variant.Description, variant.Points ?? template.Points);
+                : new ResolvedTemplateContent(variant.Title, variant.Description, Math.Max(0, variant.Points ?? template.Points));
         }
 
         if (template.Recurrence.Equals(TaskTemplate.RecurrenceCustom, StringComparison.OrdinalIgnoreCase))
@@ -1446,20 +1512,20 @@ public class DailyRoutineService : IDailyRoutineService
             // Mesmo conteudo do template todo dia escolhido -- so a lista de dias
             // muda (ex.: "Ingles" so terca e quarta, "Escoteiro" so sabado).
             return template.CustomDays.Contains(dayOfWeek)
-                ? new ResolvedTemplateContent(template.Title, template.Description, template.Points)
+                ? new ResolvedTemplateContent(template.Title, template.Description, Math.Max(0, template.Points))
                 : null;
         }
 
         if (template.Recurrence.Equals(TaskTemplate.RecurrenceInterval, StringComparison.OrdinalIgnoreCase))
         {
             return IsIntervalDay(template, date)
-                ? new ResolvedTemplateContent(template.Title, template.Description, template.Points)
+                ? new ResolvedTemplateContent(template.Title, template.Description, Math.Max(0, template.Points))
                 : null;
         }
 
         // RecurrenceDaily (ou qualquer valor desconhecido/legado): comportamento
         // original, todo dia, com o conteudo do proprio template.
-        return new ResolvedTemplateContent(template.Title, template.Description, template.Points);
+        return new ResolvedTemplateContent(template.Title, template.Description, Math.Max(0, template.Points));
     }
 
     // "Dia sim, dia nao" (IntervalDays == 2) ou qualquer intervalo de N dias, contado
@@ -1517,7 +1583,7 @@ public class DailyRoutineService : IDailyRoutineService
 
         var pointsEarned = active
             .Where(t => t.Status == TaskItemStatus.Done)
-            .Sum(t => t.Points);
+            .Sum(t => Math.Max(0, t.Points));
 
         return new DailyRoutineStats
         {

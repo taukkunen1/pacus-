@@ -132,7 +132,7 @@ public class WaterController : ControllerBase
                 id = WaterTaskId(date),
                 title = "Beber água",
                 points = profile.RewardPoints,
-                isDone = total >= profile.GoalMl && awardedPoints > 0
+                isDone = total >= profile.GoalMl
             },
             entries = events.Select(x => new
             {

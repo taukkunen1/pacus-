@@ -397,6 +397,7 @@ public class DailyRoutineService : IDailyRoutineService
     {
         var routine = await _dailyRoutineRepository.GetLatestOpenAsync(userId)
             ?? throw new ValidationException("Nenhuma rotina em aberto para este usuario.");
+        await NormalizeLegacyPenaltiesAsync(routine);
 
         var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
             ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
@@ -640,7 +641,7 @@ public class DailyRoutineService : IDailyRoutineService
         routine.Stats = BuildStats(routine.Tasks);
         routine.PointsEarned = routine.Tasks
             .Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null)
-            .Sum(t => t.Points);
+            .Sum(t => Math.Max(0, t.Points));
 
         await SyncGameTimerAsync(routine, userId);
         var actorRoleEnum = actorRole.Equals("adult", StringComparison.OrdinalIgnoreCase)
@@ -705,7 +706,7 @@ public class DailyRoutineService : IDailyRoutineService
             task.SelectedOption = null;
         task.UpdatedAt = DateTime.UtcNow;
         routine.Stats = BuildStats(routine.Tasks);
-        routine.PointsEarned = routine.Tasks.Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null).Sum(t => t.Points);
+        routine.PointsEarned = routine.Tasks.Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null).Sum(t => Math.Max(0, t.Points));
         await SyncGameTimerAsync(routine, userId);
         var role = ParseRole(actorRole);
         var audit = new TaskEvent
@@ -762,7 +763,7 @@ public class DailyRoutineService : IDailyRoutineService
         task.DeletedAt = DateTime.UtcNow;
         task.UpdatedAt = DateTime.UtcNow;
         routine.Stats = BuildStats(routine.Tasks);
-        routine.PointsEarned = routine.Tasks.Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null).Sum(t => t.Points);
+        routine.PointsEarned = routine.Tasks.Where(t => t.Status == TaskItemStatus.Done && t.DeletedAt is null).Sum(t => Math.Max(0, t.Points));
         await SyncGameTimerAsync(routine, userId);
         var role = ParseRole(actorRole);
         var audit = new TaskEvent
@@ -1485,7 +1486,7 @@ public class DailyRoutineService : IDailyRoutineService
 
         if (template.Recurrence.Equals(TaskTemplate.RecurrenceWeekend, StringComparison.OrdinalIgnoreCase))
         {
-            return isWeekend ? new ResolvedTemplateContent(template.Title, template.Description, template.Points) : null;
+            return isWeekend ? new ResolvedTemplateContent(template.Title, template.Description, Math.Max(0, template.Points)) : null;
         }
 
         if (template.Recurrence.Equals(TaskTemplate.RecurrenceWeekdayRotation, StringComparison.OrdinalIgnoreCase))
@@ -1501,20 +1502,20 @@ public class DailyRoutineService : IDailyRoutineService
             // Mesmo conteudo do template todo dia escolhido -- so a lista de dias
             // muda (ex.: "Ingles" so terca e quarta, "Escoteiro" so sabado).
             return template.CustomDays.Contains(dayOfWeek)
-                ? new ResolvedTemplateContent(template.Title, template.Description, template.Points)
+                ? new ResolvedTemplateContent(template.Title, template.Description, Math.Max(0, template.Points))
                 : null;
         }
 
         if (template.Recurrence.Equals(TaskTemplate.RecurrenceInterval, StringComparison.OrdinalIgnoreCase))
         {
             return IsIntervalDay(template, date)
-                ? new ResolvedTemplateContent(template.Title, template.Description, template.Points)
+                ? new ResolvedTemplateContent(template.Title, template.Description, Math.Max(0, template.Points))
                 : null;
         }
 
         // RecurrenceDaily (ou qualquer valor desconhecido/legado): comportamento
         // original, todo dia, com o conteudo do proprio template.
-        return new ResolvedTemplateContent(template.Title, template.Description, template.Points);
+        return new ResolvedTemplateContent(template.Title, template.Description, Math.Max(0, template.Points));
     }
 
     // "Dia sim, dia nao" (IntervalDays == 2) ou qualquer intervalo de N dias, contado
@@ -1572,7 +1573,7 @@ public class DailyRoutineService : IDailyRoutineService
 
         var pointsEarned = active
             .Where(t => t.Status == TaskItemStatus.Done)
-            .Sum(t => t.Points);
+            .Sum(t => Math.Max(0, t.Points));
 
         return new DailyRoutineStats
         {

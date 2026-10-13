@@ -110,7 +110,10 @@ public class DailyRoutineService : IDailyRoutineService
             return await CreateRoutineForDateAsync(userId, tomorrow, timezone, RoutineStatus.Planned);
 
         if (existing.Status == RoutineStatus.Planned)
+        {
+            await NormalizeLegacyPenaltiesAsync(existing);
             await SyncMissingTemplatesAsync(existing, userId);
+        }
 
         return existing;
     }
@@ -1367,9 +1370,9 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
-    // Remove qualquer penalidade legada de tarefas ainda ativas. Se uma tarefa
-    // negativa já havia sido concluída, um ajuste positivo neutraliza o desconto antigo
-    // no ledger; a tarefa é zerada na mesma transação, evitando correção duplicada.
+    // Remove qualquer penalidade legada de tarefas ainda ativas ou planejadas. Se uma
+    // tarefa de rotina aberta já havia sido concluída, um ajuste positivo neutraliza o
+    // desconto antigo no ledger; a tarefa é zerada na mesma transação.
     private async Task NormalizeLegacyPenaltiesAsync(DailyRoutine routine)
     {
         var legacyTasks = routine.Tasks
@@ -1379,7 +1382,7 @@ public class DailyRoutineService : IDailyRoutineService
         foreach (var task in legacyTasks)
         {
             var oldPoints = task.Points;
-            var wasDone = task.Status == TaskItemStatus.Done;
+            var wasDone = routine.Status == RoutineStatus.Open && task.Status == TaskItemStatus.Done;
             task.Points = 0;
             task.UpdatedAt = DateTime.UtcNow;
             routine.Stats = BuildStats(routine.Tasks);

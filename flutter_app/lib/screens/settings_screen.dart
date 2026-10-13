@@ -585,9 +585,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   decoration: const InputDecoration(labelText: 'Perfil de hidratação'),
                   items: waterProfiles.map((profile) {
                     final role = profile['role']?.toString() == 'child' ? 'criança' : 'adulto';
+                    final name = profile['name']?.toString() ?? 'Perfil';
                     return DropdownMenuItem<String>(
                       value: profile['profileId']?.toString(),
-                      child: Text('${profile['name'] ?? 'Perfil'} · $role'),
+                      child: Text('$name · $role'),
                     );
                   }).toList(),
                   onChanged: _selectWaterProfile,

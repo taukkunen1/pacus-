@@ -11,12 +11,14 @@ public static class TaskSupportConfiguration
     public const string Handwriting = "handwriting";
     public const string Bathing = "bathing";
     public const string MoodBoard = "mood_board";
+    public const string General = "general";
     // 08/10/2026 e o primeiro dia de lavar o cabelo; 07/10 foi dia sem lavar.
     private static readonly DateOnly HairWashAnchor = new(2026, 10, 8);
 
     public static readonly IReadOnlyDictionary<string, string[]> DefaultSteps =
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
+            [General] = new[] { "Preparar o que vou precisar", "Começar por uma parte pequena", "Continuar no meu ritmo e pedir ajuda se precisar", "Conferir o que consegui fazer" },
             [Reading] = new[] { "Escolher o livro", "Ler o trecho combinado", "Contar algo sobre a leitura" },
             [Homework] = new[] { "Separar o material da escola ou do ingles", "Ver quais atividades foram pedidas", "Escolher por qual atividade comecar", "Fazer a primeira atividade (pode comecar com 10 minutos)", "Continuar a licao, fazer pausas e pedir ajuda se precisar", "Conferir o que foi feito e guardar o material" },
             [Handwriting] = new[] { "Separar o caderno e lapis", "Escrever a primeira linha", "Concluir a quantidade combinada" },

@@ -201,7 +201,8 @@ public class StoreService : IStoreService
             throw new ValidationException("Saldo de Pacus Points insuficiente para aprovar este resgate.");
 
         var item = await _storeRepository.GetItemByIdAsync(redemption.StoreItemId);
-        if (item?.ScreenTimeMinutes is int configuredMinutes
+        var grantedScreenTimeMinutes = redemption.ScreenTimeMinutes ?? item?.ScreenTimeMinutes;
+        if (grantedScreenTimeMinutes is int configuredMinutes
             && (configuredMinutes < 1 || configuredMinutes > 60))
         {
             throw new ValidationException(
@@ -214,7 +215,7 @@ public class StoreService : IStoreService
         // debitar qualquer ponto — AdjustGameTimerAsync exige uma rotina em aberto e nao a
         // cria sozinho. Fazer isso primeiro evita o cenario de aprovar o resgate (debitar
         // pontos, marcar Approved) e so depois descobrir que o timer nao pode ser ajustado.
-        if (item?.ScreenTimeMinutes is int minutes)
+        if (grantedScreenTimeMinutes is not null)
         {
             await _dailyRoutineService.GetOrCreateTodayAsync(familyId, timezone);
         }
@@ -242,7 +243,7 @@ public class StoreService : IStoreService
         // Concede o tempo de tela comprado -- soma direto no game timer do dia (mesmo
         // mecanismo dos botoes +5/-5 min do adulto). actorRole "adult" porque aprovar
         // resgate ja e uma acao restrita a adulto (RequireRole no controller).
-        if (item?.ScreenTimeMinutes is int screenTimeMinutes)
+        if (grantedScreenTimeMinutes is int screenTimeMinutes)
         {
             await _dailyRoutineService.AdjustGameTimerAsync(familyId, screenTimeMinutes, reviewedBy, "adult");
         }
@@ -259,7 +260,7 @@ public class StoreService : IStoreService
         // Log de auditoria (checklist de seguranca, item A5) — aprovar resgate e uma
         // acao administrativa sensivel (debita pontos da familia), registrada separada
         // do dado em si.
-        var screenTimeNote = item?.ScreenTimeMinutes is int grantedMinutes
+        var screenTimeNote = grantedScreenTimeMinutes is int grantedMinutes
             ? $", +{grantedMinutes}min de tempo de tela"
             : string.Empty;
 

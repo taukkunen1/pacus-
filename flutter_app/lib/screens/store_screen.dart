@@ -121,7 +121,14 @@ class _StoreScreenState extends State<StoreScreen> {
                   Expanded(child: TextField(controller: daily, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Limite/dia'))),
                 ]),
                 const SizedBox(height: 10),
-                TextField(controller: screen, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Minutos de tela concedidos')),
+                TextField(
+                  controller: screen,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Minutos de tela (opcional, máx. 60 por item)'),
+                ),
+                const SizedBox(height: 6),
+                const Text('O total de tempo de tela extra aprovado é limitado a 60 minutos por dia, somando todos os itens.'),
+
               ]),
             ),
           ),
@@ -130,6 +137,14 @@ class _StoreScreenState extends State<StoreScreen> {
             FilledButton(
               onPressed: () {
                 if (title.text.trim().isEmpty) return;
+                final screenMinutes = int.tryParse(screen.text);
+                if (screen.text.trim().isNotEmpty
+                    && (screenMinutes == null || screenMinutes < 1 || screenMinutes > 60)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Informe de 1 a 60 minutos por item.')),
+                  );
+                  return;
+                }
                 Navigator.pop(context, {
                   'title': title.text.trim(),
                   'description': description.text.trim().isEmpty ? null : description.text.trim(),
@@ -188,6 +203,8 @@ class _StoreScreenState extends State<StoreScreen> {
           if (error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
           const SizedBox(height: 18),
           const Text('Itens', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 6),
+          const Text('Tempo de tela é uma opção da família, não uma recompensa necessária por cada tarefa.'),
           const SizedBox(height: 10),
           if (items.isEmpty && loading) const Center(child: CircularProgressIndicator()),
           for (final item in items) ...[

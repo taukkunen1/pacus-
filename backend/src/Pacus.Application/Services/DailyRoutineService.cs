@@ -1211,8 +1211,8 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
-    // Missoes de estudo V4: progresso independente da conclusao e do ledger de pontos.
-    // Somente tarefas com suporte habilitado pelo adulto aceitam estas acoes.
+    // Autorregulacao: etapas, ajuda e adiamento em qualquer tarefa incompleta,
+    // com progresso independente da conclusao e sem alterar o ledger de pontos.
     public async Task<DailyRoutine> RecordSupportActionAsync(
         ObjectId userId, string taskId, TaskSupportActionRequest request, ObjectId actorId, string actorRole)
     {
@@ -1252,6 +1252,7 @@ public class DailyRoutineService : IDailyRoutineService
                 break;
             case "postpone":
                 task.SupportPostponeCount++;
+                task.SupportStartedAt ??= now;
                 task.SupportPostponedUntil = now.AddMinutes(10);
                 break;
             case "help":

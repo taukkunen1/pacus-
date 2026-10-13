@@ -95,9 +95,7 @@ public class WaterController : ControllerBase
         var afterEvents = await _water.GetByDateAsync(
             _currentUser.FamilyId, date, _currentUser.UserId);
         var afterTotal = afterEvents.Sum(x => x.AmountMl);
-        if (profile.RewardPoints > 0
-            && beforeTotal < profile.GoalMl
-            && afterTotal >= profile.GoalMl)
+        if (profile.RewardPoints > 0 && afterTotal >= profile.GoalMl)
         {
             await EnsureRewardAsync(date, profile.RewardPoints);
         }

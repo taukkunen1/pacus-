@@ -163,6 +163,35 @@ public class StoreService : IStoreService
                 $"Limite diario deste item ja atingido ({item.DailyLimit}x por dia). Tente novamente amanha.");
     }
 
+    // Soma recompensas pendentes e aprovadas de todos os itens de tela no dia operacional.
+    private async Task EnsureDailyScreenTimeLimitNotReachedAsync(ObjectId familyId, int requestedMinutes)
+    {
+        var timezone = await _familyTimezoneService.GetTimezoneAsync(familyId);
+        var today = TimezoneHelper.GetOperationalDate(timezone);
+        var recent = await _storeRepository.GetRedemptionsSinceAsync(
+            familyId, DateTime.UtcNow.AddDays(-2));
+        var usedToday = 0;
+
+        foreach (var redemption in recent)
+        {
+            if (redemption.Status == RedemptionStatus.Rejected
+                || TimezoneHelper.GetOperationalDate(timezone, redemption.RequestedAt) != today)
+                continue;
+
+            var minutes = redemption.ScreenTimeMinutes;
+            if (minutes is null)
+            {
+                var oldItem = await _storeRepository.GetItemByIdAsync(redemption.StoreItemId);
+                minutes = oldItem?.ScreenTimeMinutes;
+            }
+            usedToday += minutes ?? 0;
+        }
+
+        if (usedToday + requestedMinutes > 60)
+            throw new ValidationException(
+                "O limite de tempo de tela extra é de 60 minutos por dia.");
+    }
+
     public async Task<Redemption> ApproveRedemptionAsync(ObjectId familyId, string redemptionId, ObjectId reviewedBy)
     {
         var redemption = await GetOwnedPendingRedemptionAsync(familyId, redemptionId);

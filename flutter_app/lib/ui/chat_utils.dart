@@ -54,7 +54,7 @@ String chatRequestStatusLabel(String? status, {String? type}) {
       case 'approved':
         return 'Recebido';
       case 'rejected':
-        return 'Nao atendido';
+        return 'Não atendido';
       case 'processing':
         return 'Processando';
       default:

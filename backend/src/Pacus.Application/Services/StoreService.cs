@@ -68,8 +68,8 @@ public class StoreService : IStoreService
         if (request.DailyLimit is not null && request.DailyLimit <= 0)
             throw new ValidationException("O limite diario, quando informado, deve ser maior que zero.");
 
-        if (request.ScreenTimeMinutes is not null && request.ScreenTimeMinutes <= 0)
-            throw new ValidationException("Os minutos de tempo de tela, quando informados, devem ser maiores que zero.");
+        if (request.ScreenTimeMinutes is int screenMinutes && (screenMinutes < 1 || screenMinutes > 60))
+            throw new ValidationException("A recompensa de tempo de tela deve ser de 1 a 60 minutos por item.");
 
         item.Title = request.Title;
         item.Description = request.Description;

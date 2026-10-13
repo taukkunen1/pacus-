@@ -1377,7 +1377,7 @@ public class DailyRoutineService : IDailyRoutineService
     private async Task NormalizeLegacyPenaltiesAsync(DailyRoutine routine)
     {
         var legacyTasks = routine.Tasks
-            .Where(task => task.DeletedAt is null && task.Points < 0)
+            .Where(task => task.Points < 0)
             .ToList();
 
         foreach (var task in legacyTasks)

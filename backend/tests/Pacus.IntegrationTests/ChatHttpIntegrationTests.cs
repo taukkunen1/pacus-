@@ -293,6 +293,81 @@ public class ChatHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
         Assert.Equal(HttpStatusCode.Conflict, secondApprove.StatusCode);
     }
 
+    [Theory]
+    [InlineData("help", "Vi seu pedido de ajuda.")]
+    [InlineData("change_task", "Vi seu pedido para mudar uma tarefa.")]
+    public async Task Chat_SupportRequests_CannotBeRejected_ButCanBeAcknowledged(
+        string type, string expectedReply)
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var adultClient = factory.CreateClient();
+        using var childClient = factory.CreateClient();
+
+        var family = await BootstrapAsync(adultClient);
+        await LoginAdultAsync(adultClient, family);
+        await LoginChildAsync(childClient, family);
+
+        var created = await childClient.PostAsJsonAsync(
+            "/api/v1/chat/requests", new { type });
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        var requestBody = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var requestId = requestBody.GetProperty("id").GetString();
+
+        var reject = await adultClient.PutAsJsonAsync(
+            $"/api/v1/chat/requests/{requestId}/reject", new { });
+        Assert.Equal(HttpStatusCode.BadRequest, reject.StatusCode);
+
+        var pending = await adultClient.GetFromJsonAsync<JsonElement>(
+            "/api/v1/chat/unread-count");
+        Assert.Equal(1, pending.GetProperty("pendingRequests").GetInt64());
+
+        var acknowledge = await adultClient.PutAsJsonAsync(
+            $"/api/v1/chat/requests/{requestId}/approve", new { });
+        Assert.Equal(HttpStatusCode.OK, acknowledge.StatusCode);
+        var acknowledged = await acknowledge.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("approved", acknowledged.GetProperty("requestStatus").GetString());
+
+        var childMessages = await childClient.GetFromJsonAsync<JsonElement>(
+            "/api/v1/chat/messages");
+        Assert.Contains(
+            childMessages.EnumerateArray(),
+            message => message.GetProperty("kind").GetString() == "message" &&
+                message.GetProperty("text").GetString()!.StartsWith(
+                    expectedReply, StringComparison.Ordinal));
+
+        var after = await adultClient.GetFromJsonAsync<JsonElement>(
+            "/api/v1/chat/unread-count");
+        Assert.Equal(0, after.GetProperty("pendingRequests").GetInt64());
+    }
+
+    [Fact]
+    public async Task Chat_ExtraTimeRequest_CanStillBeRejected()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var adultClient = factory.CreateClient();
+        using var childClient = factory.CreateClient();
+
+        var family = await BootstrapAsync(adultClient);
+        await LoginAdultAsync(adultClient, family);
+        await LoginChildAsync(childClient, family);
+
+        var created = await childClient.PostAsJsonAsync(
+            "/api/v1/chat/requests", new { type = "extra_time", minutes = 20 });
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        var body = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var requestId = body.GetProperty("id").GetString();
+
+        var reject = await adultClient.PutAsJsonAsync(
+            $"/api/v1/chat/requests/{requestId}/reject", new { });
+        Assert.Equal(HttpStatusCode.OK, reject.StatusCode);
+        var rejected = await reject.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("rejected", rejected.GetProperty("requestStatus").GetString());
+
+        var after = await adultClient.GetFromJsonAsync<JsonElement>(
+            "/api/v1/chat/unread-count");
+        Assert.Equal(0, after.GetProperty("pendingRequests").GetInt64());
+    }
+
     private static async Task LoginAdultAsync(HttpClient client, TestFamily family)
     {
         var response = await client.PostAsJsonAsync(

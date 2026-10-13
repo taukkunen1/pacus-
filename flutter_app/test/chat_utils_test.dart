@@ -35,6 +35,32 @@ void main() {
     );
   });
 
+  test('distinguishes requests for support from rewards', () {
+    expect(chatRequestNeedsSupport('help'), isTrue);
+    expect(chatRequestNeedsSupport('change_task'), isTrue);
+    expect(chatRequestNeedsSupport('extra_time'), isFalse);
+
+    expect(chatRequestApproveLabel('help'), 'Vou ajudar');
+    expect(chatRequestApproveLabel('change_task'), 'Vamos conversar');
+    expect(chatRequestApproveLabel('extra_time'), 'Aprovar');
+  });
+
+  test('support request statuses avoid approval and rejection language', () {
+    expect(
+      chatRequestStatusLabel('pending', type: 'help'),
+      'Aguardando resposta',
+    );
+    expect(chatRequestStatusLabel('approved', type: 'help'), 'Recebido');
+    expect(
+      chatRequestStatusLabel('rejected', type: 'change_task'),
+      'Nao atendido',
+    );
+    expect(
+      chatRequestStatusLabel('approved', type: 'extra_time'),
+      'Aprovado',
+    );
+  });
+
   test('labels request status', () {
     expect(chatRequestStatusLabel('pending'), 'Aguardando');
     expect(chatRequestStatusLabel('approved'), 'Aprovado');

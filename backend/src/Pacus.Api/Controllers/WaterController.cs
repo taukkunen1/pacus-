@@ -83,20 +83,21 @@ public class WaterController : ControllerBase
             OccurredAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow,
         };
-        var created = true;
         try { await _water.CreateAsync(intake); }
         catch (MongoDB.Driver.MongoWriteException ex) when (
             ex.WriteError?.Category == MongoDB.Driver.ServerErrorCategory.DuplicateKey)
         {
             // Retry/offline sync do mesmo evento: idempotente.
-            created = false;
         }
 
-        // Há no máximo uma recompensa por perfil/dia, e nenhuma recompensa adicional
-        // por ultrapassar a meta. O registro de água continua sendo individual.
-        if (created && profile.RewardPoints > 0
+        // Confere o total persistido depois da gravação. Isso também recupera a
+        // recompensa se houve falha entre persistir o evento e registrar os pontos.
+        var afterEvents = await _water.GetByDateAsync(
+            _currentUser.FamilyId, date, _currentUser.UserId);
+        var afterTotal = afterEvents.Sum(x => x.AmountMl);
+        if (profile.RewardPoints > 0
             && beforeTotal < profile.GoalMl
-            && beforeTotal + request.AmountMl >= profile.GoalMl)
+            && afterTotal >= profile.GoalMl)
         {
             await EnsureRewardAsync(date, profile.RewardPoints);
         }

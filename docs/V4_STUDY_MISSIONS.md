@@ -62,8 +62,7 @@ em uma única operação lógica:
   as tarefas futuras na rotina planejada.
 
 Os fluxos protegidos incluem conclusão, reabertura, ajuste de pontos,
-edição de tarefa concluída, exclusão, bônus único de iniciativa (+1 PP)
-e ações V4 de suporte. Falha em qualquer escrita aborta a transação.
+edição de tarefa concluída, exclusão e ações V4 de suporte. Falha em qualquer escrita aborta a transação.
 
 A API constrói `DailyRoutineService` com `ITaskLedgerCommitter`
 obrigatório; não existe fallback não transacional na DI de produção.

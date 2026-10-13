@@ -69,8 +69,6 @@ public class WaterController : ControllerBase
         var timezone = await _timezone.GetTimezoneAsync(_currentUser.FamilyId);
         var date = TimezoneHelper.GetOperationalDate(timezone, DateTime.UtcNow);
         var profile = await GetWaterProfileAsync(_currentUser.UserId);
-        var beforeEvents = await _water.GetByDateAsync(_currentUser.FamilyId, date, _currentUser.UserId);
-        var beforeTotal = beforeEvents.Sum(x => x.AmountMl);
 
         var intake = new WaterIntake
         {

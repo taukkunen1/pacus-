@@ -27,7 +27,7 @@ O adulto cadastra itens (brinquedo, atividade, tempo de tela, outro); a criança
 - **Limite diário** (`dailyLimit`) — quantas vezes por dia operacional este item pode ser resgatado (pedidos rejeitados não contam para o limite).
 - **Tempo de tela concedido** (`screenTimeMinutes`) — ao aprovar, soma automaticamente esses minutos no game timer do dia (mesmo mecanismo dos botões +5/-5 min do adulto).
 
-Toda família nova já recebe o item padrão **"1 hora de tela" = 100 Pacus Points, 1 resgate por dia, +60min no game timer ao aprovar**.
+Toda família nova recebe o item opcional **"30 minutos de tela" = 100 Pacus Points**, limitado a um resgate por dia. O backend limita a soma de recompensas de tela a 60 minutos adicionais por dia e a 60 minutos por item.
 
 ## Desenvolvimento local
 

@@ -2,8 +2,8 @@ using Pacus.Application.Exceptions;
 
 namespace Pacus.Application.Services;
 
-// V4: recursos opcionais para as tres missoes selecionadas pelo adulto.
-// Nenhuma classificacao automatica por titulo e feita.
+// Roteiros específicos configuráveis pelo adulto e roteiro geral para qualquer
+// tarefa. Nenhuma classificação automática por título é feita.
 public static class TaskSupportConfiguration
 {
     public const string Reading = "reading";

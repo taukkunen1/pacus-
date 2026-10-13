@@ -175,7 +175,8 @@ public class StoreService : IStoreService
 
         foreach (var redemption in recent)
         {
-            if (redemption.Id == excludeRedemptionId || redemption.Status == RedemptionStatus.Rejected)
+            if ((excludeRedemptionId.HasValue && redemption.Id == excludeRedemptionId.Value)
+                || redemption.Status == RedemptionStatus.Rejected)
                 continue;
 
             var relevantAt = redemption.Status == RedemptionStatus.Approved

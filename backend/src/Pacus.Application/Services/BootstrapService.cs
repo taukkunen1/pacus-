@@ -124,7 +124,7 @@ public class BootstrapService : IBootstrapService
             Id = ObjectId.GenerateNewId(),
             FamilyId = familyId,
             Title = "1 hora de tela",
-            Description = "Resgata 1 hora extra de tempo de tela para hoje.",
+            Description = "Resgata até 1 hora extra de tempo de tela para hoje. Recompensa opcional, combinada em família.",
             Cost = 100,
             Category = "screen_time",
             Icon = "🎮",

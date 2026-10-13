@@ -54,7 +54,17 @@ public class WaterController : ControllerBase
         var existing = await _water.GetByEventIdAsync(
             _currentUser.FamilyId, _currentUser.UserId, request.EventId.Trim());
         if (existing is not null)
+        {
+            var existingProfile = await GetWaterProfileAsync(_currentUser.UserId);
+            var existingEvents = await _water.GetByDateAsync(
+                _currentUser.FamilyId, existing.Date, _currentUser.UserId);
+            if (existingProfile.RewardPoints > 0
+                && existingEvents.Sum(x => x.AmountMl) >= existingProfile.GoalMl)
+            {
+                await EnsureRewardAsync(existing.Date, existingProfile.RewardPoints);
+            }
             return Ok(await BuildDayAsync(existing.Date));
+        }
 
         var timezone = await _timezone.GetTimezoneAsync(_currentUser.FamilyId);
         var date = TimezoneHelper.GetOperationalDate(timezone, DateTime.UtcNow);

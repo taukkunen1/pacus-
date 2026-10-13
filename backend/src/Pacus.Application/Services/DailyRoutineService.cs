@@ -1302,11 +1302,9 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
-    // Autodeclaracao de como a tarefa foi comecada (item 4 da spec: "Incentivar
-    // iniciativa"). Concede um pequeno bonus de pontos via PointsService quando a
-    // iniciativa nao dependeu de um adulto -- reaproveita o mesmo mecanismo de
-    // PointTransaction usado por ToggleTaskAsync, so com um Reason proprio pra ficar
-    // claro no extrato que aquele credito e sobre iniciativa, nao sobre a tarefa em si.
+    // Autodeclaracao de como a tarefa foi comecada. O registro serve para entender
+    // que tipo de apoio funcionou; nao concede nem retira pontos, para nao incentivar
+    // respostas estrategicas nem transformar autorrelato em penalidade/recompensa.
     public async Task<DailyRoutine> SetTaskInitiativeAsync(
         ObjectId userId, string taskId, TaskInitiativeLevel initiative, ObjectId actorId, string actorRole)
     {
@@ -1333,10 +1331,7 @@ public class DailyRoutineService : IDailyRoutineService
             ActorRole = actorRoleEnum,
             CreatedAt = DateTime.UtcNow,
         };
-        await CommitTaskLedgerAsync(routine, audit,
-            alreadyInformed ? null
-                : new TaskLedgerDelta(PointTransactionType.Award, InitiativeBonusPoints,
-                    "Bonus de autonomia: iniciativa registrada"));
+        await CommitTaskLedgerAsync(routine, audit);
 
         return routine;
     }

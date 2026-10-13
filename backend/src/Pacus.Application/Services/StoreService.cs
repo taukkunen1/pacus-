@@ -35,8 +35,8 @@ public class StoreService : IStoreService
         if (request.DailyLimit is not null && request.DailyLimit <= 0)
             throw new ValidationException("O limite diario, quando informado, deve ser maior que zero.");
 
-        if (request.ScreenTimeMinutes is not null && request.ScreenTimeMinutes <= 0)
-            throw new ValidationException("Os minutos de tempo de tela, quando informados, devem ser maiores que zero.");
+        if (request.ScreenTimeMinutes is int screenMinutes && (screenMinutes < 1 || screenMinutes > 60))
+            throw new ValidationException("A recompensa de tempo de tela deve ser de 1 a 60 minutos por item.");
 
         var item = new StoreItem
         {
@@ -164,6 +164,13 @@ public class StoreService : IStoreService
             throw new ValidationException("Saldo de Pacus Points insuficiente para aprovar este resgate.");
 
         var item = await _storeRepository.GetItemByIdAsync(redemption.StoreItemId);
+        if (item?.ScreenTimeMinutes is int configuredMinutes
+            && (configuredMinutes < 1 || configuredMinutes > 60))
+        {
+            throw new ValidationException(
+                "Este item antigo ultrapassa o limite de 60 minutos por resgate. Edite o item antes de aprovar.");
+        }
+
         var timezone = await _familyTimezoneService.GetTimezoneAsync(familyId);
 
         // Se o item concede tempo de tela, garante que a rotina de hoje existe ANTES de

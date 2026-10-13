@@ -279,7 +279,7 @@ public class ChatController : ControllerBase
         {
             return BadRequest(new
             {
-                error = "Pedidos de ajuda e conversa nao podem ser recusados. Responda pelo chat."
+                error = "Pedidos de ajuda e conversa não podem ser recusados. Responda pelo chat."
             });
         }
 

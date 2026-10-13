@@ -57,14 +57,12 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
         Assert.Equal("pending", created.GetProperty("status").GetString());
     }
 
-    [Fact]
-    public async Task Create_WithInvalidPoints_ShouldReturnBadRequest()
+    [Theory]
+    [InlineData(11)]
+    [InlineData(-1)]
+    public async Task Create_WithInvalidPoints_ShouldReturnBadRequest(int points)
     {
-        // Regra de negocio atual (DailyRoutineService.ValidatePoints) aceita
-        // qualquer valor entre -10 e 10, exceto zero -- entao 5 pontos, que
-        // este teste usava antes, e valido hoje. Trocado para um valor
-        // realmente fora do range (11), mantendo a intencao original do
-        // teste (pontos invalidos -> 400).
+        // Pontuação de tarefa aceita apenas valores positivos entre 1 e 10.
         using var factory = new PacusApiFactory(_mongo.ConnectionString);
         using var client = factory.CreateClient();
 
@@ -80,7 +78,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
                 description = (string?)null,
                 type = "mandatory",
                 period = "morning",
-                points = 11
+                points
             });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

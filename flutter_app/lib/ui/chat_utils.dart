@@ -34,7 +34,34 @@ String chatRequestTitle(String? type, {int? minutes}) {
   }
 }
 
-String chatRequestStatusLabel(String? status) {
+bool chatRequestNeedsSupport(String? type) =>
+    type == 'help' || type == 'change_task';
+
+String chatRequestApproveLabel(String? type) {
+  switch (type) {
+    case 'help':
+      return 'Vou ajudar';
+    case 'change_task':
+      return 'Vamos conversar';
+    default:
+      return 'Aprovar';
+  }
+}
+
+String chatRequestStatusLabel(String? status, {String? type}) {
+  if (chatRequestNeedsSupport(type)) {
+    switch (status) {
+      case 'approved':
+        return 'Recebido';
+      case 'rejected':
+        return 'Nao atendido';
+      case 'processing':
+        return 'Processando';
+      default:
+        return 'Aguardando resposta';
+    }
+  }
+
   switch (status) {
     case 'approved':
       return 'Aprovado';

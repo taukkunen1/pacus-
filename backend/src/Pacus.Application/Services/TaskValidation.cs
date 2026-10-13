@@ -34,9 +34,9 @@ public static class TaskValidation
     // -- ver DailyTasksHttpIntegrationTests, que confere este texto literalmente.
     public static void ValidatePoints(int points)
     {
-        if (points == 0 || points < -10 || points > 10)
+        if (points < 1 || points > 10)
             throw new ValidationException(
-                "Cada tarefa deve valer entre 1 e 10 Pacus Points, ou entre -1 e -10 (penalidade). Zero nao e permitido.");
+                "Cada tarefa deve valer entre 1 e 10 Pacus Points. Tarefas nao podem descontar pontos.");
     }
 }
 

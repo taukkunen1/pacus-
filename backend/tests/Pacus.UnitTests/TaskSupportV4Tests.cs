@@ -287,10 +287,10 @@ public class TaskSupportV4Tests
 
         await routines.SetTaskInitiativeAsync(family, taskId, TaskInitiativeLevel.PromptedByAdult, family, "adult");
         await routines.SetTaskInitiativeAsync(family, taskId, TaskInitiativeLevel.SelfStarted, family, "child");
-        Assert.Equal(1, points.Transactions.Sum(p => p.Points));
+        Assert.Empty(points.Transactions);
 
         await routines.ToggleTaskAsync(family, taskId, true, family, "child");
-        Assert.Equal(2, points.Transactions.Sum(p => p.Points));
+        Assert.Equal(1, points.Transactions.Sum(p => p.Points));
     }
 
     [Fact]

@@ -270,6 +270,19 @@ public class ChatController : ControllerBase
         if (!ObjectId.TryParse(id, out var messageId))
             return BadRequest(new { error = "Id de pedido invalido." });
 
+        // Pedir ajuda ou conversar sobre uma tarefa nao e uma solicitacao
+        // que possa ser recusada. Apenas pedidos de tempo extra podem ser negados.
+        var request = await _chatRepository.GetByIdForFamilyAsync(
+            _currentUser.FamilyId, messageId);
+        if (request?.Kind == "request" &&
+            request.RequestType is "help" or "change_task")
+        {
+            return BadRequest(new
+            {
+                error = "Pedidos de ajuda e conversa nao podem ser recusados. Responda pelo chat."
+            });
+        }
+
         var rejected = await _chatRepository.TryTransitionRequestAsync(
             _currentUser.FamilyId,
             messageId,
@@ -313,9 +326,15 @@ public class ChatController : ControllerBase
             SenderId = reviewer.Id,
             SenderName = reviewer.Name,
             SenderRole = reviewer.Role,
-            Text = approved
-                ? $"Aprovado: {requestLabel}."
-                : $"Recusado: {requestLabel}.",
+            Text = request.RequestType switch
+            {
+                "help" when approved =>
+                    "Vi seu pedido de ajuda. Vamos conversar por aqui.",
+                "change_task" when approved =>
+                    "Vi seu pedido para mudar uma tarefa. Vamos conversar por aqui.",
+                _ when approved => $"Aprovado: {requestLabel}.",
+                _ => $"Recusado: {requestLabel}."
+            },
             Kind = "message",
             CreatedAt = DateTime.UtcNow,
         };

@@ -15,7 +15,7 @@ O frontend oficial do PACUS é `flutter_app/`; o frontend HTML/CSS/JS legado foi
 - O histórico dos dias encerrados é preservado.
 - As tarefas do dia são independentes da configuração permanente.
 - Existem três tipos: `mandatory`, `expected`, `challenge`.
-- Cada tarefa vale de 1 a 10 Pacus Points, ou de -1 a -10 como penalidade (zero não é permitido).
+- Cada tarefa vale de 1 a 10 Pacus Points. Tarefas não concluídas não descontam pontos.
 - Tarefa concluída ganha pontos; não concluída ganha zero e não perde saldo.
 - 1 Pacus Point equivale a R$ 0,06 (configurável por família em `Settings.PointToBrlRate`).
 - O PACUS cresce uma vez por dia encerrado, independentemente da conclusão das tarefas.

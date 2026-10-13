@@ -1070,10 +1070,6 @@ public class DailyRoutineService : IDailyRoutineService
         return routine;
     }
 
-    // V4: toda primeira declaracao de iniciativa concede exatamente +1 ponto,
-    // independentemente de quem lembrou o membro. Niveis servem para relatorio.
-    public const int InitiativeBonusPoints = 1;
-
     // A crianca monta o "combinado" da tarde/noite -- ver docs/ESTADO_ATUAL.md, item 1.
     // Substitui qualquer plano anterior do mesmo dia (nao acumula); items vazio limpa o
     // plano. Sem RequireRole aqui de proposito, igual ReorderTasksAsync -- e autonomia

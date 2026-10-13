@@ -1314,7 +1314,6 @@ public class DailyRoutineService : IDailyRoutineService
         var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
             ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
 
-        var alreadyInformed = task.Initiative is not null;
         task.Initiative = initiative;
         task.UpdatedAt = DateTime.UtcNow;
         var actorRoleEnum = ParseRole(actorRole);

@@ -685,7 +685,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text((task['period'] ?? '').toString() + ' · ' + (task['points'] ?? 0).toString() + ' PP'),
+                    Text(
+                      (task['period'] ?? '').toString() + ' · ' +
+                      (((task['points'] as num?)?.toInt() ?? 0) > 0
+                          ? (task['points']).toString() + ' PP'
+                          : 'sem pontos associados'),
+                    ),
                     if (task['supportKind'] != null)
                       const Padding(padding: EdgeInsets.only(top: 4), child: Text('Missão de estudo V4 habilitada')),
                     if (task['lastModifiedByMember'] == true)

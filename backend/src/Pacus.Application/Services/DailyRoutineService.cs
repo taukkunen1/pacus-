@@ -1223,10 +1223,24 @@ public class DailyRoutineService : IDailyRoutineService
         var task = routine.Tasks.FirstOrDefault(t => t.Id == taskId && t.DeletedAt is null)
             ?? throw new NotFoundException($"Tarefa {taskId} nao encontrada na rotina atual.");
 
-        if (task.SupportKind is null || task.SupportSteps.Count == 0)
-            throw new ValidationException("Esta tarefa nao possui missao de estudo habilitada.");
         if (task.Status == TaskItemStatus.Done)
             throw new ValidationException("Uma tarefa concluida nao aceita novas etapas.");
+
+        // Qualquer tarefa pode usar etapas, pedir ajuda ou adiar. Missões específicas
+        // continuam usando seu roteiro; tarefas comuns recebem um roteiro geral na
+        // primeira interação. Essas ações nunca alteram pontos.
+        if (task.SupportKind is null || task.SupportSteps.Count == 0)
+        {
+            var kind = task.SupportKind is not null
+                && TaskSupportConfiguration.DefaultSteps.ContainsKey(task.SupportKind)
+                    ? task.SupportKind
+                    : TaskSupportConfiguration.General;
+            task.SupportKind = kind;
+            task.SupportSteps = TaskSupportConfiguration.StepsForDay(
+                kind,
+                TaskSupportConfiguration.DefaultSteps[kind].ToList(),
+                routine.Date);
+        }
 
         var action = request.Action?.Trim().ToLowerInvariant();
         var now = DateTime.UtcNow;
@@ -1243,6 +1257,8 @@ public class DailyRoutineService : IDailyRoutineService
                 break;
             case "help":
                 task.SupportHelpCount++;
+                task.SupportStartedAt ??= now;
+                task.SupportPostponedUntil = null;
                 break;
             case "step":
             case "undo-step":

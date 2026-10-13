@@ -641,7 +641,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
     // A2: conta de teste (adulto e membro) isolada em database temporario,
     // com transacoes reais no replica set da fixture. Nunca usa producao.
     [Fact]
-    public async Task V4_ContaFicticia_PassoAjudaIniciativaEConclusao_GeramLedgerCorreto()
+    public async Task V4_ContaFicticia_PassoAjudaIniciativaEConclusao_GeraSomentePontosDaTarefa()
     {
         using var factory = new PacusApiFactory(_mongo.ConnectionString);
         using var client = factory.CreateClient();
@@ -687,7 +687,7 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
             new { initiative = "promptedByAdult" });
         Assert.Equal(HttpStatusCode.OK, initiative.StatusCode);
 
-        // Alterar a autodeclaracao nao gera um segundo bonus.
+        // O autorrelato serve para entender o apoio necessário, sem pontos extras.
         var again = await client.PutAsJsonAsync(
             $"/api/v1/daily-tasks/{taskId}/initiative",
             new { initiative = "selfStarted" });
@@ -702,11 +702,11 @@ public class DailyTasksHttpIntegrationTests : IClassFixture<MongoIntegrationFixt
         var ledger = db.GetCollection<BsonDocument>("point_transactions");
         var events = db.GetCollection<BsonDocument>("task_events");
         var entries = await ledger.Find(new BsonDocument("taskId", taskId)).ToListAsync();
-        Assert.Equal(2, entries.Count);
-        Assert.Equal(2, entries.Sum(e => e["points"].ToInt32()));
-        Assert.Equal(1, entries.Count(e => e["points"].ToInt32() == 1 &&
+        Assert.Single(entries);
+        Assert.Equal(1, entries.Sum(e => e["points"].ToInt32()));
+        Assert.DoesNotContain(entries, e =>
             e.TryGetValue("reason", out var reason) && reason.IsString &&
-            reason.AsString.Contains("autonomia")));
+            reason.AsString.Contains("autonomia", StringComparison.OrdinalIgnoreCase));
 
         var auditCount = await events.CountDocumentsAsync(new BsonDocument("taskId", taskId));
         Assert.True(auditCount >= 7);

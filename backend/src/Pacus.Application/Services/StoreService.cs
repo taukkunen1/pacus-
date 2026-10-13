@@ -117,15 +117,15 @@ public class StoreService : IStoreService
         if (item.Stock is not null && item.Stock <= 0)
             throw new ValidationException("Item sem estoque disponivel.");
 
+        if (item.DailyLimit is not null)
+            await EnsureDailyLimitNotReachedAsync(familyId, item);
+
         if (item.ScreenTimeMinutes is int screenMinutes)
         {
             if (screenMinutes < 1 || screenMinutes > 60)
                 throw new ValidationException("A recompensa de tempo de tela deve ser de 1 a 60 minutos por item.");
             await EnsureDailyScreenTimeLimitNotReachedAsync(familyId, screenMinutes);
         }
-
-        if (item.DailyLimit is not null)
-            await EnsureDailyLimitNotReachedAsync(familyId, item);
 
         var redemption = new Redemption
         {

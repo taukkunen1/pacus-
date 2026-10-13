@@ -53,7 +53,7 @@ void main() {
     expect(chatRequestStatusLabel('approved', type: 'help'), 'Recebido');
     expect(
       chatRequestStatusLabel('rejected', type: 'change_task'),
-      'Nao atendido',
+      'Não atendido',
     );
     expect(
       chatRequestStatusLabel('approved', type: 'extra_time'),

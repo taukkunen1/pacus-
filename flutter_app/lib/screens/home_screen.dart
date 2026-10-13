@@ -838,7 +838,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               const SizedBox(height: 8),
               TextField(controller: description, decoration: const InputDecoration(labelText: 'Descrição')),
               const SizedBox(height: 8),
-              TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos')),
+              TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos (1–10; sem desconto)')),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 initialValue: period,

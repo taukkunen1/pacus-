@@ -274,7 +274,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _editTask([Map<String, dynamic>? task]) async {
     final title = TextEditingController(text: task?['title']?.toString() ?? '');
     final description = TextEditingController(text: task?['description']?.toString() ?? '');
-    final points = TextEditingController(text: (task?['points'] ?? 1).toString());
+    final existingPoints = (task?['points'] as num?)?.toInt() ?? 1;
+    final points = TextEditingController(text: existingPoints > 0 ? existingPoints.toString() : '1');
     final minimum = TextEditingController(text: task?['minimumGoalLabel']?.toString() ?? '');
     String supportKind = task?['supportKind']?.toString() ?? 'none';
     final supportSteps = TextEditingController(
@@ -314,7 +315,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 8),
                 TextField(controller: description, decoration: const InputDecoration(labelText: 'Descrição')),
                 const SizedBox(height: 8),
-                TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos')),
+                TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos (1–10; sem desconto)')),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   initialValue: period,
@@ -394,6 +395,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   decoration: const InputDecoration(labelText: 'Missão dividida em etapas'),
                   items: const [
                     DropdownMenuItem(value: 'none', child: Text('Desativada')),
+                    DropdownMenuItem(value: 'general', child: Text('Etapas gerais para qualquer tarefa')),
                     DropdownMenuItem(value: 'reading', child: Text('Leitura do livro')),
                     DropdownMenuItem(value: 'homework', child: Text('Lição de casa')),
                     DropdownMenuItem(value: 'handwriting', child: Text('Caderno de caligrafia')),
@@ -456,12 +458,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
             FilledButton(
-              onPressed: () => Navigator.pop(context, {
+              onPressed: () {
+                final pointValue = int.tryParse(points.text);
+                if (pointValue == null || pointValue < 1 || pointValue > 10) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Use de 1 a 10 pontos. Tarefas não descontam pontos.')),
+                  );
+                  return;
+                }
+                Navigator.pop(context, {
                 'title': title.text.trim(),
                 'description': description.text.trim().isEmpty ? null : description.text.trim(),
                 'type': 'mandatory',
                 'period': period,
-                'points': int.tryParse(points.text) ?? 1,
+                'points': pointValue,
                 'recurrence': recurrence,
                 'customDays': recurrence == 'custom' ? selectedDays.toList() : null,
                 'anchorDate': recurrence == 'interval' && anchorDate.text.trim().isNotEmpty ? anchorDate.text.trim() : null,
@@ -483,8 +493,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'supportKind': supportKind == 'none' ? null : supportKind,
                 'supportSteps': supportKind == 'none' || supportSteps.text.trim().isEmpty
                     ? null
-                    : supportSteps.text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
-              }),
+                    : supportSteps.text.split('\\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+                });
+              },
               child: const Text('Salvar'),
             ),
           ],

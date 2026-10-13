@@ -165,7 +165,8 @@ public class StoreService : IStoreService
 
     // Soma recompensas pendentes e aprovadas de todos os itens de tela no dia operacional.
     private async Task EnsureDailyScreenTimeLimitNotReachedAsync(
-        ObjectId familyId, int requestedMinutes, ObjectId? excludeRedemptionId = null)
+        ObjectId familyId, int requestedMinutes, ObjectId? excludeRedemptionId = null,
+        bool includePending = true)
     {
         var timezone = await _familyTimezoneService.GetTimezoneAsync(familyId);
         var today = TimezoneHelper.GetOperationalDate(timezone);
@@ -176,7 +177,8 @@ public class StoreService : IStoreService
         foreach (var redemption in recent)
         {
             if ((excludeRedemptionId.HasValue && redemption.Id == excludeRedemptionId.Value)
-                || redemption.Status == RedemptionStatus.Rejected)
+                || redemption.Status == RedemptionStatus.Rejected
+                || (!includePending && redemption.Status != RedemptionStatus.Approved))
                 continue;
 
             var relevantAt = redemption.Status == RedemptionStatus.Approved
@@ -220,7 +222,7 @@ public class StoreService : IStoreService
         if (grantedScreenTimeMinutes is int minutesToGrant)
         {
             await EnsureDailyScreenTimeLimitNotReachedAsync(
-                familyId, minutesToGrant, redemption.Id);
+                familyId, minutesToGrant, redemption.Id, includePending: false);
         }
 
         // Se o item concede tempo de tela, garante que a rotina de hoje existe ANTES de

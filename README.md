@@ -22,6 +22,14 @@ O frontend oficial do PACUS é `flutter_app/`; o frontend HTML/CSS/JS legado foi
 - A criança pode alterar somente as tarefas do dia atual, conforme permissões.
 - O adulto administra regras permanentes, configurações e histórico autorizado.
 
+## Hidratação por perfil
+
+O registro de água e a meta diária são separados por perfil. Cada registro aceita
+50–1000 mL; metas configuráveis ficam entre 500–4000 mL e a recompensa, quando
+habilitada, é de 0–5 PP uma única vez por perfil/dia. Ultrapassar a meta não gera
+pontos extras. A meta do aplicativo é uma configuração familiar, não uma recomendação
+médica.
+
 ## Loja de Pacus Points
 O adulto cadastra itens (brinquedo, atividade, tempo de tela, outro); a criança solicita o resgate e o adulto aprova ou rejeita. Ao aprovar, o saldo é debitado (nunca na solicitação). Cada item pode opcionalmente ter:
 - **Limite diário** (`dailyLimit`) — quantas vezes por dia operacional este item pode ser resgatado (pedidos rejeitados não contam para o limite).

@@ -41,7 +41,7 @@ Exemplos de payload:
 - `{"action":"resume"}`
 
 O endpoint exige autenticação, verifica a família autenticada via
-`GetLatestOpenAsync`, rejeita tarefas excluídas, concluídas ou sem opt-in,
+`GetLatestOpenAsync`, rejeita tarefas excluídas ou concluídas,
 e valida índices de etapa no servidor. Todas as ações emitem um
 `TaskEventType.SupportAction`, sem chamar `PointsService`.
 

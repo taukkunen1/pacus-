@@ -294,6 +294,39 @@ public class TaskSupportV4Tests
     }
 
     [Fact]
+    public async Task PenalidadeLegadaEmTarefaAtivaEAnuladaSemDeixarSaldoNegativo()
+    {
+        var templateRepo = new FakeTaskTemplateRepository();
+        var routineRepo = new FakeDailyRoutineRepository();
+        var pointRepo = new FakePointTransactionRepository();
+        var templates = new TaskTemplateService(templateRepo, new FakeAuditLogRepository());
+        var pointsService = new PointsService(pointRepo);
+        var routines = new DailyRoutineService(
+            routineRepo, templateRepo, new FakeTaskEventRepository(),
+            pointsService, new FakeSettingsRepository());
+        var family = ObjectId.GenerateNewId();
+
+        await templates.CreateAsync(family, family,
+            new CreateTaskRequest("Tarefa antiga", null, "mandatory", "morning", 1));
+        var routine = await routines.GetOrCreateTodayAsync(family, "America/Sao_Paulo");
+        var task = Assert.Single(routine.Tasks);
+        task.Points = -2;
+        task.Status = Pacus.Domain.Enums.TaskItemStatus.Done;
+        await routineRepo.UpdateAsync(routine);
+        await pointsService.RecordAsync(
+            family, routine.Id, routine.Date, task.Id, task.Title,
+            PointTransactionType.Award, -2, family, UserRole.Adult, "Penalidade legada");
+
+        Assert.Equal(-2, await pointsService.GetBalanceAsync(family));
+
+        var normalized = await routines.GetOrCreateTodayAsync(family, "America/Sao_Paulo");
+        Assert.Equal(0, Assert.Single(normalized.Tasks).Points);
+        Assert.Equal(0, normalized.PointsEarned);
+        Assert.Equal(0, await pointsService.GetBalanceAsync(family));
+        Assert.Equal(0, pointRepo.Transactions.Sum(transaction => transaction.Points));
+    }
+
+    [Fact]
     public async Task TarefaComumRecebeEtapasEAdiamentoSemDescontarPontos()
     {
         var (templates, routines, points) = BuildSystem();

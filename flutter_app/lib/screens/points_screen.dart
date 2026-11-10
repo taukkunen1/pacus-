@@ -18,7 +18,6 @@ class PointsScreen extends StatefulWidget {
 
 class _PointsScreenState extends State<PointsScreen> {
   Map<String, dynamic>? balance;
-  Map<String, dynamic>? autonomy;
   final transactions = <Map<String, dynamic>>[];
   int page = 1;
   int totalPages = 1;
@@ -75,13 +74,12 @@ class _PointsScreenState extends State<PointsScreen> {
 
   Future<void> _load({bool reset = false}) async {
     if (!mounted) return;
-    if (reset) { page = 1; transactions.clear(); balance = null; autonomy = null; }
+    if (reset) { page = 1; transactions.clear(); balance = null; }
     setState(() => loading = true);
     try {
       balance ??= await widget.api.getMap('/points');
       if (!mounted) return;
       widget.onBalanceChanged(balance!);
-      try { autonomy ??= await widget.api.getMap('/autonomy/weekly'); } catch (_) {}
       final data = await widget.api.getMap('/points/transactions?page=' + page.toString() + '&pageSize=20');
       transactions.addAll((data['items'] as List? ?? []).map((e) => Map<String, dynamic>.from(e as Map)));
       totalPages = (data['totalPages'] as num?)?.toInt() ?? 1;
@@ -108,23 +106,6 @@ class _PointsScreenState extends State<PointsScreen> {
                 label: const Text('Ajustar saldo'),
               ),
             ),
-          if (autonomy != null) ...[
-            const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Autonomia nesta semana', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 8),
-                  Text('Iniciadas por conta própria: ' + (autonomy!['selfStarted'] ?? autonomy!['selfStartedCount'] ?? 0).toString()),
-                  Text('Com lembrete do PACUS: ' + (autonomy!['promptedByPacus'] ?? autonomy!['promptedByPacusCount'] ?? 0).toString()),
-                  Text('Com lembrete de adulto: ' + (autonomy!['promptedByAdult'] ?? autonomy!['promptedByAdultCount'] ?? 0).toString()),
-                  Text('Criadas por mim: ' + (autonomy!['memberCreatedTasks'] ?? 0).toString()),
-                  Text('Dias planejados: ' + (autonomy!['plannedDays'] ?? 0).toString()),
-                ]),
-              ),
-            ),
-          ],
           const SizedBox(height: 18),
           const Text('Movimentações', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
           const SizedBox(height: 10),

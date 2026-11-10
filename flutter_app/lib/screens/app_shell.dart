@@ -14,7 +14,6 @@ import 'pacus_screen.dart';
 import 'points_screen.dart';
 import 'settings_screen.dart';
 import 'store_screen.dart';
-import 'tomorrow_screen.dart';
 
 class PacusShell extends StatefulWidget {
   const PacusShell({
@@ -233,8 +232,6 @@ class _PacusShellState extends State<PacusShell> {
           ),
           badge: widget.session.isAdult ? 0 : todayPending,
         ),
-        _TabSpec('Amanhã', Icons.edit_calendar_outlined,
-            TomorrowScreen(api: widget.api, session: widget.session)),
         _TabSpec(
           'Chat',
           Icons.chat_bubble_outline,

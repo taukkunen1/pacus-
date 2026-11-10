@@ -1508,7 +1508,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           title: 'Manhã',
           icon: Icons.wb_sunny_outlined,
           tasks: morning,
-          accent: const Color(0xFFE59A22),
+          accent: theme.colorScheme.secondary,
         ),
         const SizedBox(height: 14),
         _periodSection(

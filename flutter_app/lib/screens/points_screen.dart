@@ -4,9 +4,15 @@ import '../api.dart';
 import '../models.dart';
 
 class PointsScreen extends StatefulWidget {
-  const PointsScreen({super.key, required this.api, required this.session});
+  const PointsScreen({
+    super.key,
+    required this.api,
+    required this.session,
+    required this.onBalanceChanged,
+  });
   final PacusApi api;
   final AuthSession session;
+  final ValueChanged<Map<String, dynamic>> onBalanceChanged;
   @override State<PointsScreen> createState() => _PointsScreenState();
 }
 
@@ -68,10 +74,13 @@ class _PointsScreenState extends State<PointsScreen> {
   }
 
   Future<void> _load({bool reset = false}) async {
+    if (!mounted) return;
     if (reset) { page = 1; transactions.clear(); balance = null; autonomy = null; }
     setState(() => loading = true);
     try {
       balance ??= await widget.api.getMap('/points');
+      if (!mounted) return;
+      widget.onBalanceChanged(balance!);
       try { autonomy ??= await widget.api.getMap('/autonomy/weekly'); } catch (_) {}
       final data = await widget.api.getMap('/points/transactions?page=' + page.toString() + '&pageSize=20');
       transactions.addAll((data['items'] as List? ?? []).map((e) => Map<String, dynamic>.from(e as Map)));
@@ -82,29 +91,23 @@ class _PointsScreenState extends State<PointsScreen> {
     }
   }
 
-  @override Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Pacus Points')),
-    body: RefreshIndicator(
+  @override
+  Widget build(BuildContext context) => RefreshIndicator(
       onRefresh: () => _load(reset: true),
       child: ListView(
-        padding: const EdgeInsets.all(18),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           if (error != null) Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(children: [
-                Text((balance?['balance'] ?? 0).toString(), style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w900)),
-                const Text('Pacus Points', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
-                Text('R\$ ' + (((balance?['brl'] as num?)?.toDouble() ?? 0).toStringAsFixed(2).replaceAll('.', ','))),
-                if (widget.session.isAdult) ...[
-                  const SizedBox(height: 14),
-                  OutlinedButton.icon(onPressed: _adjustBalance, icon: const Icon(Icons.tune), label: const Text('Ajustar saldo')),
-                ],
-              ]),
+          if (widget.session.isAdult)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: loading || balance == null ? null : _adjustBalance,
+                icon: const Icon(Icons.tune),
+                label: const Text('Ajustar saldo'),
+              ),
             ),
-          ),
           if (autonomy != null) ...[
             const SizedBox(height: 16),
             Card(
@@ -136,6 +139,5 @@ class _PointsScreenState extends State<PointsScreen> {
           if (page < totalPages) OutlinedButton(onPressed: loading ? null : () { page++; _load(); }, child: const Text('Carregar mais')),
         ],
       ),
-    ),
-  );
+    );
 }

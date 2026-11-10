@@ -9,10 +9,12 @@ class StoreScreen extends StatefulWidget {
     required this.api,
     required this.session,
     this.onPendingChanged,
+    required this.onBalanceChanged,
   });
   final PacusApi api;
   final AuthSession session;
   final ValueChanged<int>? onPendingChanged;
+  final ValueChanged<Map<String, dynamic>> onBalanceChanged;
   @override State<StoreScreen> createState() => _StoreScreenState();
 }
 
@@ -26,10 +28,13 @@ class _StoreScreenState extends State<StoreScreen> {
   @override void initState() { super.initState(); _load(); }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => loading = true);
     try {
-      final rawItems = await widget.api.getList(widget.session.isAdult ? '/store/items/all' : '/store/items');
       final points = await widget.api.getMap('/points');
+      if (!mounted) return;
+      widget.onBalanceChanged(points);
+      final rawItems = await widget.api.getList(widget.session.isAdult ? '/store/items/all' : '/store/items');
       final rawPending = widget.session.isAdult ? await widget.api.getList('/store/redemptions/pending') : <dynamic>[];
       if (!mounted) return;
       final pendingItems = rawPending.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -181,32 +186,47 @@ class _StoreScreenState extends State<StoreScreen> {
     return labels[value?.toString()] ?? value?.toString() ?? 'Outro';
   }
 
-  @override Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Loja'),
-      actions: [if (widget.session.isAdult) IconButton(onPressed: () => _edit(), icon: const Icon(Icons.add), tooltip: 'Novo item')],
-    ),
-    body: RefreshIndicator(
+  @override
+  Widget build(BuildContext context) => RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.all(18),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(22),
-              child: Column(children: [
-                Text(balance.toString(), style: const TextStyle(fontSize: 44, fontWeight: FontWeight.w900)),
-                const Text('Pacus Points'),
-              ]),
+          if (widget.session.isAdult)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: () => _edit(),
+                icon: const Icon(Icons.add),
+                label: const Text('Novo item'),
+              ),
             ),
-          ),
           if (error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
+          if (widget.session.isAdult && pending.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text('Resgates pendentes (${pending.length})', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 10),
+            for (final p in pending)
+              Card(
+                child: ListTile(
+                  title: Text(p['itemTitle']?.toString() ?? 'Item'),
+                  subtitle: Text((p['cost'] ?? 0).toString() + ' PP'),
+                  trailing: Wrap(spacing: 6, children: [
+                    IconButton(onPressed: () => _review(p['id'].toString(), true), icon: const Icon(Icons.check_circle), tooltip: 'Aprovar'),
+                    IconButton(onPressed: () => _review(p['id'].toString(), false), icon: const Icon(Icons.cancel_outlined), tooltip: 'Rejeitar'),
+                  ]),
+                ),
+              ),
+          ],
           const SizedBox(height: 18),
-          const Text('Itens', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+          const Text('Recompensas', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
           const SizedBox(height: 6),
           const Text('Tempo de tela é uma opção da família, não uma recompensa necessária por cada tarefa.'),
           const SizedBox(height: 10),
           if (items.isEmpty && loading) const Center(child: CircularProgressIndicator()),
+          if (items.isEmpty && !loading && error == null)
+            const Text('Nenhuma recompensa disponível por enquanto.'),
           for (final item in items) ...[
             Card(
               child: Padding(
@@ -246,25 +266,8 @@ class _StoreScreenState extends State<StoreScreen> {
             ),
             const SizedBox(height: 10),
           ],
-          if (widget.session.isAdult) ...[
-            const SizedBox(height: 14),
-            const Text('Aguardando aprovação', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 10),
-            if (pending.isEmpty) const Text('Nenhum resgate pendente.'),
-            for (final p in pending)
-              Card(
-                child: ListTile(
-                  title: Text(p['itemTitle']?.toString() ?? 'Item'),
-                  subtitle: Text((p['cost'] ?? 0).toString() + ' PP'),
-                  trailing: Wrap(spacing: 6, children: [
-                    IconButton(onPressed: () => _review(p['id'].toString(), true), icon: const Icon(Icons.check_circle), tooltip: 'Aprovar'),
-                    IconButton(onPressed: () => _review(p['id'].toString(), false), icon: const Icon(Icons.cancel_outlined), tooltip: 'Rejeitar'),
-                  ]),
-                ),
-              ),
-          ],
+
         ],
       ),
-    ),
-  );
+    );
 }

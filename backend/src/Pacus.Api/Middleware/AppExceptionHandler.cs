@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Routing;
 using Pacus.Application.Exceptions;
 
 namespace Pacus.Api.Middleware;
@@ -39,9 +40,8 @@ public class AppExceptionHandler : IExceptionHandler
         {
             _logger.LogError(
                 exception,
-                "Erro nao tratado em {Method} {Path}",
-                httpContext.Request.Method,
-                httpContext.Request.Path);
+                "Erro nao tratado na rota {Route}",
+                (httpContext.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText ?? "sem rota");
         }
 
         httpContext.Response.StatusCode = status;

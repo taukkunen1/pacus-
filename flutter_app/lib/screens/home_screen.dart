@@ -1504,24 +1504,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ],
         ),
         const SizedBox(height: 12),
-        if (tasks.any((t) => t.hasStudySupport && !t.isDone)) ...[
-          Text('Escolha sua próxima missão de estudo',
-            style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final mission in tasks.where((t) => t.hasStudySupport && !t.isDone))
-                ActionChip(
-                  avatar: const Icon(Icons.menu_book_outlined, size: 18),
-                  label: Text(mission.title),
-                  onPressed: () => _openStudyMission(mission),
-                ),
-            ],
-          ),
-          const SizedBox(height: 14),
-        ],
         _periodSection(
           title: 'Manhã',
           icon: Icons.wb_sunny_outlined,

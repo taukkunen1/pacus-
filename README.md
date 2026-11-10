@@ -11,7 +11,7 @@ Flutter Web -> ASP.NET Core 10 / C# -> MongoDB Atlas
 O frontend oficial do PACUS é `flutter_app/`; o frontend HTML/CSS/JS legado foi aposentado após a auditoria final de migração.
 
 ## Regras centrais
-- Cada dia começa às 00:00 no timezone do usuário.
+- Cada dia começa às 00:00 no fuso horário da família.
 - O histórico dos dias encerrados é preservado.
 - As tarefas do dia são independentes da configuração permanente.
 - Existem três tipos: `mandatory`, `expected`, `challenge`.
@@ -68,4 +68,4 @@ Ver `docs/ESTADO_ATUAL.md` para o retrato atual e `docs/FLUTTER_MIGRATION_AUDIT.
 
 ## Comunicação V2
 
-A V2 já inclui estado de leitura por usuário, badge de mensagens não lidas e pedidos rápidos da criança no Chat. O adulto pode aprovar/recusar pedidos no próprio Chat; pedidos de tempo extra aplicam os minutos ao game timer quando aprovados. A próxima evolução natural é um centro de notificações consolidado e push/PWA.
+A V2 já inclui estado de leitura por usuário, badge de mensagens não lidas e pedidos rápidos da criança no Chat. O adulto pode aprovar/recusar pedidos no próprio Chat; pedidos de tempo extra aplicam os minutos ao game timer quando aprovados. A criança pode escolher a duração do pedido de tempo extra e incluir uma observação opcional.

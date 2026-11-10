@@ -23,7 +23,7 @@ public static class TaskSupportConfiguration
             [Homework] = new[] { "Separar o material da escola ou do ingles", "Ver quais atividades foram pedidas", "Escolher por qual atividade comecar", "Fazer a primeira atividade (pode comecar com 10 minutos)", "Continuar a licao, fazer pausas e pedir ajuda se precisar", "Conferir o que foi feito e guardar o material" },
             [Handwriting] = new[] { "Separar o caderno e lapis", "Escrever a primeira linha", "Concluir a quantidade combinada" },
             [Bathing] = new[] { "Pegar a toalha", "Abrir a janela do banheiro", "Lavar o cabelo", "Tomar banho", "Tirar as roupas do chao", "Guardar a toalha" },
-            [MoodBoard] = new[] { "Pensar em como estou me sentindo hoje", "Escolher uma cor ou um desenho que combine com esse sentimento", "Desenhar na lousa", "Olhar meu desenho e, se quiser, contar algo sobre ele" },
+            [MoodBoard] = new[] { "Escolher o que quero desenhar: meu humor ou uma ideia livre", "Escolher o desafio criativo do dia (ou minha propria ideia)", "Fazer o primeiro traco na lousa", "Criar meu desenho do meu jeito", "Olhar minha criacao e concluir (dar nome ou contar e opcional)" },
         };
 
     private static readonly string[] LegacyHomeworkSteps =
@@ -34,6 +34,46 @@ public static class TaskSupportConfiguration
 
     public static bool IsLegacyHomeworkSteps(IReadOnlyList<string> steps) =>
         steps.SequenceEqual(LegacyHomeworkSteps);
+
+    // Templates criados antes desta versao continuam validos e serao atualizados
+    // somente nas novas rotinas ou pela acao explicita do adulto na rotina de hoje.
+    private static readonly string[] LegacyMoodSteps =
+    {
+        "Pensar em como estou me sentindo hoje",
+        "Escolher uma cor ou um desenho que combine com esse sentimento",
+        "Desenhar na lousa",
+        "Olhar meu desenho e, se quiser, contar algo sobre ele",
+    };
+
+    // Sugestoes abertas e ludicas. Nenhuma exige revelar sentimentos ou
+    // demonstrar qualidade artistica; a crianca sempre pode escolher sua ideia.
+    private static readonly string[] MoodChallenges =
+    {
+        "invente um monstro gentil",
+        "imagine a previsao do tempo de um planeta",
+        "crie um planeta que ninguem visitou",
+        "invente um personagem com um poder diferente",
+        "crie um animal com formas geometricas",
+        "desenhe um veiculo que ainda nao existe",
+        "conte uma historia com tres desenhos",
+        "transforme um rabisco em uma criatura",
+        "invente uma casa em uma arvore gigante",
+        "crie um robo que ajuda alguem",
+        "desenhe uma ilha com uma regra engracada",
+        "transforme uma fruta em personagem",
+        "crie um mapa de um lugar imaginario",
+        "junte dois animais e invente um terceiro",
+        "invente algo para um dia de chuva",
+        "desenhe uma maquina que cria sorrisos",
+        "invente um jardim em outro planeta",
+        "desenhe uma escola voadora",
+        "crie um personagem com um unico circulo",
+        "imagine o que existe no fundo de um oceano novo",
+        "desenhe algo pequeno que ficou gigante",
+    };
+
+    public static bool IsLegacyMoodSteps(IReadOnlyList<string> steps) =>
+        steps.SequenceEqual(LegacyMoodSteps);
 
     public static bool IsHairWashDay(string date)
     {
@@ -46,10 +86,24 @@ public static class TaskSupportConfiguration
     {
         if (kind == Homework && IsLegacyHomeworkSteps(steps))
             return new List<string>(DefaultSteps[Homework]);
+
+        if (kind == MoodBoard)
+        {
+            // Rotina nao sobrescreve etapas personalizadas pelo adulto.
+            if (!steps.SequenceEqual(DefaultSteps[MoodBoard]) && !IsLegacyMoodSteps(steps))
+                return new List<string>(steps);
+
+            var day = DateOnly.ParseExact(date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+            var selected = new List<string>(DefaultSteps[MoodBoard]);
+            var suggestion = MoodChallenges[day.DayNumber % MoodChallenges.Length];
+            selected[1] = $"Desafio de hoje: {suggestion} (ou escolha sua propria ideia)";
+            return selected;
+        }
+
         if (kind != Bathing) return new List<string>(steps);
-        var selected = new List<string>(DefaultSteps[Bathing]);
-        if (!IsHairWashDay(date)) selected.Remove("Lavar o cabelo");
-        return selected;
+        var bathSteps = new List<string>(DefaultSteps[Bathing]);
+        if (!IsHairWashDay(date)) bathSteps.Remove("Lavar o cabelo");
+        return bathSteps;
     }
 
     public static (string? Kind, List<string> Steps) Parse(string? kind, List<string>? steps)

@@ -70,4 +70,4 @@ Estes termos são regidos pelas leis da República Federativa do Brasil. 🔲 *(
 
 ## 12. Contato
 
-Dúvidas sobre estes termos: pedro.hdslima98@gmail.com
+Dúvidas sobre estes termos: 🔲 *(e-mail de contato a definir)*

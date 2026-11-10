@@ -10,8 +10,7 @@
     <!-- IMemoryCache usado por FamilyTimezoneService (revisao de API, 2026-09-11,
          achado #1); versao alinhada com Microsoft.AspNetCore.Authentication.JwtBearer
          em Pacus.Api, ambos net10.0. -->
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.14" />
   </ItemGroup>
 
   <ItemGroup>

@@ -370,6 +370,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     '(somente dia sim, dia não), tomar banho, tirar as roupas do chão '
                     'e guardar a toalha. Em 08/10/2026 deve lavar o cabelo.',
                   ),
+                ] else if (supportKind == 'homework') ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Lição de casa da escola e do inglês é uma missão só: '
+                    'separar o material, ver o que foi pedido, escolher por onde começar, '
+                    'fazer a primeira atividade, continuar com pausas se necessário '
+                    'e conferir/guardar. Sugestão flexível: 15–25 minutos, '
+                    'sem cronômetro obrigatório e sem pontos por etapa.',
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: supportSteps,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      labelText: 'Etapas personalizadas (uma por linha)',
+                      helperText: 'Em branco: usar as seis etapas sugeridas.',
+                    ),
+                  ),
                 ] else if (supportKind == 'mood_board') ...[
                   const SizedBox(height: 8),
                   const Text('Cinco etapas: escolher o tema (humor ou imaginação), ver um desafio criativo que muda a cada dia, fazer o primeiro traço, desenhar livremente e finalizar. O desafio é opcional: pode criar sua própria ideia. Não é necessário explicar sentimentos, dar título ou fazer um desenho perfeito.'),
@@ -609,11 +628,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           const SizedBox(height: 18),
-          const Text('Privacidade e termos', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+          const Text('Privacidade', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 8, children: [
             OutlinedButton.icon(onPressed: () => _openLegal('privacidade.html'), icon: const Icon(Icons.privacy_tip_outlined), label: const Text('Privacidade')),
-            OutlinedButton.icon(onPressed: () => _openLegal('termos.html'), icon: const Icon(Icons.description_outlined), label: const Text('Termos de Uso')),
           ]),
           const SizedBox(height: 18),
           FilledButton.tonalIcon(onPressed: _newRecovery, icon: const Icon(Icons.password), label: const Text('Gerar novo código de recuperação')),

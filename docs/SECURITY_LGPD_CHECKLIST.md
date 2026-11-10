@@ -100,3 +100,19 @@ A migração de hospedagem foi encerrada tecnicamente:
 - o Flutter possui suíte própria de testes para modelos, mensagens de esforço, utilitários de Chat e cliente HTTP;
 - o workflow `.github/workflows/production-health.yml` monitora frontend, API, MongoDB e CORS a cada 15 minutos;
 - a Comunicação V2 passou a incluir pedidos rápidos e revisão pelo adulto, mantendo isolamento por família e autorização por papel.
+
+
+## Hardening adicional — 2026-09-26
+
+Auditoria de código refeita; achados corrigidos em `security/hardening-2026-09`:
+- **Rate limit contornável:** o IP vinha do primeiro valor de `X-Forwarded-For`, que o cliente controla. Agora usa `Fly-Client-IP` (definido pelo proxy do Fly.io). Adicionado também teto global de 300 req/min por IP.
+- **Bloqueio por conta** (`LoginAttemptTracker`): 5 falhas em login adulto, PIN da criança ou código de recuperação bloqueiam aquela conta por 15 min, independente do IP (o PIN tem só 10.000 combinações). Estado em memória; se a API passar a rodar em mais de uma máquina, mover para o MongoDB.
+- **Códigos de recuperação e da família** passaram a usar `RandomNumberGenerator` (antes `Random.Shared`, previsível).
+- **Reset de senha** agora exige nova senha com 8+ caracteres (antes sem validação).
+- JWT: `JWT_SECRET` mínimo de 32 caracteres, só HS256 aceito, expiração obrigatória.
+- Cabeçalhos de segurança (CSP restritiva, nosniff, X-Frame-Options, Referrer-Policy), HSTS em produção, sem cabeçalho `Server`, corpo máximo de 1 MB.
+- Docker roda como usuário não-root; `appsettings.json` sem a origem antiga do GitHub Pages.
+- GitHub: Dependabot, CodeQL, secret scan (gitleaks), `permissions` mínimas no CI e `SECURITY.md`.
+
+Pendências fora do código (fazer no GitHub/Fly): ativar 2FA, *Secret scanning + Push protection*, *Private vulnerability reporting*, proteção da branch `main` (PR + CI obrigatório, sem force-push).
+Risco aceito/observação: o JWT (30 dias) fica em `shared_preferences` (localStorage na web); trocar por cookie HttpOnly exigiria mudar API e Flutter. Sem revogação de token ainda.

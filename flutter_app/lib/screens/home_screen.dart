@@ -1100,6 +1100,94 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  // Mesmo planejamento visual da noite, limitado ao periodo escolhido.
+  // Reaproveita a API de ordenacao existente, sem criar pontos nem tarefas.
+  Future<void> _planDayPeriod(DailyRoutine value, String period) async {
+    final label = period == 'morning' ? 'manhã' : 'tarde';
+    final active = value.tasks.where((t) => !t.isDeleted).toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
+    final pending = active.where((t) =>
+        !t.isDone && t.period.toLowerCase() == period).toList();
+    if (pending.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Não há tarefas pendentes para a $label.')),
+      );
+      return;
+    }
+    final ordered = List<DailyTask>.from(pending);
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialog) => AlertDialog(
+          title: Text('Como você quer organizar sua $label?'),
+          content: SizedBox(
+            width: 500,
+            height: 360,
+            child: ListView.builder(
+              itemCount: ordered.length,
+              itemBuilder: (_, i) => ListTile(
+                leading: CircleAvatar(child: Text((i + 1).toString())),
+                title: Text(ordered[i].title),
+                trailing: Wrap(
+                  spacing: 2,
+                  children: [
+                    IconButton(
+                      onPressed: i == 0 ? null : () => setDialog(() {
+                        final item = ordered.removeAt(i);
+                        ordered.insert(i - 1, item);
+                      }),
+                      icon: const Icon(Icons.arrow_upward),
+                      tooltip: 'Subir',
+                    ),
+                    IconButton(
+                      onPressed: i == ordered.length - 1 ? null : () => setDialog(() {
+                        final item = ordered.removeAt(i);
+                        ordered.insert(i + 1, item);
+                      }),
+                      icon: const Icon(Icons.arrow_downward),
+                      tooltip: 'Descer',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Salvar ordem'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (accepted != true || !mounted) return;
+
+    // Preserva a posicao das tarefas ja concluidas e de outros periodos.
+    var next = 0;
+    final reordered = active.map((task) {
+      if (!task.isDone && task.period.toLowerCase() == period) {
+        return ordered[next++];
+      }
+      return task;
+    }).toList();
+    try {
+      await widget.api.request(
+        '/daily-routines/today/order',
+        method: 'PUT',
+        body: reordered.map((t) => t.id).toList(),
+      );
+      final updated = await widget.api.getToday();
+      if (mounted) setState(() => routine = updated);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    }
+  }
+
   Future<void> _planEvening(DailyRoutine value) async {
     final evening = value.tasks.where((t) => !t.isDeleted && !t.isDone && t.period.toLowerCase() == 'evening').toList();
     if (evening.isEmpty) {
@@ -1256,7 +1344,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   const SizedBox(height: 20),
                   _tasksCard(r),
                   const SizedBox(height: 12),
-                  OutlinedButton.icon(onPressed: () => _planEvening(r), icon: const Icon(Icons.nightlight_outlined), label: const Text('Planejar minha noite')),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _planDayPeriod(r, 'morning'),
+                        icon: const Icon(Icons.wb_sunny_outlined),
+                        label: const Text('Planejar minha manhã'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _planDayPeriod(r, 'afternoon'),
+                        icon: const Icon(Icons.light_mode_outlined),
+                        label: const Text('Planejar minha tarde'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _planEvening(r),
+                        icon: const Icon(Icons.nightlight_outlined),
+                        label: const Text('Planejar minha noite'),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

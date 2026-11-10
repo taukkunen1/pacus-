@@ -18,11 +18,20 @@ public static class TaskSupportConfiguration
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             [Reading] = new[] { "Escolher o livro", "Ler o trecho combinado", "Contar algo sobre a leitura" },
-            [Homework] = new[] { "Abrir o caderno", "Ler a primeira questao", "Resolver a primeira questao", "Concluir a licao prevista" },
+            [Homework] = new[] { "Separar o material da escola ou do ingles", "Ver quais atividades foram pedidas", "Escolher por qual atividade comecar", "Fazer a primeira atividade (pode comecar com 10 minutos)", "Continuar a licao, fazer pausas e pedir ajuda se precisar", "Conferir o que foi feito e guardar o material" },
             [Handwriting] = new[] { "Separar o caderno e lapis", "Escrever a primeira linha", "Concluir a quantidade combinada" },
             [Bathing] = new[] { "Pegar a toalha", "Abrir a janela do banheiro", "Lavar o cabelo", "Tomar banho", "Tirar as roupas do chao", "Guardar a toalha" },
             [MoodBoard] = new[] { "Escolher o que quero desenhar: meu humor ou uma ideia livre", "Escolher o desafio criativo do dia (ou minha propria ideia)", "Fazer o primeiro traco na lousa", "Criar meu desenho do meu jeito", "Olhar minha criacao e concluir (dar nome ou contar e opcional)" },
         };
+
+    private static readonly string[] LegacyHomeworkSteps =
+    {
+        "Abrir o caderno", "Ler a primeira questao",
+        "Resolver a primeira questao", "Concluir a licao prevista",
+    };
+
+    public static bool IsLegacyHomeworkSteps(IReadOnlyList<string> steps) =>
+        steps.SequenceEqual(LegacyHomeworkSteps);
 
     // Templates criados antes desta versao continuam validos e serao atualizados
     // somente nas novas rotinas ou pela acao explicita do adulto na rotina de hoje.
@@ -73,6 +82,9 @@ public static class TaskSupportConfiguration
 
     public static List<string> StepsForDay(string? kind, List<string> steps, string date)
     {
+        if (kind == Homework && IsLegacyHomeworkSteps(steps))
+            return new List<string>(DefaultSteps[Homework]);
+
         if (kind == MoodBoard)
         {
             // Rotina nao sobrescreve etapas personalizadas pelo adulto.

@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using MongoDB.Bson;
 using Pacus.Application.DTOs;
 using Pacus.Application.Interfaces;
@@ -10,30 +11,46 @@ public class AuthService : IAuthService
     private readonly IUserRepository _userRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenService _tokenService;
+    private readonly ILoginAttemptTracker _attempts;
 
     // Sessão persistente para o app familiar. O Flutter Web guarda o JWT no storage
     // persistente do domínio canônico; 30 dias evita novo login a cada navegador fechado.
     private static readonly TimeSpan AdultTokenLifetime = TimeSpan.FromDays(30);
     private static readonly TimeSpan ChildTokenLifetime = TimeSpan.FromDays(30);
 
-    public AuthService(IUserRepository userRepository, IPasswordHasher passwordHasher, ITokenService tokenService)
+    public AuthService(IUserRepository userRepository, IPasswordHasher passwordHasher, ITokenService tokenService,
+        ILoginAttemptTracker attempts)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
         _tokenService = tokenService;
+        _attempts = attempts;
+    }
+
+    // Mesma mensagem generica do login normal: nao revela que a conta esta bloqueada
+    // (evita enumeracao) e o status HTTP continua 401.
+    private void EnsureNotLockedOut(string key, string genericMessage)
+    {
+        if (_attempts.IsLockedOut(key))
+            throw new UnauthorizedAccessException(genericMessage);
     }
 
     public async Task<AuthResponse> AdultLoginAsync(string email, string password)
     {
+        var lockKey = $"adult:{(email ?? string.Empty).Trim().ToLowerInvariant()}";
+        EnsureNotLockedOut(lockKey, "Email ou senha invalidos.");
+
         var user = await _userRepository.GetByEmailAsync(email);
 
         // Mensagem generica de proposito — nao revela se o email existe ou se a senha e que esta errada.
         if (user is null || user.Role != UserRole.Adult || user.PasswordHash is null
             || !_passwordHasher.Verify(user.PasswordHash, password))
         {
+            _attempts.RegisterFailure(lockKey);
             throw new UnauthorizedAccessException("Email ou senha invalidos.");
         }
 
+        _attempts.Reset(lockKey);
         return BuildResponse(user, AdultTokenLifetime);
     }
 
@@ -42,28 +59,40 @@ public class AuthService : IAuthService
         if (!ObjectId.TryParse(userId, out var parsedId))
             throw new UnauthorizedAccessException("Perfil ou PIN invalidos.");
 
+        var lockKey = $"child:{parsedId}";
+        EnsureNotLockedOut(lockKey, "Perfil ou PIN invalidos.");
+
         var user = await _userRepository.GetByIdAsync(parsedId);
 
         if (user is null || user.Role != UserRole.Child || user.PinHash is null
             || !_passwordHasher.Verify(user.PinHash, pin))
         {
+            _attempts.RegisterFailure(lockKey);
             throw new UnauthorizedAccessException("Perfil ou PIN invalidos.");
         }
 
+        _attempts.Reset(lockKey);
         return BuildResponse(user, ChildTokenLifetime);
     }
 
     public async Task<string> ResetAdultPasswordAsync(string email, string recoveryCode, string newPassword)
     {
-        var user = await _userRepository.GetByEmailAsync(email.Trim().ToLowerInvariant());
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        var lockKey = $"reset:{normalizedEmail}";
+        EnsureNotLockedOut(lockKey, "Email ou codigo de recuperacao invalidos.");
+
+        var user = await _userRepository.GetByEmailAsync(normalizedEmail);
 
         // Mensagem generica, mesmo padrao do login -- nao revela se o email existe ou
         // se so o codigo esta errado.
         if (user is null || user.Role != UserRole.Adult || user.RecoveryCodeHash is null
             || !_passwordHasher.Verify(user.RecoveryCodeHash, recoveryCode.Trim().ToUpperInvariant()))
         {
+            _attempts.RegisterFailure(lockKey);
             throw new UnauthorizedAccessException("Email ou codigo de recuperacao invalidos.");
         }
+
+        _attempts.Reset(lockKey);
 
         user.PasswordHash = _passwordHasher.Hash(newPassword);
 
@@ -86,7 +115,7 @@ public class AuthService : IAuthService
         const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         Span<char> buffer = stackalloc char[10];
         for (var i = 0; i < buffer.Length; i++)
-            buffer[i] = alphabet[Random.Shared.Next(alphabet.Length)];
+            buffer[i] = alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)];
 
         return new string(buffer);
     }
@@ -101,7 +130,7 @@ public class AuthService : IAuthService
         const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         Span<char> buffer = stackalloc char[6];
         for (var i = 0; i < buffer.Length; i++)
-            buffer[i] = alphabet[Random.Shared.Next(alphabet.Length)];
+            buffer[i] = alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)];
 
         return $"{buffer[0]}{buffer[1]}{buffer[2]}-{buffer[3]}{buffer[4]}{buffer[5]}";
     }

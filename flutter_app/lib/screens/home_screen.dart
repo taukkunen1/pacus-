@@ -11,6 +11,7 @@ import '../brand.dart';
 import '../models.dart';
 import '../ui/effort_messages.dart';
 import '../ui/pacus_components.dart';
+import '../ui/task_guidance.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -877,7 +878,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   'period': period,
                   'points': value,
                   'options': task.options,
-                  'reason': task.reason,
+                  'reason': title.text.trim() == task.title.trim() ? task.reason : null,
                 });
               },
               child: const Text('Salvar'),
@@ -1641,10 +1642,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 8),
                 Text(next.description!.trim()),
               ],
-              if ((next.reason ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 8),
-                _taskHint(icon: Icons.lightbulb_outline_rounded, label: 'Por quê', text: next.reason!.trim()),
-              ],
+              const SizedBox(height: 8),
+              _taskGuidance(next),
               if (next.options.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 const Text('Escolha como começar:'),
@@ -1806,6 +1805,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  Widget _taskGuidance(DailyTask task) {
+    final guidance = taskGuidance(
+      task.title,
+      reason: task.reason,
+      description: task.description,
+    );
+    return _taskHint(
+      icon: Icons.lightbulb_outline_rounded,
+      label: guidance.label,
+      text: guidance.text,
+    );
+  }
+
   Widget _taskTile(
     DailyTask task, {
     required bool canMoveUp,
@@ -1814,9 +1826,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final description = (task.description ?? '').trim();
-    final reason = (task.reason ?? '').trim();
-    final showReason = reason.isNotEmpty &&
-        description.toLowerCase() != reason.toLowerCase();
 
     final actionMenu = PopupMenuButton<String>(
       tooltip: 'Mais opções',
@@ -1913,14 +1922,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               text: task.minimumGoalLabel!.trim(),
             ),
           ],
-          if (showReason) ...[
-            const SizedBox(height: 6),
-            _taskHint(
-              icon: Icons.lightbulb_outline_rounded,
-              label: 'Por quê',
-              text: reason,
-            ),
-          ],
+          const SizedBox(height: 6),
+          _taskGuidance(task),
           if (task.options.isNotEmpty && !task.isDone) ...[
             const SizedBox(height: 10),
             Wrap(

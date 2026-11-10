@@ -554,42 +554,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _setReaction(String icon) async {
-    final controller = TextEditingController();
-    final message = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Enviar reconhecimento'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'O que você observou? (opcional)',
-            hintText: 'Ex.: começou sem lembrete, pediu ajuda, tentou de novo',
-          ),
-          maxLines: 3,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text('Enviar')),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (message == null) return;
-    try {
-      final data = await widget.api.request('/daily-routines/today/reaction', method: 'PUT', body: {
-        'icon': icon,
-        'message': message.isEmpty ? null : message,
-      });
-      if (data is Map<String, dynamic>) {
-        final updated = await widget.api.getToday();
-        if (mounted) setState(() => routine = updated);
-      }
-    } catch (e) {
-      if (mounted) setState(() => error = e.toString());
-    }
-  }
-
   Future<void> _createDailyTask() async {
     final title = TextEditingController();
     final description = TextEditingController();
@@ -1256,14 +1220,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     const SizedBox(height: 12),
                     _plannedYesterdayCard(),
                   ],
-                  if (r.reaction != null) ...[
-                    const SizedBox(height: 16),
-                    _receivedReactionCard(r.reaction!),
-                  ],
-                  if (widget.session.isAdult) ...[
-                    const SizedBox(height: 16),
-                    _reactionCard(),
-                  ],
                   const SizedBox(height: 16),
                   if (r.gameTimerEnabled) _timerCard(r),
                   const SizedBox(height: 20),
@@ -1445,57 +1401,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
     );
   }
-
-  Widget _receivedReactionCard(Map<String, dynamic> reaction) {
-    const icons = {
-      'heart': '❤️',
-      'clap': '👏',
-      'star': '⭐',
-      'hug': '🤗',
-    };
-    final icon = icons[reaction['icon']?.toString()] ?? '✨';
-    final message = reaction['message']?.toString().trim() ?? '';
-    return Card(
-      color: Theme.of(context).colorScheme.secondaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(icon, style: const TextStyle(fontSize: 34)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Reconhecimento de hoje', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
-                if (message.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(message),
-                ],
-              ]),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _reactionCard() => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(18),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Reconhecimento do dia', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 8),
-        const Text('Reconheça uma ação concreta que você observou: começar, pedir ajuda, tentar de novo ou concluir uma etapa.'),
-        const SizedBox(height: 10),
-        Wrap(spacing: 8, children: [
-          FilledButton.tonal(onPressed: () => _setReaction('heart'), child: const Text('❤️')),
-          FilledButton.tonal(onPressed: () => _setReaction('clap'), child: const Text('👏')),
-          FilledButton.tonal(onPressed: () => _setReaction('star'), child: const Text('⭐')),
-          FilledButton.tonal(onPressed: () => _setReaction('hug'), child: const Text('🤗')),
-        ]),
-      ]),
-    ),
-  );
 
   Widget _nextTaskCard(List<DailyTask> tasks) {
     final pending = tasks.where((task) => !task.isDone).toList();

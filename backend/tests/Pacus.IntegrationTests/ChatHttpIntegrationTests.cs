@@ -64,6 +64,45 @@ public class ChatHttpIntegrationTests : IClassFixture<MongoIntegrationFixture>
     }
 
     [Fact]
+    public async Task Chat_ImageIsAvailableOnlyToTheSendingFamily()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var adult = factory.CreateClient();
+        using var child = factory.CreateClient();
+        using var outsider = factory.CreateClient();
+        using var anonymous = factory.CreateClient();
+
+        var family = await BootstrapAsync(adult);
+        var otherFamily = await BootstrapAsync(outsider);
+        await LoginAdultAsync(adult, family);
+        await LoginChildAsync(child, family);
+        await LoginAdultAsync(outsider, otherFamily);
+
+        var image = Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWQkAAAAASUVORK5CYII=");
+        var sent = await child.PostAsJsonAsync("/api/v1/chat/messages", new { image });
+        Assert.Equal(HttpStatusCode.OK, sent.StatusCode);
+        var message = await sent.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(message.GetProperty("hasImage").GetBoolean());
+        Assert.False(message.TryGetProperty("image", out _));
+
+        var messages = await adult.GetFromJsonAsync<JsonElement>("/api/v1/chat/messages");
+        var listed = Assert.Single(messages.EnumerateArray());
+        Assert.True(listed.GetProperty("hasImage").GetBoolean());
+        Assert.False(listed.TryGetProperty("image", out _));
+
+        var path = $"/api/v1/chat/messages/{message.GetProperty("id").GetString()}/image";
+        var response = await adult.GetFromJsonAsync<JsonElement>(path);
+        Assert.Equal(image, response.GetProperty("image").GetBytesFromBase64());
+        Assert.Equal(HttpStatusCode.NotFound, (await outsider.GetAsync(path)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(path)).StatusCode);
+
+        var invalid = await child.PostAsJsonAsync(
+            "/api/v1/chat/messages", new { image = "PHN2Zy8+" });
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+    }
+
+    [Fact]
     public async Task Chat_IsIsolatedByFamily()
     {
         using var factory = new PacusApiFactory(_mongo.ConnectionString);

@@ -782,7 +782,7 @@ class _MessageBubble extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
               ],
-              if (image case final attachment?) attachment,
+              ?image,
               if (text.isNotEmpty) ...[
                 if (image != null) const SizedBox(height: 6),
                 SelectableText(
@@ -834,8 +834,8 @@ class _ChatImageState extends State<_ChatImage> {
       }
       if (!snapshot.hasData) {
         return const SizedBox(
-          height: 80,
-          width: 120,
+          height: 240,
+          width: 320,
           child: Center(child: CircularProgressIndicator()),
         );
       }

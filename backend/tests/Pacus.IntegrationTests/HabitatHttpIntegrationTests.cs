@@ -1450,6 +1450,41 @@ public class HabitatHttpIntegrationTests : IClassFixture<MongoIntegrationFixture
 
 
 
+    [Fact]
+    public async Task Companion_ChargesOnceAndPreservesTheOriginalPet()
+    {
+        using var factory = new PacusApiFactory(_mongo.ConnectionString);
+        using var client = factory.CreateClient();
+        await BootstrapAndLoginAdultAsync(client);
+
+        const string path = "/api/v1/pacus/companions/turtle";
+        var original = await client.GetFromJsonAsync<JsonElement>("/api/v1/pacus/me");
+        var adjustment = await client.PostAsJsonAsync(
+            "/api/v1/points/adjust", new { balance = 150, reason = "Teste" });
+        adjustment.EnsureSuccessStatusCode();
+
+        var purchases = await Task.WhenAll(client.PostAsync(path, null), client.PostAsync(path, null));
+        foreach (var response in purchases)
+        {
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal(50, result.GetProperty("balance").GetInt32());
+            var turtle = result.GetProperty("animal");
+            Assert.Equal("Egg", turtle.GetProperty("stage").GetString());
+            Assert.Equal(0, turtle.GetProperty("totalClosedDays").GetInt32());
+        }
+
+        var after = await client.GetFromJsonAsync<JsonElement>("/api/v1/pacus/me");
+        Assert.Equal(original.GetProperty("id").ToString(), after.GetProperty("id").ToString());
+        Assert.Equal(original.GetProperty("totalClosedDays").GetInt32(),
+            after.GetProperty("totalClosedDays").GetInt32());
+
+        await BootstrapAndLoginAdultAsync(client);
+        var other = await client.GetFromJsonAsync<JsonElement>(path);
+        Assert.Equal(JsonValueKind.Null, other.GetProperty("animal").ValueKind);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync(path, null)).StatusCode);
+    }
+
     private async Task<string> BootstrapAndLoginAdultAsync(HttpClient client)
 
 

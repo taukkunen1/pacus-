@@ -1,6 +1,8 @@
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Pacus.Application.Interfaces;
+using Pacus.Application.Exceptions;
+using Pacus.Domain.Enums;
 using Pacus.Domain.Entities;
 using Pacus.Infrastructure.Mongo;
 
@@ -14,9 +16,49 @@ public class PointTransactionRepository : IPointTransactionRepository
 
     public async Task<PointTransaction> CreateAsync(PointTransaction transaction)
     {
-        await _context.PointTransactions.InsertOneAsync(transaction);
-        return transaction;
+        if (transaction.Type != PointTransactionType.Redemption || transaction.Points >= 0)
+        {
+            await _context.PointTransactions.InsertOneAsync(transaction);
+            return transaction;
+        }
+
+        using var session = await _context.Database.Client.StartSessionAsync();
+        return await session.WithTransactionAsync(async (handle, cancellationToken) =>
+        {
+            // Serialize family purchases, including existing store redemptions.
+            await _context.Pacus.UpdateOneAsync(handle,
+                pet => pet.FamilyId == transaction.FamilyId,
+                Builders<Domain.Entities.Pacus>.Update.Inc(pet => pet.WalletSpendVersion, 1),
+                cancellationToken: cancellationToken);
+
+            if (transaction.SourceType == "pet")
+            {
+                var existing = await _context.PointTransactions
+                    .Find(handle, entry => entry.Id == transaction.Id &&
+                        entry.FamilyId == transaction.FamilyId)
+                    .FirstOrDefaultAsync(cancellationToken);
+                if (existing is not null) return existing;
+            }
+
+            var balance = await _context.PointTransactions.Aggregate(handle)
+                .Match(entry => entry.FamilyId == transaction.FamilyId)
+                .Group(entry => 1, group => new { Total = group.Sum(entry => entry.Points) })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var available = balance?.Total ?? 0;
+            if (available < -transaction.Points)
+                throw new ValidationException("Saldo de Pacus Points insuficiente.");
+
+            transaction.BalanceAfter = available + transaction.Points;
+            await _context.PointTransactions.InsertOneAsync(handle, transaction,
+                cancellationToken: cancellationToken);
+            return transaction;
+        });
     }
+
+    public Task<PointTransaction?> GetByIdForFamilyAsync(ObjectId familyId, ObjectId id) =>
+        _context.PointTransactions.Find(entry => entry.FamilyId == familyId && entry.Id == id)
+            .FirstOrDefaultAsync();
 
     public async Task<long> BackfillSourceReferencesAsync()
     {

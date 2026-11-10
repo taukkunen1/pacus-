@@ -13,6 +13,8 @@ public class Pacus
     public PacusStage Stage { get; set; }
     public double Size { get; set; }
     public int TotalClosedDays { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public long WalletSpendVersion { get; set; }
 
     // Matiz (0-359) que sobrescreve a cor derivada do id (ver
     // Flutter PACUS renderer) -- null significa "usar a cor

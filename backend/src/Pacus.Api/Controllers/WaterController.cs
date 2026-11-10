@@ -15,6 +15,7 @@ namespace Pacus.Api.Controllers;
 [Route("api/v1/water")]
 public class WaterController : ControllerBase
 {
+    private const int MaxEntryMl = 1000;
     private readonly IWaterIntakeRepository _water;
     private readonly ISettingsRepository _settings;
     private readonly IFamilyTimezoneService _timezone;
@@ -45,22 +46,29 @@ public class WaterController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Add([FromBody] AddWaterRequest request)
     {
-        if (request.AmountMl < 50 || request.AmountMl > 2000)
-            return BadRequest(new { error = "Informe uma quantidade entre 50 e 2000 mL." });
+        if (request.AmountMl < 50 || request.AmountMl > MaxEntryMl)
+            return BadRequest(new { error = $"Registre entre 50 e {MaxEntryMl} mL por vez." });
         if (string.IsNullOrWhiteSpace(request.EventId) || request.EventId.Length > 100)
             return BadRequest(new { error = "eventId invalido." });
 
-        var existing = await _water.GetByEventIdAsync(_currentUser.FamilyId, request.EventId);
+        var existing = await _water.GetByEventIdAsync(
+            _currentUser.FamilyId, _currentUser.UserId, request.EventId.Trim());
         if (existing is not null)
+        {
+            var existingProfile = await GetWaterProfileAsync(_currentUser.UserId);
+            var existingEvents = await _water.GetByDateAsync(
+                _currentUser.FamilyId, existing.Date, _currentUser.UserId);
+            if (existingProfile.RewardPoints > 0
+                && existingEvents.Sum(x => x.AmountMl) >= existingProfile.GoalMl)
+            {
+                await EnsureRewardAsync(existing.Date, existingProfile.RewardPoints);
+            }
             return Ok(await BuildDayAsync(existing.Date));
+        }
 
         var timezone = await _timezone.GetTimezoneAsync(_currentUser.FamilyId);
         var date = TimezoneHelper.GetOperationalDate(timezone, DateTime.UtcNow);
-        var settings = await _settings.GetByUserIdAsync(_currentUser.FamilyId);
-        var goal = settings?.WaterGoalMl ?? 2000;
-        var rewardPoints = settings?.WaterRewardPoints ?? 5;
-        var beforeEvents = await _water.GetByDateAsync(_currentUser.FamilyId, date);
-        var beforeTotal = beforeEvents.Sum(x => x.AmountMl);
+        var profile = await GetWaterProfileAsync(_currentUser.UserId);
 
         var intake = new WaterIntake
         {
@@ -73,17 +81,22 @@ public class WaterController : ControllerBase
             OccurredAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow,
         };
-        var created = true;
         try { await _water.CreateAsync(intake); }
         catch (MongoDB.Driver.MongoWriteException ex) when (
             ex.WriteError?.Category == MongoDB.Driver.ServerErrorCategory.DuplicateKey)
         {
             // Retry/offline sync do mesmo evento: idempotente.
-            created = false;
         }
 
-        if (created && rewardPoints > 0 && beforeTotal < goal && beforeTotal + request.AmountMl >= goal)
-            await EnsureRewardAsync(date, rewardPoints);
+        // Confere o total persistido depois da gravação. Isso também recupera a
+        // recompensa se houve falha entre persistir o evento e registrar os pontos.
+        var afterEvents = await _water.GetByDateAsync(
+            _currentUser.FamilyId, date, _currentUser.UserId);
+        var afterTotal = afterEvents.Sum(x => x.AmountMl);
+        if (profile.RewardPoints > 0 && afterTotal >= profile.GoalMl)
+        {
+            await EnsureRewardAsync(date, profile.RewardPoints);
+        }
 
         return Ok(await BuildDayAsync(date));
     }
@@ -93,14 +106,14 @@ public class WaterController : ControllerBase
     {
         var timezone = await _timezone.GetTimezoneAsync(_currentUser.FamilyId);
         var date = TimezoneHelper.GetOperationalDate(timezone, DateTime.UtcNow);
-        var latest = await _water.GetLatestByDateAsync(_currentUser.FamilyId, date);
+        var latest = await _water.GetLatestByDateAsync(
+            _currentUser.FamilyId, date, _currentUser.UserId);
         if (latest is not null)
-            await _water.DeleteAsync(_currentUser.FamilyId, latest.Id);
+            await _water.DeleteAsync(_currentUser.FamilyId, latest.Id, _currentUser.UserId);
 
-        var settings = await _settings.GetByUserIdAsync(_currentUser.FamilyId);
-        var goal = settings?.WaterGoalMl ?? 2000;
-        var remaining = await _water.GetByDateAsync(_currentUser.FamilyId, date);
-        if (remaining.Sum(x => x.AmountMl) < goal)
+        var profile = await GetWaterProfileAsync(_currentUser.UserId);
+        var remaining = await _water.GetByDateAsync(_currentUser.FamilyId, date, _currentUser.UserId);
+        if (remaining.Sum(x => x.AmountMl) < profile.GoalMl)
             await EnsureReversalAsync(date);
 
         return Ok(await BuildDayAsync(date));
@@ -108,26 +121,25 @@ public class WaterController : ControllerBase
 
     private async Task<object> BuildDayAsync(string date)
     {
-        var events = await _water.GetByDateAsync(_currentUser.FamilyId, date);
-        var settings = await _settings.GetByUserIdAsync(_currentUser.FamilyId);
-        var goal = settings?.WaterGoalMl ?? 2000;
-        var rewardPoints = settings?.WaterRewardPoints ?? 5;
+        var events = await _water.GetByDateAsync(_currentUser.FamilyId, date, _currentUser.UserId);
+        var profile = await GetWaterProfileAsync(_currentUser.UserId);
         var total = events.Sum(x => x.AmountMl);
         var awardedPoints = await GetEffectiveRewardAsync(date);
 
         return new
         {
             date,
-            goalMl = goal,
+            profileId = _currentUser.UserId.ToString(),
+            goalMl = profile.GoalMl,
             totalMl = total,
-            rewardPoints,
+            rewardPoints = profile.RewardPoints,
             rewarded = awardedPoints > 0,
             task = new
             {
                 id = WaterTaskId(date),
                 title = "Beber água",
-                points = rewardPoints,
-                isDone = total >= goal && awardedPoints > 0
+                points = profile.RewardPoints,
+                isDone = total >= profile.GoalMl
             },
             entries = events.Select(x => new
             {
@@ -139,7 +151,13 @@ public class WaterController : ControllerBase
         };
     }
 
-    private static string WaterTaskId(string date) => $"water:{date}";
+    private async Task<WaterProfileSettings> GetWaterProfileAsync(ObjectId profileId)
+    {
+        var settings = await _settings.GetByUserIdAsync(_currentUser.FamilyId);
+        return settings?.GetWaterProfile(profileId) ?? new WaterProfileSettings();
+    }
+
+    private string WaterTaskId(string date) => $"water:{_currentUser.UserId}:{date}";
 
     private async Task<int> GetEffectiveRewardAsync(string date)
     {
@@ -160,12 +178,12 @@ public class WaterController : ControllerBase
             null,
             date,
             WaterTaskId(date),
-            "Beber água",
+            "Meta de hidratação",
             PointTransactionType.Award,
             rewardPoints,
             _currentUser.UserId,
             _currentUser.Role,
-            "Meta diária de hidratação concluída");
+            "Meta diária de hidratação do perfil concluída");
     }
 
     private async Task EnsureReversalAsync(string date)
@@ -178,12 +196,12 @@ public class WaterController : ControllerBase
             null,
             date,
             WaterTaskId(date),
-            "Beber água",
+            "Meta de hidratação",
             PointTransactionType.Reversal,
             -effectiveReward,
             _currentUser.UserId,
             _currentUser.Role,
-            "Meta diária de hidratação voltou a ficar incompleta");
+            "Registro desfeito; meta de hidratação do perfil incompleta");
     }
 
     public record AddWaterRequest(int AmountMl, string EventId);

@@ -30,13 +30,12 @@ public static class TaskValidation
                 $"A descricao da tarefa deve ter no maximo {MaxDescriptionLength} caracteres.");
     }
 
-    // Mensagem mantida identica a regra historica (DailyRoutineService.ValidatePoints)
-    // -- ver DailyTasksHttpIntegrationTests, que confere este texto literalmente.
+    // Regra não punitiva compartilhada por tarefas permanentes e diárias.
     public static void ValidatePoints(int points)
     {
-        if (points == 0 || points < -10 || points > 10)
+        if (points < 1 || points > 10)
             throw new ValidationException(
-                "Cada tarefa deve valer entre 1 e 10 Pacus Points, ou entre -1 e -10 (penalidade). Zero nao e permitido.");
+                "Cada tarefa deve valer entre 1 e 10 Pacus Points. Tarefas nao podem descontar pontos.");
     }
 }
 

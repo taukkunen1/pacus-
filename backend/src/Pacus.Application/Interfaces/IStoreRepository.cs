@@ -17,6 +17,7 @@ public interface IStoreRepository
     // qualquer fuso) -- StoreService filtra depois pelo dia operacional exato da familia,
     // igual ao padrao ja usado com TimezoneHelper no resto do backend.
     Task<List<Redemption>> GetRedemptionsByItemSinceAsync(ObjectId familyId, ObjectId storeItemId, DateTime sinceUtc);
+    Task<List<Redemption>> GetRedemptionsSinceAsync(ObjectId familyId, DateTime sinceUtc);
 
     // Resgates Pending da familia, para a fila de aprovacao do adulto.
     Task<List<Redemption>> GetPendingRedemptionsByFamilyAsync(ObjectId familyId);

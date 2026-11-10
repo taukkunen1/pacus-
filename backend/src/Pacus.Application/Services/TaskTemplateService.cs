@@ -264,10 +264,10 @@ public class TaskTemplateService : ITaskTemplateService
                 $"Periodo invalido: {request.Period}");
         }
 
-        if (request.Points == 0 || request.Points < -10 || request.Points > 10)
+        if (request.Points < 1 || request.Points > 10)
         {
             throw new ValidationException(
-                "Cada tarefa deve valer entre 1 e 10 Pacus Points, ou entre -1 e -10 (penalidade). Zero nao e permitido.");
+                "Cada tarefa deve valer entre 1 e 10 Pacus Points. Tarefas nao podem descontar pontos.");
         }
 
         return (type, period);
@@ -345,10 +345,10 @@ public class TaskTemplateService : ITaskTemplateService
                     $"Toda variante precisa de titulo (faltando em {dayOfWeek}).");
             }
 
-            if (variant.Points is { } variantPoints && (variantPoints == 0 || variantPoints < -10 || variantPoints > 10))
+            if (variant.Points is { } variantPoints && (variantPoints < 1 || variantPoints > 10))
             {
                 throw new ValidationException(
-                    $"Pontos invalidos na variante de {dayOfWeek}: cada tarefa deve valer entre 1 e 10 Pacus Points, ou entre -1 e -10 (penalidade). Zero nao e permitido.");
+                    $"Pontos invalidos na variante de {dayOfWeek}: use de 1 a 10 Pacus Points; tarefas nao podem descontar pontos.");
             }
 
             variants.Add(new TaskTemplateVariant

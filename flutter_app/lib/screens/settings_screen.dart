@@ -20,6 +20,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   double pointToBrlRate = 0.06;
   int waterGoalMl = 2000;
   int waterRewardPoints = 5;
+  List<Map<String, dynamic>> waterProfiles = [];
+  String? selectedWaterProfileId;
   List<Map<String, dynamic>> members = [];
   List<Map<String, dynamic>> growth = [];
   List<Map<String, dynamic>> tasks = [];
@@ -37,6 +39,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final timer = await widget.api.getMap('/settings/game-timer');
       final pointValue = await widget.api.getMap('/settings/point-value');
       final water = await widget.api.getMap('/settings/water');
+      final rawWaterProfiles = (water['profiles'] as List? ?? const [])
+          .whereType<Map>()
+          .map((profile) => Map<String, dynamic>.from(profile))
+          .toList();
+      final currentSelectionExists = rawWaterProfiles.any(
+        (profile) => profile['profileId']?.toString() == selectedWaterProfileId,
+      );
+      final selectedId = currentSelectionExists
+          ? selectedWaterProfileId
+          : rawWaterProfiles.where((profile) => profile['role'] == 'child').isNotEmpty
+              ? rawWaterProfiles.firstWhere((profile) => profile['role'] == 'child')['profileId']?.toString()
+              : rawWaterProfiles.isNotEmpty
+                  ? rawWaterProfiles.first['profileId']?.toString()
+                  : water['profileId']?.toString();
+      Map<String, dynamic>? selectedWaterProfile;
+      for (final profile in rawWaterProfiles) {
+        if (profile['profileId']?.toString() == selectedId) {
+          selectedWaterProfile = profile;
+          break;
+        }
+      }
       final rawMembers = await widget.api.getList('/family/children');
       final rawGrowth = await widget.api.getList('/settings/growth-stages');
       final rawTasks = await widget.api.getList('/tasks');
@@ -49,8 +72,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         timerEnabled = timer['enabled'] == true;
         timerMinutes = (timer['minutes'] as num?)?.toInt() ?? 120;
         pointToBrlRate = (pointValue['rate'] as num?)?.toDouble() ?? 0.06;
-        waterGoalMl = (water['goalMl'] as num?)?.toInt() ?? 2000;
-        waterRewardPoints = (water['rewardPoints'] as num?)?.toInt() ?? 5;
+        waterProfiles = rawWaterProfiles;
+        selectedWaterProfileId = selectedId;
+        waterGoalMl = (selectedWaterProfile?['goalMl'] as num?)?.toInt()
+            ?? (water['goalMl'] as num?)?.toInt() ?? 2000;
+        waterRewardPoints = (selectedWaterProfile?['rewardPoints'] as num?)?.toInt()
+            ?? (water['rewardPoints'] as num?)?.toInt() ?? 5;
         members = rawMembers.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         growth = rawGrowth.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         tasks = rawTasks.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -141,6 +168,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) { _snack(e.toString()); }
   }
 
+  void _selectWaterProfile(String? profileId) {
+    if (profileId == null) return;
+    final profile = waterProfiles.where(
+      (item) => item['profileId']?.toString() == profileId,
+    );
+    if (profile.isEmpty) return;
+    setState(() {
+      selectedWaterProfileId = profileId;
+      waterGoalMl = (profile.first['goalMl'] as num?)?.toInt() ?? 2000;
+      waterRewardPoints = (profile.first['rewardPoints'] as num?)?.toInt() ?? 5;
+    });
+  }
+
   Future<void> _changeWaterGoal() async {
     final value = await _ask(
       'Meta diária de água',
@@ -150,12 +190,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (value == null) return;
     final goal = int.tryParse(value);
-    if (goal == null || goal < 250 || goal > 10000) {
-      _snack('Informe uma meta entre 250 e 10000 mL.');
+    if (goal == null || goal < 500 || goal > 4000) {
+      _snack('Informe uma meta entre 500 e 4000 mL.');
       return;
     }
     try {
       await widget.api.request('/settings/water', method: 'PUT', body: {
+        'profileId': selectedWaterProfileId,
         'goalMl': goal,
         'rewardPoints': waterRewardPoints,
       });
@@ -173,12 +214,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (value == null) return;
     final points = int.tryParse(value);
-    if (points == null || points < 0 || points > 100) {
-      _snack('Informe uma recompensa entre 0 e 100 PP.');
+    if (points == null || points < 0 || points > 5) {
+      _snack('Informe uma recompensa entre 0 e 5 PP.');
       return;
     }
     try {
       await widget.api.request('/settings/water', method: 'PUT', body: {
+        'profileId': selectedWaterProfileId,
         'goalMl': waterGoalMl,
         'rewardPoints': points,
       });
@@ -232,7 +274,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _editTask([Map<String, dynamic>? task]) async {
     final title = TextEditingController(text: task?['title']?.toString() ?? '');
     final description = TextEditingController(text: task?['description']?.toString() ?? '');
-    final points = TextEditingController(text: (task?['points'] ?? 1).toString());
+    final existingPoints = (task?['points'] as num?)?.toInt() ?? 1;
+    final points = TextEditingController(text: existingPoints > 0 ? existingPoints.toString() : '1');
     final minimum = TextEditingController(text: task?['minimumGoalLabel']?.toString() ?? '');
     String supportKind = task?['supportKind']?.toString() ?? 'none';
     final supportSteps = TextEditingController(
@@ -272,7 +315,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 8),
                 TextField(controller: description, decoration: const InputDecoration(labelText: 'Descrição')),
                 const SizedBox(height: 8),
-                TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos')),
+                TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos (1–10; sem desconto)')),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   initialValue: period,
@@ -352,6 +395,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   decoration: const InputDecoration(labelText: 'Missão dividida em etapas'),
                   items: const [
                     DropdownMenuItem(value: 'none', child: Text('Desativada')),
+                    DropdownMenuItem(value: 'general', child: Text('Etapas gerais para qualquer tarefa')),
                     DropdownMenuItem(value: 'reading', child: Text('Leitura do livro')),
                     DropdownMenuItem(value: 'homework', child: Text('Lição de casa')),
                     DropdownMenuItem(value: 'handwriting', child: Text('Caderno de caligrafia')),
@@ -414,12 +458,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
             FilledButton(
-              onPressed: () => Navigator.pop(context, {
+              onPressed: () {
+                final pointValue = int.tryParse(points.text);
+                if (pointValue == null || pointValue < 1 || pointValue > 10) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Use de 1 a 10 pontos. Tarefas não descontam pontos.')),
+                  );
+                  return;
+                }
+                Navigator.pop(context, {
                 'title': title.text.trim(),
                 'description': description.text.trim().isEmpty ? null : description.text.trim(),
                 'type': 'mandatory',
                 'period': period,
-                'points': int.tryParse(points.text) ?? 1,
+                'points': pointValue,
                 'recurrence': recurrence,
                 'customDays': recurrence == 'custom' ? selectedDays.toList() : null,
                 'anchorDate': recurrence == 'interval' && anchorDate.text.trim().isNotEmpty ? anchorDate.text.trim() : null,
@@ -442,7 +494,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'supportSteps': supportKind == 'none' || supportSteps.text.trim().isEmpty
                     ? null
                     : supportSteps.text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
-              }),
+                });
+              },
               child: const Text('Salvar'),
             ),
           ],
@@ -523,11 +576,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
             action: TextButton(onPressed: _changePointValue, child: const Text('Alterar')),
           ),
           const SizedBox(height: 10),
+          if (waterProfiles.length > 1)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                child: DropdownButtonFormField<String>(
+                  initialValue: selectedWaterProfileId,
+                  decoration: const InputDecoration(labelText: 'Perfil de hidratação'),
+                  items: waterProfiles.map((profile) {
+                    final role = profile['role']?.toString() == 'child' ? 'criança' : 'adulto';
+                    final name = profile['name']?.toString() ?? 'Perfil';
+                    return DropdownMenuItem<String>(
+                      value: profile['profileId']?.toString(),
+                      child: Text('$name · $role'),
+                    );
+                  }).toList(),
+                  onChanged: _selectWaterProfile,
+                ),
+              ),
+            ),
           _tile(
             'Meta diária de água',
             (waterGoalMl / 1000).toStringAsFixed(waterGoalMl % 1000 == 0 ? 0 : 2) + ' L por dia',
             Icons.water_drop_outlined,
             action: TextButton(onPressed: _changeWaterGoal, child: const Text('Alterar')),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Text(
+              'Meta configurada por perfil (500–4000 mL). Não é uma recomendação médica; não é necessário ultrapassar a meta para ganhar mais pontos.',
+            ),
           ),
           const SizedBox(height: 10),
           _tile(
@@ -608,7 +686,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text((task['period'] ?? '').toString() + ' · ' + (task['points'] ?? 0).toString() + ' PP'),
+                    Text(
+                      (task['period'] ?? '').toString() + ' · ' +
+                      (((task['points'] as num?)?.toInt() ?? 0) > 0
+                          ? (task['points']).toString() + ' PP'
+                          : 'sem pontos associados'),
+                    ),
                     if (task['supportKind'] != null)
                       const Padding(padding: EdgeInsets.only(top: 4), child: Text('Missão de estudo V4 habilitada')),
                     if (task['lastModifiedByMember'] == true)

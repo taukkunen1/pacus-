@@ -15,19 +15,27 @@ O frontend oficial do PACUS é `flutter_app/`; o frontend HTML/CSS/JS legado foi
 - O histórico dos dias encerrados é preservado.
 - As tarefas do dia são independentes da configuração permanente.
 - Existem três tipos: `mandatory`, `expected`, `challenge`.
-- Cada tarefa vale de 1 a 10 Pacus Points, ou de -1 a -10 como penalidade (zero não é permitido).
+- Cada tarefa vale de 1 a 10 Pacus Points. Tarefas não concluídas não descontam pontos.
 - Tarefa concluída ganha pontos; não concluída ganha zero e não perde saldo.
 - 1 Pacus Point equivale a R$ 0,06 (configurável por família em `Settings.PointToBrlRate`).
 - O PACUS cresce uma vez por dia encerrado, independentemente da conclusão das tarefas.
 - A criança pode alterar somente as tarefas do dia atual, conforme permissões.
 - O adulto administra regras permanentes, configurações e histórico autorizado.
 
+## Hidratação por perfil
+
+O registro de água e a meta diária são separados por perfil. Cada registro aceita
+50–1000 mL; metas configuráveis ficam entre 500–4000 mL e a recompensa, quando
+habilitada, é de 0–5 PP uma única vez por perfil/dia. Ultrapassar a meta não gera
+pontos extras. A meta do aplicativo é uma configuração familiar, não uma recomendação
+médica.
+
 ## Loja de Pacus Points
 O adulto cadastra itens (brinquedo, atividade, tempo de tela, outro); a criança solicita o resgate e o adulto aprova ou rejeita. Ao aprovar, o saldo é debitado (nunca na solicitação). Cada item pode opcionalmente ter:
 - **Limite diário** (`dailyLimit`) — quantas vezes por dia operacional este item pode ser resgatado (pedidos rejeitados não contam para o limite).
 - **Tempo de tela concedido** (`screenTimeMinutes`) — ao aprovar, soma automaticamente esses minutos no game timer do dia (mesmo mecanismo dos botões +5/-5 min do adulto).
 
-Toda família nova já recebe o item padrão **"1 hora de tela" = 100 Pacus Points, 1 resgate por dia, +60min no game timer ao aprovar**.
+Toda família nova recebe o item opcional **"30 minutos de tela" = 100 Pacus Points**, limitado a um resgate por dia. O backend limita a soma de recompensas de tela a 60 minutos adicionais por dia e a 60 minutos por item.
 
 ## Desenvolvimento local
 

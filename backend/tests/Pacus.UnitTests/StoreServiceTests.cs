@@ -147,6 +147,38 @@ public class StoreServiceTests
         Assert.True(updatedItem.Active);
     }
 
+    [Fact]
+    public async Task RecompensaDeTela_NaoPodeUltrapassar60MinutosPorItem()
+    {
+        var (store, _, _, _) = BuildSystem();
+        var familyId = ObjectId.GenerateNewId();
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            store.CreateItemAsync(familyId, familyId,
+                new CreateStoreItemRequest("Tempo de tela excessivo", null, 100,
+                    "screen_time", "🎮", null, ScreenTimeMinutes: 61)));
+    }
+
+    [Fact]
+    public async Task RecompensasDeTelaSomadas_NaoPodemUltrapassar60MinutosNoDia()
+    {
+        var (store, _, _, _) = BuildSystem();
+        var familyId = ObjectId.GenerateNewId();
+
+        var first = await store.CreateItemAsync(familyId, familyId,
+            new CreateStoreItemRequest("Tela 40 min", null, 100, "screen_time", "🎮", null,
+                ScreenTimeMinutes: 40));
+        var second = await store.CreateItemAsync(familyId, familyId,
+            new CreateStoreItemRequest("Tela 30 min", null, 100, "screen_time", "🎮", null,
+                ScreenTimeMinutes: 30));
+
+        await store.RequestRedemptionAsync(familyId, familyId, first.Id);
+        var error = await Assert.ThrowsAsync<ValidationException>(
+            () => store.RequestRedemptionAsync(familyId, familyId, second.Id));
+
+        Assert.Contains("60 minutos por dia", error.Message);
+    }
+
     // "1 hora de tela = 100 pontos, limite 1x resgate por dia" (pedido do dono do produto).
     [Fact]
     public async Task ItemComLimiteDiario_ImpedeSegundoResgateNoMesmoDiaOperacional()

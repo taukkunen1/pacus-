@@ -45,9 +45,11 @@ public class TaskValidationTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(11)]
+    [InlineData(-1)]
+    [InlineData(-10)]
     [InlineData(-11)]
-    public void ValidatePoints_ForaDaFaixa_LancaValidationException(int points)
+    [InlineData(11)]
+    public void ValidatePoints_ForaDaFaixaOuPunitivos_LancaValidationException(int points)
     {
         Assert.Throws<ValidationException>(() => TaskValidation.ValidatePoints(points));
     }
@@ -55,7 +57,6 @@ public class TaskValidationTests
     [Theory]
     [InlineData(1)]
     [InlineData(10)]
-    [InlineData(-10)]
     public void ValidatePoints_DentroDaFaixa_NaoLancaExcecao(int points)
     {
         TaskValidation.ValidatePoints(points);

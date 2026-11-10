@@ -42,6 +42,28 @@ public class Settings
     // a ponto de voltar para baixo da meta.
     public int WaterRewardPoints { get; set; } = 5;
 
+    // Configurações individuais por perfil. WaterGoalMl/WaterRewardPoints permanecem
+    // como fallback para documentos antigos, sem migração destrutiva.
+    public Dictionary<string, WaterProfileSettings> WaterProfiles { get; set; } = new();
+
+    public WaterProfileSettings GetWaterProfile(ObjectId profileId)
+    {
+        if (WaterProfiles.TryGetValue(profileId.ToString(), out var profile))
+        {
+            return new WaterProfileSettings
+            {
+                GoalMl = Math.Clamp(profile.GoalMl, 500, 4000),
+                RewardPoints = Math.Clamp(profile.RewardPoints, 0, 5),
+            };
+        }
+
+        return new WaterProfileSettings
+        {
+            GoalMl = Math.Clamp(WaterGoalMl, 500, 4000),
+            RewardPoints = Math.Clamp(WaterRewardPoints, 0, 5),
+        };
+    }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

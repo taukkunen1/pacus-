@@ -11,7 +11,6 @@ import '../brand.dart';
 import '../models.dart';
 import '../ui/effort_messages.dart';
 import '../ui/pacus_components.dart';
-import '../ui/task_guidance.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -1428,8 +1427,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 8),
                 Text(next.description!.trim()),
               ],
-              const SizedBox(height: 8),
-              _taskGuidance(next),
               if (next.options.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 const Text('Escolha como começar:'),
@@ -1591,19 +1588,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _taskGuidance(DailyTask task) {
-    final guidance = taskGuidance(
-      task.title,
-      reason: task.reason,
-      description: task.description,
-    );
-    return _taskHint(
-      icon: Icons.lightbulb_outline_rounded,
-      label: guidance.label,
-      text: guidance.text,
-    );
-  }
-
   Widget _taskTile(
     DailyTask task, {
     required bool canMoveUp,
@@ -1708,8 +1692,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               text: task.minimumGoalLabel!.trim(),
             ),
           ],
-          const SizedBox(height: 6),
-          _taskGuidance(task),
           if (task.options.isNotEmpty && !task.isDone) ...[
             const SizedBox(height: 10),
             Wrap(

@@ -18,14 +18,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool timerEnabled = false;
   int timerMinutes = 120;
   double pointToBrlRate = 0.06;
-  int waterGoalMl = 2000;
-  int waterRewardPoints = 5;
-  List<Map<String, dynamic>> waterProfiles = [];
-  String? selectedWaterProfileId;
   List<Map<String, dynamic>> members = [];
   List<Map<String, dynamic>> growth = [];
   List<Map<String, dynamic>> tasks = [];
-  Map<String, dynamic> autonomyWeekly = {};
   bool loading = true;
   String? error;
 
@@ -38,33 +33,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final tz = await widget.api.getMap('/family/timezone');
       final timer = await widget.api.getMap('/settings/game-timer');
       final pointValue = await widget.api.getMap('/settings/point-value');
-      final water = await widget.api.getMap('/settings/water');
-      final rawWaterProfiles = (water['profiles'] as List? ?? const [])
-          .whereType<Map>()
-          .map((profile) => Map<String, dynamic>.from(profile))
-          .toList();
-      final currentSelectionExists = rawWaterProfiles.any(
-        (profile) => profile['profileId']?.toString() == selectedWaterProfileId,
-      );
-      final selectedId = currentSelectionExists
-          ? selectedWaterProfileId
-          : rawWaterProfiles.where((profile) => profile['role'] == 'child').isNotEmpty
-              ? rawWaterProfiles.firstWhere((profile) => profile['role'] == 'child')['profileId']?.toString()
-              : rawWaterProfiles.isNotEmpty
-                  ? rawWaterProfiles.first['profileId']?.toString()
-                  : water['profileId']?.toString();
-      Map<String, dynamic>? selectedWaterProfile;
-      for (final profile in rawWaterProfiles) {
-        if (profile['profileId']?.toString() == selectedId) {
-          selectedWaterProfile = profile;
-          break;
-        }
-      }
       final rawMembers = await widget.api.getList('/family/children');
       final rawGrowth = await widget.api.getList('/settings/growth-stages');
       final rawTasks = await widget.api.getList('/tasks');
-      Map<String, dynamic> weekly = {};
-      try { weekly = await widget.api.getMap('/autonomy/weekly'); } catch (_) { /* Indicadores sao opcionais. */ }
       if (!mounted) return;
       setState(() {
         familyCode = code['familyCode']?.toString() ?? '';
@@ -72,16 +43,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         timerEnabled = timer['enabled'] == true;
         timerMinutes = (timer['minutes'] as num?)?.toInt() ?? 120;
         pointToBrlRate = (pointValue['rate'] as num?)?.toDouble() ?? 0.06;
-        waterProfiles = rawWaterProfiles;
-        selectedWaterProfileId = selectedId;
-        waterGoalMl = (selectedWaterProfile?['goalMl'] as num?)?.toInt()
-            ?? (water['goalMl'] as num?)?.toInt() ?? 2000;
-        waterRewardPoints = (selectedWaterProfile?['rewardPoints'] as num?)?.toInt()
-            ?? (water['rewardPoints'] as num?)?.toInt() ?? 5;
         members = rawMembers.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         growth = rawGrowth.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         tasks = rawTasks.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-        autonomyWeekly = weekly;
         loading = false;
         error = null;
       });
@@ -168,67 +132,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) { _snack(e.toString()); }
   }
 
-  void _selectWaterProfile(String? profileId) {
-    if (profileId == null) return;
-    final profile = waterProfiles.where(
-      (item) => item['profileId']?.toString() == profileId,
-    );
-    if (profile.isEmpty) return;
-    setState(() {
-      selectedWaterProfileId = profileId;
-      waterGoalMl = (profile.first['goalMl'] as num?)?.toInt() ?? 2000;
-      waterRewardPoints = (profile.first['rewardPoints'] as num?)?.toInt() ?? 5;
-    });
-  }
-
-  Future<void> _changeWaterGoal() async {
-    final value = await _ask(
-      'Meta diária de água',
-      'Quantidade em mL',
-      initial: waterGoalMl.toString(),
-      type: TextInputType.number,
-    );
-    if (value == null) return;
-    final goal = int.tryParse(value);
-    if (goal == null || goal < 500 || goal > 4000) {
-      _snack('Informe uma meta entre 500 e 4000 mL.');
-      return;
-    }
-    try {
-      await widget.api.request('/settings/water', method: 'PUT', body: {
-        'profileId': selectedWaterProfileId,
-        'goalMl': goal,
-        'rewardPoints': waterRewardPoints,
-      });
-      await _load();
-      _snack('Meta de água atualizada.');
-    } catch (e) { _snack(e.toString()); }
-  }
-
-  Future<void> _changeWaterReward() async {
-    final value = await _ask(
-      'Recompensa por beber água',
-      'Pacus Points ao atingir a meta diária',
-      initial: waterRewardPoints.toString(),
-      type: TextInputType.number,
-    );
-    if (value == null) return;
-    final points = int.tryParse(value);
-    if (points == null || points < 0 || points > 5) {
-      _snack('Informe uma recompensa entre 0 e 5 PP.');
-      return;
-    }
-    try {
-      await widget.api.request('/settings/water', method: 'PUT', body: {
-        'profileId': selectedWaterProfileId,
-        'goalMl': waterGoalMl,
-        'rewardPoints': points,
-      });
-      await _load();
-      _snack('Recompensa da tarefa de água atualizada.');
-    } catch (e) { _snack(e.toString()); }
-  }
-
   Future<void> _changePointValue() async {
     final current = pointToBrlRate.toStringAsFixed(2).replaceAll('.', ',');
     final value = await _ask(
@@ -271,8 +174,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) { _snack(e.toString()); }
   }
 
-  Future<void> _editTask([Map<String, dynamic>? task]) async {
-    final title = TextEditingController(text: task?['title']?.toString() ?? '');
+  Future<void> _editTask([Map<String, dynamic>? task, String? suggestedTitle]) async {
+    final title = TextEditingController(text: task?['title']?.toString() ?? suggestedTitle ?? '');
     final description = TextEditingController(text: task?['description']?.toString() ?? '');
     final existingPoints = (task?['points'] as num?)?.toInt() ?? 1;
     final points = TextEditingController(text: existingPoints > 0 ? existingPoints.toString() : '1');
@@ -582,47 +485,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             action: TextButton(onPressed: _changePointValue, child: const Text('Alterar')),
           ),
           const SizedBox(height: 10),
-          if (waterProfiles.length > 1)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                child: DropdownButtonFormField<String>(
-                  initialValue: selectedWaterProfileId,
-                  decoration: const InputDecoration(labelText: 'Perfil de hidratação'),
-                  items: waterProfiles.map((profile) {
-                    final role = profile['role']?.toString() == 'child' ? 'criança' : 'adulto';
-                    final name = profile['name']?.toString() ?? 'Perfil';
-                    return DropdownMenuItem<String>(
-                      value: profile['profileId']?.toString(),
-                      child: Text('$name · $role'),
-                    );
-                  }).toList(),
-                  onChanged: _selectWaterProfile,
-                ),
-              ),
-            ),
-          _tile(
-            'Meta diária de água',
-            (waterGoalMl / 1000).toStringAsFixed(waterGoalMl % 1000 == 0 ? 0 : 2) + ' L por dia',
-            Icons.water_drop_outlined,
-            action: TextButton(onPressed: _changeWaterGoal, child: const Text('Alterar')),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-            child: Text(
-              'Meta configurada por perfil (500–4000 mL). Não é uma recomendação médica; não é necessário ultrapassar a meta para ganhar mais pontos.',
-            ),
-          ),
-          const SizedBox(height: 10),
-          _tile(
-            'Recompensa da tarefa de água',
-            waterRewardPoints == 0
-                ? 'Sem recompensa em PP'
-                : waterRewardPoints.toString() + ' PP ao atingir a meta',
-            Icons.stars_outlined,
-            action: TextButton(onPressed: _changeWaterReward, child: const Text('Alterar')),
-          ),
-          const SizedBox(height: 10),
           Card(
             child: SwitchListTile(
               value: timerEnabled,
@@ -661,29 +523,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (growth.isEmpty) const Text('Nenhum estágio personalizado.'),
           for (final g in growth) ListTile(title: Text(g['stage']?.toString() ?? ''), trailing: Text(g['date']?.toString() ?? '')),
           const SizedBox(height: 18),
-          if (autonomyWeekly.isNotEmpty)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Missões de estudo · últimos 7 dias',
-                      style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    Text('Adiamentos: ${autonomyWeekly['postponements'] ?? 0} · Pedidos de ajuda: ${autonomyWeekly['helpRequests'] ?? 0}'),
-                    Text('Iniciativa própria: ${autonomyWeekly['selfStarted'] ?? 0} · Com PACUS: ${autonomyWeekly['promptedByPacus'] ?? 0} · Com adulto: ${autonomyWeekly['promptedByAdult'] ?? 0}'),
-                    const SizedBox(height: 4),
-                    const Text('Acompanhamento sem punição ou desconto de pontos.'),
-                  ],
-                ),
-              ),
-            ),
           const SizedBox(height: 18),
           Row(children: [
             const Expanded(child: Text('Tarefas permanentes', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900))),
             IconButton(onPressed: () => _editTask(), icon: const Icon(Icons.add_task), tooltip: 'Nova tarefa'),
           ]),
+          if (!loading && !tasks.any((task) {
+            final title = task['title']?.toString().trim().toLowerCase();
+            return title == 'beber água' || title == 'beber agua';
+          }))
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: () => _editTask(null, 'Beber água'),
+                icon: const Icon(Icons.add_task),
+                label: const Text('Adicionar tarefa Beber água'),
+              ),
+            ),
           if (tasks.isEmpty) const Text('Nenhuma tarefa permanente.'),
           for (final task in tasks)
             Card(

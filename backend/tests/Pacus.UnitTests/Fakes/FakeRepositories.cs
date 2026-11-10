@@ -353,6 +353,9 @@ public class FakePointTransactionRepository
         return Task.FromResult(changed);
     }
 
+    public Task<PointTransaction?> GetByIdForFamilyAsync(ObjectId familyId, ObjectId id) =>
+        Task.FromResult(Transactions.FirstOrDefault(entry => entry.FamilyId == familyId && entry.Id == id));
+
     public Task<int> GetBalanceAsync(
         ObjectId userId) =>
         Task.FromResult(

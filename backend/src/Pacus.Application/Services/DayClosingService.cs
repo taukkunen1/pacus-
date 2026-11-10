@@ -177,7 +177,7 @@ public class DayClosingService : IDayClosingService
         return (int)applicable.Stage < (int)fallback ? fallback : applicable.Stage;
     }
 
-    private static PacusStage DetermineStageFromClosedDays(int totalClosedDays) =>
+    public static PacusStage DetermineStageFromClosedDays(int totalClosedDays) =>
         totalClosedDays switch
         {
             >= 23 => PacusStage.Adult,
@@ -191,7 +191,7 @@ public class DayClosingService : IDayClosingService
     // Tamanho progressivo e simples por enquanto â€” cresce com o total de dias fechados,
     // com um teto por estagio para o salto visual acompanhar o estagio (filhote -> pequeno,
     // juvenil -> medio, adulto -> maior). Regra final de escala ainda esta em aberto na spec.
-    private static double ComputeSize(PacusStage stage, int totalClosedDays)
+    public static double ComputeSize(PacusStage stage, int totalClosedDays)
     {
         var stageCap = stage switch
         {

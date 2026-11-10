@@ -34,6 +34,101 @@ class _PacusScreenState extends State<PacusScreen> with SingleTickerProviderStat
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     }
+    if (mounted) await _loadCompanion();
+  }
+
+  Map<String, dynamic>? _companion;
+  String? _companionError;
+  bool _buyingCompanion = false;
+
+  Future<void> _loadCompanion() async {
+    try {
+      final data = await widget.api.getMap('/pacus/companions/turtle');
+      if (mounted) setState(() { _companion = data; _companionError = null; });
+    } catch (e) {
+      if (mounted) setState(() => _companionError = e.toString());
+    }
+  }
+
+  Future<void> _buyCompanion(int cost) async {
+    if (_buyingCompanion) return;
+    setState(() => _buyingCompanion = true);
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Adotar tartaruga'),
+          content: Text('Usar $cost PP para adotar um ovo de tartaruga?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Adotar')),
+          ],
+        ),
+      );
+      if (!mounted || confirmed != true) return;
+      final data = await widget.api.postMap('/pacus/companions/turtle', {});
+      if (mounted) setState(() { _companion = data; _companionError = null; });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        await _loadCompanion();
+      }
+    } finally {
+      if (mounted) setState(() => _buyingCompanion = false);
+    }
+  }
+
+  Widget _companionCard() {
+    final animal = _companion?['animal'] as Map?;
+    final cost = (_companion?['cost'] as num?)?.toInt();
+    final balance = (_companion?['balance'] as num?)?.toInt() ?? 0;
+    final stage = _stageKey(animal?['stage']);
+    final egg = stage == 'egg' || stage == 'cracking' || stage == 'hatching';
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Tartaruga', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            if (animal != null) ...[
+              Center(
+                child: SizedBox(
+                  width: 130,
+                  height: 110,
+                  child: egg
+                      ? CustomPaint(painter: _EggPainter(stage))
+                      : Center(child: Text('🐢', style: TextStyle(fontSize: 74 * _visualScale(stage)))),
+                ),
+              ),
+              Wrap(
+                spacing: 16,
+                children: [
+                  Text('Estágio: ${_stage(animal['stage'])}'),
+                  Text('Dias vividos: ${animal['totalClosedDays']}'),
+                ],
+              ),
+            ] else if (cost != null) ...[
+              Text('Adote um ovo por $cost PP. A tartaruga cresce a cada dia encerrado.'),
+              const SizedBox(height: 8),
+              Text('Saldo: $balance PP'),
+              if (widget.session.isAdult)
+                FilledButton.icon(
+                  onPressed: _buyingCompanion || balance < cost ? null : () => _buyCompanion(cost),
+                  icon: const Icon(Icons.egg_outlined),
+                  label: Text(balance < cost ? 'Saldo insuficiente' : 'Adotar por $cost PP'),
+                )
+              else
+                const Text('Um adulto da família pode fazer a adoção.'),
+            ] else if (_companionError == null)
+              const LinearProgressIndicator(),
+            if (_companionError != null)
+              TextButton(onPressed: _loadCompanion, child: const Text('Tentar carregar tartaruga novamente')),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _editState() async {
@@ -217,6 +312,8 @@ class _PacusScreenState extends State<PacusScreen> with SingleTickerProviderStat
             const SizedBox(width: 10),
             Expanded(child: _stat('Tamanho', ((pacus?['size'] as num?)?.toDouble() ?? 0).toStringAsFixed(1))),
           ]),
+          const SizedBox(height: 20),
+          _companionCard(),
           const SizedBox(height: 20),
           if ((pacus?['stageHistory'] as List?)?.isNotEmpty == true) ...[
             const Text('Estágios anteriores', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),

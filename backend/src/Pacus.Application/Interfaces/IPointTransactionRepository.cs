@@ -6,6 +6,7 @@ namespace Pacus.Application.Interfaces;
 public interface IPointTransactionRepository
 {
     Task<PointTransaction> CreateAsync(PointTransaction transaction);
+    Task<PointTransaction?> GetByIdForFamilyAsync(ObjectId familyId, ObjectId id);
     Task<int> GetBalanceAsync(ObjectId userId);
     // Migracao idempotente de registros anteriores ao ledger com sourceType/sourceId.
     Task<long> BackfillSourceReferencesAsync();

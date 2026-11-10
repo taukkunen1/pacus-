@@ -11,9 +11,8 @@ import 'chat_screen.dart';
 import 'history_screen.dart';
 import 'home_screen.dart';
 import 'pacus_screen.dart';
-import 'points_screen.dart';
 import 'settings_screen.dart';
-import 'store_screen.dart';
+import 'rewards_screen.dart';
 
 class PacusShell extends StatefulWidget {
   const PacusShell({
@@ -248,14 +247,10 @@ class _PacusShellState extends State<PacusShell> {
         ),
         _TabSpec('Histórico', Icons.history,
             HistoryScreen(api: widget.api)),
-        _TabSpec('Pontos', Icons.stars_outlined,
-            PointsScreen(api: widget.api, session: widget.session)),
-        _TabSpec('PACUS', Icons.water,
-            PacusScreen(api: widget.api, session: widget.session)),
         _TabSpec(
-          'Loja',
-          Icons.storefront_outlined,
-          StoreScreen(
+          'Pontos e Loja',
+          Icons.stars_outlined,
+          RewardsScreen(
             api: widget.api,
             session: widget.session,
             onPendingChanged: (value) {
@@ -264,6 +259,8 @@ class _PacusShellState extends State<PacusShell> {
           ),
           badge: widget.session.isAdult ? storePending : 0,
         ),
+        _TabSpec('PACUS', Icons.water,
+            PacusScreen(api: widget.api, session: widget.session)),
         if (widget.session.isAdult)
           _TabSpec('Atividade', Icons.receipt_long_outlined,
               ActivityScreen(api: widget.api)),

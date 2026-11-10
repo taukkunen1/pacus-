@@ -36,6 +36,7 @@ public class ChatMessageRepository : IChatMessageRepository
                 .Find(filter)
                 .SortBy(m => m.Id)
                 .Limit(limit)
+                .Project<ChatMessage>(Builders<ChatMessage>.Projection.Exclude(m => m.Image))
                 .ToListAsync();
         }
 
@@ -43,6 +44,7 @@ public class ChatMessageRepository : IChatMessageRepository
             .Find(familyFilter)
             .SortByDescending(m => m.Id)
             .Limit(limit)
+            .Project<ChatMessage>(Builders<ChatMessage>.Projection.Exclude(m => m.Image))
             .ToListAsync();
 
         latest.Reverse();

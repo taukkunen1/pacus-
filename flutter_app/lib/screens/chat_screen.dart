@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
@@ -32,6 +35,9 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _loading = true;
   bool _refreshing = false;
   bool _sending = false;
+  bool _pickingImage = false;
+  Uint8List? _attachedImage;
+  static const _maxImageBytes = 1024 * 1024;
   bool _markingRead = false;
   String? _error;
 
@@ -369,16 +375,89 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _pickImage() async {
+    if (_sending || _pickingImage) return;
+    setState(() => _pickingImage = true);
+
+    try {
+      final file = await openFile(acceptedTypeGroups: const [
+        XTypeGroup(
+          label: 'Imagens PNG e JPEG',
+          extensions: ['png', 'jpg', 'jpeg'],
+          mimeTypes: ['image/png', 'image/jpeg'],
+          uniformTypeIdentifiers: ['public.png', 'public.jpeg'],
+        ),
+      ]);
+      if (file == null || !mounted) return;
+      if (await file.length() > _maxImageBytes) {
+        throw const FormatException('Escolha uma imagem de até 1 MB.');
+      }
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty || bytes.length > _maxImageBytes) {
+        throw const FormatException('Escolha uma imagem PNG ou JPEG de até 1 MB.');
+      }
+      if (mounted) setState(() => _attachedImage = bytes);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Não foi possível anexar a imagem. $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _pickingImage = false);
+    }
+  }
+
+  Future<void> _pickEmoji() async {
+    final emoji = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Escolher emoji'),
+        content: Wrap(
+          children: [
+            for (final emoji in const [
+              '😀', '😊', '😂', '😍', '🥰', '😎', '😢', '😮',
+              '❤️', '👍', '👏', '🙌', '🤗', '🎉', '⭐', '💙',
+            ])
+              TextButton(
+                onPressed: () => Navigator.pop(context, emoji),
+                child: Text(emoji, style: const TextStyle(fontSize: 24)),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (emoji == null || !mounted) return;
+    final value = _messageController.value;
+    final selection = value.selection;
+    final start = selection.isValid ? selection.start : value.text.length;
+    final end = selection.isValid ? selection.end : value.text.length;
+    final text = value.text.replaceRange(start, end, emoji);
+    if (text.length > 2000) return;
+
+    _messageController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: start + emoji.length),
+    );
+    _focusNode.requestFocus();
+  }
+
+  Future<Uint8List> _loadChatImage(String messageId) async {
+    final data = await widget.api.getMap('/chat/messages/$messageId/image');
+    return base64Decode(data['image'] as String);
+  }
+
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
-    if (text.isEmpty || _sending) return;
+    final image = _attachedImage;
+    if ((text.isEmpty && image == null) || _sending || _pickingImage) return;
 
     setState(() => _sending = true);
 
     try {
       final sent = await widget.api.postMap(
         '/chat/messages',
-        {'text': text},
+        {'text': text, if (image != null) 'image': base64Encode(image)},
       );
 
       if (!mounted) return;
@@ -388,6 +467,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _messages.add(sent);
         }
         _messageController.clear();
+        _attachedImage = null;
         _error = null;
       });
 
@@ -503,9 +583,17 @@ class _ChatScreenState extends State<ChatScreen> {
                               onReject: () => _reviewRequest(message, false),
                             );
                           }
+                          final messageId = message['id'].toString();
                           return _MessageBubble(
+                            key: ValueKey(messageId),
                             message: message,
                             mine: mine,
+                            image: message['hasImage'] == true
+                                ? _ChatImage(
+                                    messageId: messageId,
+                                    loadImage: _loadChatImage,
+                                  )
+                                : null,
                           );
                         },
                       ),
@@ -569,6 +657,23 @@ class _ChatScreenState extends State<ChatScreen> {
                 },
               ),
             ),
+            if (_attachedImage case final image?)
+              ListTile(
+                dense: true,
+                leading: Image.memory(
+                  image,
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const Icon(Icons.broken_image_outlined),
+                ),
+                title: const Text('Imagem anexada'),
+                trailing: IconButton(
+                  tooltip: 'Remover anexo',
+                  onPressed: _sending ? null : () => setState(() => _attachedImage = null),
+                  icon: const Icon(Icons.close),
+                ),
+              ),
             Container(
               decoration: BoxDecoration(
                 color: scheme.surface,
@@ -580,9 +685,20 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  IconButton(
+                    tooltip: 'Anexar imagem',
+                    onPressed: _sending || _pickingImage ? null : _pickImage,
+                    icon: const Icon(Icons.image_outlined),
+                  ),
+                  IconButton(
+                    tooltip: 'Escolher emoji',
+                    onPressed: _sending ? null : _pickEmoji,
+                    icon: const Icon(Icons.emoji_emotions_outlined),
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _messageController,
+                      readOnly: _sending,
                       focusNode: _focusNode,
                       minLines: 1,
                       maxLines: 4,
@@ -597,7 +713,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   const SizedBox(width: 8),
                   IconButton.filled(
                     tooltip: 'Enviar',
-                    onPressed: _sending ? null : _sendMessage,
+                    onPressed: _sending || _pickingImage ? null : _sendMessage,
                     icon: _sending
                         ? const SizedBox.square(
                             dimension: 20,
@@ -617,12 +733,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
+    super.key,
     required this.message,
     required this.mine,
+    this.image,
   });
 
   final Map<String, dynamic> message;
   final bool mine;
+  final Widget? image;
 
   @override
   Widget build(BuildContext context) {
@@ -663,10 +782,14 @@ class _MessageBubble extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
               ],
-              SelectableText(
-                text,
-                style: const TextStyle(fontSize: 16, height: 1.3),
-              ),
+              ?image,
+              if (text.isNotEmpty) ...[
+                if (image != null) const SizedBox(height: 6),
+                SelectableText(
+                  text,
+                  style: const TextStyle(fontSize: 16, height: 1.3),
+                ),
+              ],
               const SizedBox(height: 4),
               Text(
                 timestamp,
@@ -684,6 +807,52 @@ class _MessageBubble extends StatelessWidget {
 
 }
 
+
+class _ChatImage extends StatefulWidget {
+  const _ChatImage({required this.messageId, required this.loadImage});
+
+  final String messageId;
+  final Future<Uint8List> Function(String messageId) loadImage;
+
+  @override
+  State<_ChatImage> createState() => _ChatImageState();
+}
+
+class _ChatImageState extends State<_ChatImage> {
+  late Future<Uint8List> _image = widget.loadImage(widget.messageId);
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Uint8List>(
+    future: _image,
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return TextButton.icon(
+          onPressed: () => setState(() => _image = widget.loadImage(widget.messageId)),
+          icon: const Icon(Icons.refresh),
+          label: const Text('Recarregar imagem'),
+        );
+      }
+      if (!snapshot.hasData) {
+        return const SizedBox(
+          height: 240,
+          width: 320,
+          child: Center(child: CircularProgressIndicator()),
+        );
+      }
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.memory(
+          snapshot.data!,
+          semanticLabel: 'Imagem da mensagem',
+          width: 320,
+          height: 240,
+          fit: BoxFit.contain,
+          errorBuilder: (_, _, _) => const Text('Não foi possível abrir a imagem.'),
+        ),
+      );
+    },
+  );
+}
 
 class _RequestBubble extends StatelessWidget {
   const _RequestBubble({

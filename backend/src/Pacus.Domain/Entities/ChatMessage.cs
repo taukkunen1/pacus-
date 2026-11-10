@@ -11,6 +11,8 @@ public class ChatMessage
     public string SenderName { get; set; } = string.Empty;
     public UserRole SenderRole { get; set; }
     public string Text { get; set; } = string.Empty;
+    public bool HasImage { get; set; }
+    public byte[]? Image { get; set; }
 
     // V2: mensagens podem representar pedidos rapidos da crianca.
     // Kind = "message" | "request".

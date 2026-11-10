@@ -40,6 +40,34 @@ class FakeChatApi extends PacusApi {
 }
 
 void main() {
+  testWidgets('adds the selected emoji to the message draft', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChatScreen(
+          api: FakeChatApi(),
+          session: const AuthSession(
+            token: 'token',
+            userId: 'adult-user',
+            role: 'Adult',
+            name: 'Adulto',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'Oi ');
+    await tester.tap(find.byTooltip('Escolher emoji'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('😊'));
+    await tester.pumpAndSettle();
+
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.controller!.text, 'Oi 😊');
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('loads chat and marks last visible message as read', (tester) async {
     final api = FakeChatApi();
     int? unread;

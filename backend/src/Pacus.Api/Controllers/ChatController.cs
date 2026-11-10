@@ -14,6 +14,7 @@ namespace Pacus.Api.Controllers;
 public class ChatController : ControllerBase
 {
     private const int MaxMessageLength = 2000;
+    private const int MaxImageBytes = 1024 * 1024;
     private static readonly HashSet<string> AllowedRequestTypes =
         ["help", "change_task", "extra_time"];
 
@@ -115,13 +116,35 @@ public class ChatController : ControllerBase
         });
     }
 
+    [HttpGet("messages/{id}/image")]
+    public async Task<IActionResult> GetImage(string id)
+    {
+        if (!ObjectId.TryParse(id, out var messageId))
+            return NotFound();
+
+        var message = await _chatRepository.GetByIdForFamilyAsync(
+            _currentUser.FamilyId, messageId);
+
+        if (message?.Image is not { Length: > 0 } image)
+            return NotFound();
+
+        Response.Headers.CacheControl = "no-store";
+        return Ok(new { image });
+    }
+
     [HttpPost("messages")]
+    [RequestSizeLimit(1_450_000)]
     public async Task<IActionResult> SendMessage([FromBody] SendChatMessageRequest request)
     {
         var text = request.Text?.Trim() ?? string.Empty;
 
-        if (text.Length == 0)
-            return BadRequest(new { error = "Digite uma mensagem." });
+        var image = request.Image;
+
+        if (text.Length == 0 && image is null)
+            return BadRequest(new { error = "Digite uma mensagem ou anexe uma imagem." });
+
+        if (image is not null && (image.Length > MaxImageBytes || !IsSupportedImage(image)))
+            return BadRequest(new { error = "Escolha uma imagem PNG ou JPEG de até 1 MB." });
 
         if (text.Length > MaxMessageLength)
             return BadRequest(new { error = $"A mensagem pode ter no maximo {MaxMessageLength} caracteres." });
@@ -138,6 +161,8 @@ public class ChatController : ControllerBase
             SenderName = sender.Name,
             SenderRole = sender.Role,
             Text = text,
+            HasImage = image is not null,
+            Image = image,
             Kind = "message",
             CreatedAt = DateTime.UtcNow,
         };
@@ -376,6 +401,16 @@ public class ChatController : ControllerBase
             : $"{baseText} {note}";
     }
 
+    private static bool IsSupportedImage(ReadOnlySpan<byte> image)
+    {
+        ReadOnlySpan<byte> pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+        ReadOnlySpan<byte> jpegStart = [255, 216, 255];
+        ReadOnlySpan<byte> jpegEnd = [255, 217];
+        return (image.Length >= 33 && image.StartsWith(pngSignature) &&
+                image.Slice(12, 4).SequenceEqual("IHDR"u8)) ||
+               (image.Length > 5 && image.StartsWith(jpegStart) && image.EndsWith(jpegEnd));
+    }
+
     private static ChatMessageResponse ToResponse(ChatMessage message) =>
         new(
             message.Id.ToString(),
@@ -389,10 +424,11 @@ public class ChatController : ControllerBase
             message.RequestedMinutes,
             message.ReviewedBy?.ToString(),
             message.ReviewedAt,
-            message.CreatedAt);
+            message.CreatedAt,
+            message.HasImage);
 }
 
-public record SendChatMessageRequest(string? Text);
+public record SendChatMessageRequest(string? Text, byte[]? Image = null);
 public record MarkChatReadRequest(string? LastMessageId);
 public record CreateChatQuickRequest(string? Type, int? Minutes, string? Note);
 
@@ -408,4 +444,5 @@ public record ChatMessageResponse(
     int? RequestedMinutes,
     string? ReviewedBy,
     DateTime? ReviewedAt,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    bool HasImage);

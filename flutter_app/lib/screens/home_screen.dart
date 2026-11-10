@@ -42,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool completing = false;
   bool slowLoading = false;
   bool _showFullRoutine = false;
+  bool _adjustingTime = false;
   Timer? slowLoadTimer;
   Timer? dayBoundaryTimer;
   late String lastDayKey;
@@ -485,12 +486,64 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _adjust(int delta) async {
+    if (!mounted || _adjustingTime) return;
+    setState(() => _adjustingTime = true);
     try {
       final updated = await widget.api.adjustGameTimer(delta);
       if (mounted) setState(() => routine = updated);
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
+    } finally {
+      if (mounted) setState(() => _adjustingTime = false);
     }
+  }
+
+  Future<void> _addCustomTime() async {
+    final formKey = GlobalKey<FormState>();
+    int? minutes;
+    final selected = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) {
+        void submit() {
+          if (formKey.currentState?.validate() == true) {
+            Navigator.pop(dialogContext, minutes);
+          }
+        }
+
+        return AlertDialog(
+          title: const Text('Adicionar tempo'),
+          content: Form(
+            key: formKey,
+            child: TextFormField(
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              decoration: const InputDecoration(
+                labelText: 'Minutos',
+                helperText: 'De 1 a 1440 minutos',
+              ),
+              onChanged: (value) => minutes = int.tryParse(value.trim()),
+              validator: (_) {
+                final value = minutes;
+                if (value == null || value < 1 || value > 1440) {
+                  return 'Digite um número inteiro entre 1 e 1440.';
+                }
+                return null;
+              },
+              onFieldSubmitted: (_) => submit(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(onPressed: submit, child: const Text('Adicionar')),
+          ],
+        );
+      },
+    );
+    if (selected != null) await _adjust(selected);
   }
 
   Future<void> _toggleTask(DailyTask task) async {
@@ -1391,9 +1444,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             const Text('Adulto · adicionar tempo', style: TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 10),
             Wrap(spacing: 8, runSpacing: 8, children: [
-              OutlinedButton(onPressed: () => _adjust(15), child: const Text('+15 min')),
-              OutlinedButton(onPressed: () => _adjust(30), child: const Text('+30 min')),
-              OutlinedButton(onPressed: () => _adjust(60), child: const Text('+1 hora')),
+              for (final minutes in const [1, 2, 5, 10, 15, 30, 60])
+                OutlinedButton(
+                  onPressed: _adjustingTime ? null : () => _adjust(minutes),
+                  child: Text(minutes == 60 ? '+1 hora' : '+$minutes min'),
+                ),
+              OutlinedButton(
+                onPressed: _adjustingTime ? null : _addCustomTime,
+                child: const Text('Outro valor'),
+              ),
             ]),
           ],
         ]),

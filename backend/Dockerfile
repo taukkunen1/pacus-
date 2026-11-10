@@ -19,8 +19,11 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish .
 
-# Render injeta a variavel de ambiente PORT em runtime; o Kestrel precisa
-# escutar nela. Usamos forma shell no ENTRYPOINT para expandir $PORT
+# O Kestrel escuta em $PORT (8080 por padrao; porta > 1024, nao exige root). Usamos forma shell no # Roda sem privilegios de root: se a API for comprometida, o atacante nao tem root no container.
+RUN groupadd --system --gid 10001 pacus && useradd --system --uid 10001 --gid pacus --no-create-home pacus
+USER pacus
+
+ENTRYPOINT para expandir $PORT
 # (com fallback 8080 para rodar local via "docker run").
 ENV PORT=8080
 EXPOSE 8080

@@ -1,6 +1,6 @@
 # PACUS — Estado atual do projeto
 
-Atualizado em 2026-09-23 após a auditoria final da migração para Flutter Web.
+Atualizado em 2026-11-10 com base no código da branch `main`.
 
 ## Fonte de verdade
 
@@ -33,7 +33,8 @@ Atualizado em 2026-09-23 após a auditoria final da migração para Flutter Web.
 - registro de iniciativa;
 - motivo de tarefa não realizada;
 - planejamento da noite;
-- planejamento de Amanhã;
+- missão da lousa com desafios criativos opcionais em rotação diária;
+- registro de hidratação e lembrete a cada três horas enquanto o app está aberto;
 - sugestões/autonomia;
 - histórico de dias;
 - atualização automática da tela na virada do dia;
@@ -74,22 +75,23 @@ Atualizado em 2026-09-23 após a auditoria final da migração para Flutter Web.
 - isolamento por `FamilyId`;
 - estado de leitura por usuário;
 - contagem de mensagens não lidas;
-- badge do Chat atualizado em segundo plano.
+- badge do Chat atualizado em segundo plano;
+- pedidos rápidos de ajuda, conversa sobre tarefas e tempo extra, com observação opcional;
+- aprovação e recusa pelo adulto dentro do chat.
 
 ### Navegação
 - Hoje;
-- Amanhã;
 - Chat;
 - Histórico;
 - Pontos;
 - PACUS;
 - Loja;
-- Config (adulto);
+- Atividade e Config (adulto);
 - badges de tarefas pendentes, mensagens não lidas e resgates aguardando aprovação.
 
 ## CI/CD
 
-`.github/workflows/ci.yml`:
+`.github/workflows/ci.yml` usa Ubuntu 22.04 no job de backend para executar os testes de integração com MongoDB 8:
 - `dotnet restore`;
 - `dotnet build`;
 - `dotnet test`;

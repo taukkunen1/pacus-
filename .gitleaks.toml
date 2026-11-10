@@ -1,0 +1,11 @@
+title = "PACUS gitleaks"
+
+[extend]
+useDefault = true
+
+# Falsos positivos conhecidos: fixtures de teste e o placeholder de JWT_SECRET do CI.
+[allowlist]
+paths = [
+  '''backend/tests/''',
+  '''\.github/workflows/ci\.yml''',
+]

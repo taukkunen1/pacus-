@@ -16,4 +16,6 @@ public enum TaskEventType
     InitiativeSet,
     SkipReasonSet,
     EveningPlanSet,
+    SupportAction,
+    SupportTemplateApplied,
 }

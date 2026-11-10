@@ -58,6 +58,10 @@ public class AuthController : ControllerBase
     [HttpPost("adult/reset-password")]
     public async Task<IActionResult> ResetAdultPassword([FromBody] ResetAdultPasswordRequest request)
     {
+        // Mesma regra minima do cadastro (BootstrapService): senha nova com 8+ caracteres.
+        if (string.IsNullOrEmpty(request.NewPassword) || request.NewPassword.Length < 8)
+            return BadRequest(new { error = "A nova senha deve ter pelo menos 8 caracteres." });
+
         try
         {
             var newRecoveryCode = await _authService.ResetAdultPasswordAsync(

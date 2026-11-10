@@ -6,6 +6,9 @@ namespace Pacus.Application.DTOs;
 
 public record SetTaskInitiativeRequest(TaskInitiativeLevel Initiative);
 
+// Acoes opcionais da V4; nunca concedem ou retiram pontos.
+public record TaskSupportActionRequest(string Action, int? StepIndex = null);
+
 public record SetTaskSkipReasonRequest(
     TaskSkipReason Reason,
     // So usado quando Reason == TaskSkipReason.Other. Ignorado nos demais casos.
@@ -44,6 +47,10 @@ public record AutonomyWeeklyReportResponse(
     int MemberCreatedTasks,
     int PlannedDays,
     int PreviousMemberCreatedTasks,
-    int PreviousPlannedDays
+    int PreviousPlannedDays,
+    int Postponements = 0,
+    int HelpRequests = 0,
+    int PreviousPostponements = 0,
+    int PreviousHelpRequests = 0
 );
 

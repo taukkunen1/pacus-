@@ -698,18 +698,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _createDailyTask() async {
     final title = TextEditingController();
+    final description = TextEditingController();
     final points = TextEditingController(text: '1');
+    String repetition = 'today';
     String period = 'morning';
-    String type = 'expected';
     final payload = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialog) => AlertDialog(
-          title: const Text('Nova tarefa de hoje'),
+          title: const Text('Nova tarefa'),
+          scrollable: true,
           content: SizedBox(
             width: 460,
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(controller: title, decoration: const InputDecoration(labelText: 'Título')),
+              const SizedBox(height: 10),
+              TextField(controller: description, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'Descrição (opcional)')),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: repetition,
+                decoration: const InputDecoration(labelText: 'Repetição'),
+                items: const [
+                  DropdownMenuItem(value: 'today', child: Text('Só hoje')),
+                  DropdownMenuItem(value: 'daily', child: Text('A cada 1 dia (todos os dias)')),
+                  DropdownMenuItem(value: 'interval', child: Text('A cada 2 dias (dia sim, dia não)')),
+                ],
+                onChanged: (v) => setDialog(() => repetition = v ?? 'today'),
+              ),
               const SizedBox(height: 10),
               TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Pontos')),
               const SizedBox(height: 10),
@@ -724,24 +739,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 onChanged: (v) => setDialog(() => period = v ?? period),
               ),
               const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: type,
-                decoration: const InputDecoration(labelText: 'Tipo'),
-                items: const [
-                  DropdownMenuItem(value: 'mandatory', child: Text('Obrigatória')),
-                  DropdownMenuItem(value: 'expected', child: Text('Esperada')),
-                  DropdownMenuItem(value: 'challenge', child: Text('Desafio')),
-                ],
-                onChanged: (v) => setDialog(() => type = v ?? type),
-              ),
             ]),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
             FilledButton(onPressed: () => Navigator.pop(context, {
               'title': title.text.trim(),
-              'description': null,
-              'type': type,
+              'description': description.text.trim().isEmpty ? null : description.text.trim(),
+              'permanent': repetition != 'today',
+              'recurrence': repetition == 'interval' ? 'interval' : 'daily',
+              'intervalDays': repetition == 'interval' ? 2 : null,
+              'type': 'mandatory',
               'period': period,
               'points': int.tryParse(points.text) ?? 1,
             }), child: const Text('Adicionar')),
@@ -750,6 +758,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
     );
     title.dispose();
+    description.dispose();
     points.dispose();
     if (payload == null || (payload['title']?.toString() ?? '').isEmpty) return;
     try {
@@ -762,8 +771,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _deleteDailyTask(DailyTask task) async {
+    final permanent = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir tarefa'),
+        content: Text('Como deseja excluir "${task.title}"? A opção para sempre remove também dos próximos dias.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Só hoje')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Para sempre')),
+        ],
+      ),
+    );
+    if (permanent == null) return;
     try {
-      await widget.api.delete('/daily-tasks/' + task.id);
+      await widget.api.delete('/daily-tasks/${task.id}?permanent=$permanent');
       final updated = await widget.api.getToday();
       if (mounted) setState(() => routine = updated);
     } catch (e) {
@@ -786,7 +808,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final description = TextEditingController(text: task.description ?? '');
     final points = TextEditingController(text: task.points.toString());
     String period = task.period;
-    String type = task.type;
     final payload = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -812,25 +833,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 onChanged: (v) => setDialog(() => period = v ?? period),
               ),
               const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: type,
-                decoration: const InputDecoration(labelText: 'Tipo'),
-                items: const [
-                  DropdownMenuItem(value: 'mandatory', child: Text('Obrigatória')),
-                  DropdownMenuItem(value: 'expected', child: Text('Esperada')),
-                  DropdownMenuItem(value: 'challenge', child: Text('Desafio')),
-                ],
-                onChanged: (v) => setDialog(() => type = v ?? type),
-              ),
             ]),
           ),
           actions: [
+            if (widget.session.isAdult)
+              TextButton.icon(
+                onPressed: () => Navigator.pop(context, {'applyTemplateSupport': true}),
+                icon: const Icon(Icons.sync),
+                label: const Text('Aplicar etapas permanentes a hoje'),
+              ),
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
             FilledButton(
               onPressed: () => Navigator.pop(context, {
                 'title': title.text.trim(),
                 'description': description.text.trim().isEmpty ? null : description.text.trim(),
-                'type': type,
+                'type': 'mandatory',
                 'period': period,
                 'points': int.tryParse(points.text) ?? task.points,
                 'options': task.options,
@@ -844,6 +861,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
     title.dispose(); description.dispose(); points.dispose();
     if (payload == null) return;
+    if (payload['applyTemplateSupport'] == true) {
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Atualizar etapas de hoje?'),
+          content: const Text(
+            'Usar as etapas da tarefa permanente somente no dia atual. '
+            'Os pontos, a conclusão e as etapas já marcadas que ainda existirem '
+            'serão preservados. O histórico não será alterado.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(context, true),
+                child: const Text('Aplicar')),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      try {
+        await widget.api.request(
+          '/daily-tasks/${task.id}/apply-template-support', method: 'POST');
+        final updated = await widget.api.getToday();
+        if (mounted) setState(() { routine = updated; error = null; });
+      } catch (e) {
+        if (mounted) setState(() => error = e.toString());
+      }
+      return;
+    }
     try {
       await widget.api.request('/daily-tasks/' + task.id, method: 'PUT', body: payload);
       final updated = await widget.api.getToday();
@@ -851,6 +898,155 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     }
+  }
+
+  // V4: seletor de missao; a ordem da rotina nao e alterada.
+  Future<void> _openStudyMission(DailyTask task) async {
+    DailyTask active = task;
+    bool busy = false;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheet) {
+          Future<void> save(String path, Map<String, dynamic> body) async {
+            if (busy) return;
+            setSheet(() => busy = true);
+            try {
+              await widget.api.request(path, method: 'PUT', body: body);
+              final updated = await widget.api.getToday();
+              if (!mounted || !sheetContext.mounted) return;
+              setState(() => routine = updated);
+              setSheet(() {
+                active = updated.tasks.firstWhere((t) => t.id == task.id);
+                busy = false;
+              });
+            } catch (e) {
+              if (sheetContext.mounted) {
+                setSheet(() => busy = false);
+                ScaffoldMessenger.of(sheetContext).showSnackBar(
+                  SnackBar(content: Text('Não foi possível salvar: $e')),
+                );
+              }
+            }
+          }
+
+          Future<void> action(String kind, {int? index}) {
+            final body = <String, dynamic>{'action': kind};
+            if (index != null) body['stepIndex'] = index;
+            return save('/daily-tasks/${task.id}/support', body);
+          }
+
+          Future<void> chooseDifficulty() async {
+            final selected = await showDialog<String>(
+              context: sheetContext,
+              builder: (dialogContext) => AlertDialog(
+                title: const Text('Não quero fazer agora'),
+                content: const Text('Tudo bem contar como está se sentindo. Que tal escolher um próximo passo?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, 'postpone'),
+                    child: const Text('Adiar 10 minutos'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, 'help'),
+                    child: const Text('Preciso de ajuda'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(dialogContext, 'start'),
+                    child: const Text('Começar pequeno'),
+                  ),
+                ],
+              ),
+            );
+            if (selected != null && sheetContext.mounted) await action(selected);
+          }
+
+          final progress = active.completedSupportSteps.length;
+          final isPaused = active.supportPostponedUntil != null &&
+              active.supportPostponedUntil!.isAfter(DateTime.now());
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                20, 8, 20, MediaQuery.viewInsetsOf(sheetContext).bottom + 20),
+              child: SizedBox(
+                height: MediaQuery.sizeOf(sheetContext).height * 0.72,
+                child: ListView(
+                  children: [
+                    Text(active.title, style: Theme.of(sheetContext).textTheme.headlineSmall),
+                    const SizedBox(height: 6),
+                    Text('$progress de ${active.supportSteps.length} etapas. Cada etapa é um avanço; os pontos da tarefa só vêm quando ela estiver concluída.'),
+                    if (isPaused) ...[
+                      const SizedBox(height: 8),
+                      const Text('Você combinou uma pausa de 10 minutos. Pode retomar antes, se quiser.'),
+                    ],
+                    const SizedBox(height: 12),
+                    if (active.supportStartedAt == null)
+                      FilledButton.icon(
+                        onPressed: busy ? null : () => action('start'),
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: const Text('Começar missão'),
+                      ),
+                    if (active.supportStartedAt != null && isPaused)
+                      FilledButton.tonal(
+                        onPressed: busy ? null : () => action('resume'),
+                        child: const Text('Retomar agora'),
+                      ),
+                    for (var i = 0; i < active.supportSteps.length; i++)
+                      CheckboxListTile(
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(active.supportSteps[i]),
+                        value: active.completedSupportSteps.contains(i),
+                        onChanged: busy ? null : (checked) =>
+                            action(checked == true ? 'step' : 'undo-step', index: i),
+                      ),
+                    const SizedBox(height: 10),
+                    if (active.initiative == null) ...[
+                      Text('Como você começou?', style: Theme.of(sheetContext).textTheme.titleMedium),
+                      const SizedBox(height: 6),
+                      Wrap(spacing: 8, runSpacing: 8, children: [
+                        ActionChip(
+                          label: const Text('Sozinho'),
+                          onPressed: busy ? null : () => save('/daily-tasks/${task.id}/initiative', {'initiative': 'selfStarted'}),
+                        ),
+                        ActionChip(
+                          label: const Text('Com o PACUS'),
+                          onPressed: busy ? null : () => save('/daily-tasks/${task.id}/initiative', {'initiative': 'promptedByPacus'}),
+                        ),
+                        ActionChip(
+                          label: const Text('Com um adulto'),
+                          onPressed: busy ? null : () => save('/daily-tasks/${task.id}/initiative', {'initiative': 'promptedByAdult'}),
+                        ),
+                      ]),
+                      const SizedBox(height: 8),
+                      const Text('Registrar como começou vale +1 ponto, seja qual for a resposta.'),
+                    ] else
+                      const Text('Seu início já foi registrado.'),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: busy ? null : chooseDifficulty,
+                      icon: const Icon(Icons.sentiment_dissatisfied_outlined),
+                      label: const Text('Não quero fazer agora'),
+                    ),
+                    const SizedBox(height: 6),
+                    FilledButton.tonalIcon(
+                      onPressed: busy ? null : () async {
+                        Navigator.pop(sheetContext);
+                        await _toggleTask(active);
+                      },
+                      icon: const Icon(Icons.check_circle_outline),
+                      label: const Text('Concluí a tarefa inteira'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _setInitiative(DailyTask task) async {
@@ -897,6 +1093,94 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (value == null) return;
     try {
       await widget.api.request('/daily-tasks/' + task.id + '/skip-reason', method: 'PUT', body: {'reason': value, 'note': null});
+      final updated = await widget.api.getToday();
+      if (mounted) setState(() => routine = updated);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    }
+  }
+
+  // Mesmo planejamento visual da noite, limitado ao periodo escolhido.
+  // Reaproveita a API de ordenacao existente, sem criar pontos nem tarefas.
+  Future<void> _planDayPeriod(DailyRoutine value, String period) async {
+    final label = period == 'morning' ? 'manhã' : 'tarde';
+    final active = value.tasks.where((t) => !t.isDeleted).toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
+    final pending = active.where((t) =>
+        !t.isDone && t.period.toLowerCase() == period).toList();
+    if (pending.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Não há tarefas pendentes para a $label.')),
+      );
+      return;
+    }
+    final ordered = List<DailyTask>.from(pending);
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialog) => AlertDialog(
+          title: Text('Como você quer organizar sua $label?'),
+          content: SizedBox(
+            width: 500,
+            height: 360,
+            child: ListView.builder(
+              itemCount: ordered.length,
+              itemBuilder: (_, i) => ListTile(
+                leading: CircleAvatar(child: Text((i + 1).toString())),
+                title: Text(ordered[i].title),
+                trailing: Wrap(
+                  spacing: 2,
+                  children: [
+                    IconButton(
+                      onPressed: i == 0 ? null : () => setDialog(() {
+                        final item = ordered.removeAt(i);
+                        ordered.insert(i - 1, item);
+                      }),
+                      icon: const Icon(Icons.arrow_upward),
+                      tooltip: 'Subir',
+                    ),
+                    IconButton(
+                      onPressed: i == ordered.length - 1 ? null : () => setDialog(() {
+                        final item = ordered.removeAt(i);
+                        ordered.insert(i + 1, item);
+                      }),
+                      icon: const Icon(Icons.arrow_downward),
+                      tooltip: 'Descer',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Salvar ordem'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (accepted != true || !mounted) return;
+
+    // Preserva a posicao das tarefas ja concluidas e de outros periodos.
+    var next = 0;
+    final reordered = active.map((task) {
+      if (!task.isDone && task.period.toLowerCase() == period) {
+        return ordered[next++];
+      }
+      return task;
+    }).toList();
+    try {
+      await widget.api.request(
+        '/daily-routines/today/order',
+        method: 'PUT',
+        body: reordered.map((t) => t.id).toList(),
+      );
       final updated = await widget.api.getToday();
       if (mounted) setState(() => routine = updated);
     } catch (e) {
@@ -1060,7 +1344,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   const SizedBox(height: 20),
                   _tasksCard(r),
                   const SizedBox(height: 12),
-                  OutlinedButton.icon(onPressed: () => _planEvening(r), icon: const Icon(Icons.nightlight_outlined), label: const Text('Planejar minha noite')),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _planDayPeriod(r, 'morning'),
+                        icon: const Icon(Icons.wb_sunny_outlined),
+                        label: const Text('Planejar minha manhã'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _planDayPeriod(r, 'afternoon'),
+                        icon: const Icon(Icons.light_mode_outlined),
+                        label: const Text('Planejar minha tarde'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _planEvening(r),
+                        icon: const Icon(Icons.nightlight_outlined),
+                        label: const Text('Planejar minha noite'),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -1277,11 +1581,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             IconButton(
               onPressed: _createDailyTask,
               icon: const Icon(Icons.add_task_rounded),
-              tooltip: 'Adicionar tarefa de hoje',
+              tooltip: 'Adicionar tarefa',
             ),
           ],
         ),
         const SizedBox(height: 12),
+        if (tasks.any((t) => t.hasStudySupport && !t.isDone)) ...[
+          Text('Escolha sua próxima missão de estudo',
+            style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final mission in tasks.where((t) => t.hasStudySupport && !t.isDone))
+                ActionChip(
+                  avatar: const Icon(Icons.menu_book_outlined, size: 18),
+                  label: Text(mission.title),
+                  onPressed: () => _openStudyMission(mission),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+        ],
         _periodSection(
           title: 'Manhã',
           icon: Icons.wb_sunny_outlined,
@@ -1378,7 +1700,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         const PopupMenuItem(value: 'edit', child: Text('Editar')),
         const PopupMenuItem(value: 'initiative', child: Text('Como comecei')),
         const PopupMenuItem(value: 'skip', child: Text('O que aconteceu')),
-        const PopupMenuItem(value: 'delete', child: Text('Remover do dia')),
+        const PopupMenuItem(value: 'delete', child: Text('Excluir tarefa')),
       ],
     );
 
@@ -1404,7 +1726,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 label: '${task.points} ${task.points == 1 ? 'ponto' : 'pontos'}',
                 icon: Icons.stars_rounded,
               ),
-              PacusBadge(label: _typeLabel(task.type)),
               if (task.createdByMember)
                 const PacusBadge(
                   label: 'Criado por mim',
@@ -1413,6 +1734,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
             ],
           ),
+          if (task.hasStudySupport && !task.isDone) ...[
+            const SizedBox(height: 9),
+            OutlinedButton.icon(
+              onPressed: () => _openStudyMission(task),
+              icon: const Icon(Icons.auto_stories_outlined),
+              label: Text('Abrir missão · ${task.completedSupportSteps.length}/${task.supportSteps.length} etapas'),
+            ),
+          ],
           if (description.isNotEmpty) ...[
             const SizedBox(height: 9),
             Text(
@@ -1499,14 +1828,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       ],
     );
-  }
-
-  String _typeLabel(String type) {
-    switch (type.toLowerCase()) {
-      case 'mandatory': return 'Obrigatória';
-      case 'challenge': return 'Desafio';
-      default: return 'Esperada';
-    }
   }
 
 }

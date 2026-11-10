@@ -123,6 +123,13 @@ public class FakeDailyRoutineRepository : IDailyRoutineRepository
         UpdatedAt = t.UpdatedAt,
         // Autonomia e planejamento (2026-09-10, ver docs/ESTADO_ATUAL.md).
         MinimumGoalLabel = t.MinimumGoalLabel,
+        SupportKind = t.SupportKind,
+        SupportSteps = new List<string>(t.SupportSteps),
+        CompletedSupportSteps = new List<int>(t.CompletedSupportSteps),
+        SupportStartedAt = t.SupportStartedAt,
+        SupportPostponedUntil = t.SupportPostponedUntil,
+        SupportPostponeCount = t.SupportPostponeCount,
+        SupportHelpCount = t.SupportHelpCount,
         Initiative = t.Initiative,
         SkipReason = t.SkipReason,
         SkipReasonNote = t.SkipReasonNote,

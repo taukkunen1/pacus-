@@ -281,7 +281,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final supportSteps = TextEditingController(
       text: ((task?['supportSteps'] as List?) ?? const []).join('\n'));
     final options = TextEditingController(text: ((task?['options'] as List?) ?? []).join(', '));
-    final reasons = TextEditingController(text: ((task?['reasons'] as List?) ?? []).join(' | '));
+    final originalReasons = ((task?['reasons'] as List?) ?? []).join(' | ');
+    final reasons = TextEditingController(text: originalReasons);
     String period = task?['period']?.toString().toLowerCase() ?? 'morning';
     String recurrence = task?['recurrence']?.toString().toLowerCase() ?? 'daily';
     final anchorDate = TextEditingController(text: task?['anchorDate']?.toString() ?? '');
@@ -488,7 +489,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         .toList()
                     : null,
                 'options': options.text.trim().isEmpty ? null : options.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
-                'reasons': reasons.text.trim().isEmpty ? null : reasons.text.split('|').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+                'reasons': reasons.text.trim().isEmpty ||
+                        (task != null &&
+                            title.text.trim() != (task['title'] as String).trim() &&
+                            reasons.text.trim() == originalReasons.trim())
+                    ? null
+                    : reasons.text.split('|').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
                 'minimumGoalLabel': minimum.text.trim().isEmpty ? null : minimum.text.trim(),
                 'supportKind': supportKind == 'none' ? null : supportKind,
                 'supportSteps': supportKind == 'none' || supportSteps.text.trim().isEmpty

@@ -38,10 +38,11 @@ public class AppExceptionHandler : IExceptionHandler
 
         if (status == StatusCodes.Status500InternalServerError)
         {
+            var endpoint = httpContext.Features.Get<IExceptionHandlerFeature>()?.Endpoint;
             _logger.LogError(
                 exception,
                 "Erro nao tratado na rota {Route}",
-                (httpContext.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText ?? "sem rota");
+                (endpoint as RouteEndpoint)?.RoutePattern.RawText ?? "sem rota");
         }
 
         httpContext.Response.StatusCode = status;

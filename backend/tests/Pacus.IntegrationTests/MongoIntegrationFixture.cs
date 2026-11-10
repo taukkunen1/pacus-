@@ -26,25 +26,7 @@ public sealed class MongoIntegrationFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        try
-        {
-            await _container.StartAsync();
-        }
-        catch (Exception error)
-        {
-            (string Stdout, string Stderr) logs;
-            try
-            {
-                logs = await _container.GetLogsAsync();
-            }
-            catch (Exception logError)
-            {
-                throw new AggregateException(error, logError);
-            }
-
-            throw new InvalidOperationException(
-                $"Falha ao iniciar o MongoDB de testes.\nSTDOUT:\n{logs.Stdout}\nSTDERR:\n{logs.Stderr}", error);
-        }
+        await _container.StartAsync();
         var init = await _container.ExecAsync(new[]
         {
             "mongosh", "--quiet", "--eval",

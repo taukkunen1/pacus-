@@ -98,8 +98,7 @@ public class ChatController : ControllerBase
             _currentUser.FamilyId,
             _currentUser.UserId,
             message.Id,
-            message.CreatedAt,
-            message.HasImage);
+            message.CreatedAt);
 
         var count = await _chatRepository.CountUnreadAsync(
             _currentUser.FamilyId,
@@ -425,7 +424,8 @@ public class ChatController : ControllerBase
             message.RequestedMinutes,
             message.ReviewedBy?.ToString(),
             message.ReviewedAt,
-            message.CreatedAt);
+            message.CreatedAt,
+            message.HasImage);
 }
 
 public record SendChatMessageRequest(string? Text, byte[]? Image = null);

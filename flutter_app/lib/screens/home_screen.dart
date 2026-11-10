@@ -499,9 +499,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _addCustomTime() async {
+    final selected = await _pickMinutes(
+      title: 'Adicionar tempo',
+      action: 'Adicionar',
+      maxMinutes: 1440,
+    );
+    if (selected != null) await _adjust(selected);
+  }
+
+  Future<void> _startCustomSession(int available) async {
+    final maxMinutes = math.min(60, available);
+    if (maxMinutes < 1) return;
+
+    final selected = await _pickMinutes(
+      title: 'Quanto tempo você quer usar?',
+      action: 'Iniciar',
+      maxMinutes: maxMinutes,
+    );
+    if (!mounted || selected == null) return;
+    await _startSession(selected);
+  }
+
+  Future<int?> _pickMinutes({
+    required String title,
+    required String action,
+    required int maxMinutes,
+  }) {
     final formKey = GlobalKey<FormState>();
     int? minutes;
-    final selected = await showDialog<int>(
+    return showDialog<int>(
       context: context,
       builder: (dialogContext) {
         void submit() {
@@ -511,22 +537,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
 
         return AlertDialog(
-          title: const Text('Adicionar tempo'),
+          title: Text(title),
           content: Form(
             key: formKey,
             child: TextFormField(
               autofocus: true,
               keyboardType: TextInputType.number,
               textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Minutos',
-                helperText: 'De 1 a 1440 minutos',
+                helperText: 'De 1 a $maxMinutes minutos',
               ),
               onChanged: (value) => minutes = int.tryParse(value.trim()),
               validator: (_) {
                 final value = minutes;
-                if (value == null || value < 1 || value > 1440) {
-                  return 'Digite um número inteiro entre 1 e 1440.';
+                if (value == null || value < 1 || value > maxMinutes) {
+                  return 'Digite um número inteiro entre 1 e $maxMinutes.';
                 }
                 return null;
               },
@@ -538,12 +564,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancelar'),
             ),
-            FilledButton(onPressed: submit, child: const Text('Adicionar')),
+            FilledButton(onPressed: submit, child: Text(action)),
           ],
         );
       },
     );
-    if (selected != null) await _adjust(selected);
   }
 
   Future<void> _toggleTask(DailyTask task) async {
@@ -1432,12 +1457,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           const SizedBox(height: 18),
           Text(available > 0 ? 'Quanto tempo você quer usar agora?' : 'Seu tempo de tela de hoje acabou. 🦆',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          if (presets.isNotEmpty) ...[
+          if (available > 0) ...[
             const SizedBox(height: 14),
-            Wrap(spacing: 10, runSpacing: 10, children: presets.map((m) =>
-              FilledButton.tonal(onPressed: () => _startSession(m), child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12), child: Text(_formatMinutes(m)),
-              ))).toList()),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final minutes in presets)
+                  FilledButton.tonal(
+                    onPressed: () => _startSession(minutes),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                      child: Text(_formatMinutes(minutes)),
+                    ),
+                  ),
+                OutlinedButton.icon(
+                  onPressed: () => _startCustomSession(available),
+                  icon: const Icon(Icons.timer_outlined),
+                  label: const Text('Escolher minutos'),
+                ),
+              ],
+            ),
           ],
           if (widget.session.isAdult) ...[
             const Divider(height: 34),

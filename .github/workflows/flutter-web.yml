@@ -29,7 +29,7 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter build web --release --dart-define=PACUS_API_BASE_URL=https://pacus-pacus-api.fly.dev/api/v1
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: pacus-flutter-web
           path: flutter_app/build/web

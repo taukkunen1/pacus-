@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,6 +9,8 @@ import '../brand.dart';
 import '../models.dart';
 import '../ui/effort_messages.dart';
 import '../ui/pacus_components.dart';
+import '../ui/timer_alarm.dart';
+import '../ui/timer_alarm_controls.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -19,17 +19,21 @@ class HomeScreen extends StatefulWidget {
     required this.session,
     required this.onLogout,
     this.onPendingChanged,
+    this.timerAlarm,
   });
   final PacusApi api;
   final AuthSession session;
   final Future<void> Function() onLogout;
   final ValueChanged<int>? onPendingChanged;
+  final TimerAlarm? timerAlarm;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  late final TimerAlarm alarm;
+  late final Future<void> alarmReady;
   DailyRoutine? routine;
   bool loading = true;
   String? error;
@@ -53,6 +57,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    alarm = widget.timerAlarm ?? TimerAlarm();
+    alarmReady = alarm.loadVolume();
     lastDayKey = _dayKey();
     _scheduleNextDayBoundary();
     _load();
@@ -64,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     timer?.cancel();
     slowLoadTimer?.cancel();
     dayBoundaryTimer?.cancel();
+    alarm.dispose();
     super.dispose();
   }
 
@@ -398,6 +405,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (completing || sessionMinutes == null) return;
     completing = true;
 
+    // O aviso não depende da rede nem atrasa a confirmação visual.
+    unawaited(alarmReady.then((_) => alarm.play()));
+
     final wasPersistedOnServer = sessionPersistedOnServer;
     final selectedMinutes = sessionMinutes!;
 
@@ -411,78 +421,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       routine = updated;
       await _restoreSession();
-      await _playDuck();
 
       if (!mounted) return;
       setState(() => error = null);
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('🦆 Quá quá!'),
-          content: Text('Seu tempo terminou. Restam ${_formatMinutes(updated.availableGameMinutes)} hoje.'),
-          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Entendi'))],
+          scrollable: true,
+          title: const Text('Tempo encerrado'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Seu tempo terminou. Restam ${_formatMinutes(updated.availableGameMinutes)} hoje.'),
+              const SizedBox(height: 16),
+              TimerAlarmControls(alarm: alarm),
+            ],
+          ),
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Entendi e parar alarme'))],
         ),
-      );
+      ).whenComplete(alarm.stop);
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     } finally {
       completing = false;
     }
-  }
-
-  Future<void> _playDuck() async {
-    final player = AudioPlayer(playerId: 'pacus_timer_alarm');
-    try {
-      await player.setVolume(1.0);
-
-      for (var i = 0; i < 3; i++) {
-        await player.stop();
-        await player.play(
-          BytesSource(_duckWav(), mimeType: 'audio/wav'),
-          volume: 1.0,
-        );
-
-        // O alerta sintetizado dura cerca de 620 ms.
-        await Future<void>.delayed(const Duration(milliseconds: 700));
-        await player.stop();
-
-        if (i < 2) {
-          await Future<void>.delayed(const Duration(milliseconds: 180));
-        }
-      }
-    } catch (_) {
-      // O modal visual continua funcionando caso o navegador bloqueie audio.
-    } finally {
-      await player.dispose();
-    }
-  }
-
-  Uint8List _duckWav() {
-    const rate = 22050;
-    const seconds = 0.62;
-    final samples = (rate * seconds).round();
-    final data = ByteData(44 + samples * 2);
-    void ascii(int offset, String s) {
-      for (var i = 0; i < s.length; i++) { data.setUint8(offset + i, s.codeUnitAt(i)); }
-    }
-    ascii(0, 'RIFF'); data.setUint32(4, 36 + samples * 2, Endian.little); ascii(8, 'WAVE');
-    ascii(12, 'fmt '); data.setUint32(16, 16, Endian.little); data.setUint16(20, 1, Endian.little);
-    data.setUint16(22, 1, Endian.little); data.setUint32(24, rate, Endian.little);
-    data.setUint32(28, rate * 2, Endian.little); data.setUint16(32, 2, Endian.little);
-    data.setUint16(34, 16, Endian.little); ascii(36, 'data'); data.setUint32(40, samples * 2, Endian.little);
-    for (var i = 0; i < samples; i++) {
-      final t = i / rate;
-      double burst(double start, double len, double high, double low) {
-        final x = (t - start) / len;
-        if (x < 0 || x > 1) return 0;
-        final env = math.sin(math.pi * x) * (1 - x * .35);
-        final freq = high + (low - high) * x;
-        return math.sin(2 * math.pi * freq * (t - start)) * env;
-      }
-      final v = burst(0, .24, 340, 125) * .72 + burst(.30, .22, 295, 110) * .62;
-      data.setInt16(44 + i * 2, (v.clamp(-1, 1) * 32700).round(), Endian.little);
-    }
-    return data.buffer.asUint8List();
   }
 
   Future<void> _adjust(int delta) async {
@@ -1406,6 +1369,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             const SizedBox(height: 12),
             FittedBox(child: Text(_clock(remaining), style: const TextStyle(fontSize: 66, fontWeight: FontWeight.w900))),
             const SizedBox(height: 14),
+            TimerAlarmControls(alarm: alarm),
+            const SizedBox(height: 14),
             LinearProgressIndicator(value: progress, minHeight: 12, borderRadius: BorderRadius.circular(99)),
             const SizedBox(height: 12),
             Text(
@@ -1454,6 +1419,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           const SizedBox(height: 8),
           FittedBox(alignment: Alignment.centerLeft, fit: BoxFit.scaleDown,
             child: Text(_formatMinutes(available), style: const TextStyle(fontSize: 58, fontWeight: FontWeight.w900))),
+          const SizedBox(height: 18),
+          TimerAlarmControls(alarm: alarm),
           const SizedBox(height: 18),
           Text(available > 0 ? 'Quanto tempo você quer usar agora?' : 'Seu tempo de tela de hoje acabou. 🦆',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),

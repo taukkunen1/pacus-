@@ -45,7 +45,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool sessionPersistedOnServer = false;
   bool completing = false;
   bool slowLoading = false;
-  bool _showFullRoutine = false;
   bool _adjustingTime = false;
   Timer? slowLoadTimer;
   Timer? dayBoundaryTimer;
@@ -1467,71 +1466,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _nextTaskCard(List<DailyTask> tasks) {
-    final pending = tasks.where((task) => !task.isDone).toList();
-    final next = pending.isEmpty ? null : pending.first;
-    final theme = Theme.of(context);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Próxima tarefa', style: theme.textTheme.titleLarge),
-            const SizedBox(height: 6),
-            Text(
-              next == null
-                  ? 'Você concluiu as tarefas planejadas para hoje. Pode fazer uma pausa ou revisar sua rotina.'
-                  : 'Vamos cuidar de uma coisa por vez. Você pode pedir ajuda ou dividir em etapas.',
-              style: theme.textTheme.bodyMedium,
-            ),
-            if (next != null) ...[
-              const SizedBox(height: 16),
-              Text(next.title, style: theme.textTheme.headlineSmall),
-              if ((next.description ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(next.description!.trim()),
-              ],
-              if (next.options.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                const Text('Escolha como começar:'),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: next.options.map((option) => ChoiceChip(
-                    label: Text(option),
-                    selected: next.selectedOption == option,
-                    onSelected: (_) => _selectOption(next, option),
-                  )).toList(),
-                ),
-              ],
-              const SizedBox(height: 14),
-              FilledButton.icon(
-                onPressed: () => _toggleTask(next),
-                icon: const Icon(Icons.check_circle_outline),
-                label: const Text('Concluí esta tarefa'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () => _openStudyMission(next),
-                icon: const Icon(Icons.route_outlined),
-                label: const Text('Dividir em etapas, pedir ajuda ou adiar'),
-              ),
-            ],
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: () => setState(() => _showFullRoutine = true),
-              icon: const Icon(Icons.list_alt_rounded),
-              label: const Text('Ver todas as tarefas'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _tasksCard(DailyRoutine r) {
     final tasks = r.tasks.where((t) => !t.isDeleted).toList()
       ..sort((a, b) => a.order.compareTo(b.order));
@@ -1540,10 +1474,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final afternoon = tasks.where((t) => t.period.toLowerCase() == 'afternoon').toList();
     final evening = tasks.where((t) => t.period.toLowerCase() == 'evening').toList();
     final theme = Theme.of(context);
-
-    if (!widget.session.isAdult && !_showFullRoutine) {
-      return _nextTaskCard(tasks);
-    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1556,12 +1486,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 style: theme.textTheme.headlineMedium,
               ),
             ),
-            if (!widget.session.isAdult)
-              IconButton(
-                onPressed: () => setState(() => _showFullRoutine = false),
-                icon: const Icon(Icons.filter_1_rounded),
-                tooltip: 'Ver só a próxima tarefa',
-              ),
             IconButton(
               onPressed: _createDailyTask,
               icon: const Icon(Icons.add_task_rounded),

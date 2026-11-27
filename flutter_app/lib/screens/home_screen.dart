@@ -2,15 +2,12 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api.dart';
 import '../brand.dart';
 import '../models.dart';
 import '../ui/effort_messages.dart';
 import '../ui/pacus_components.dart';
-import '../ui/timer_alarm.dart';
-import '../ui/timer_alarm_controls.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -19,45 +16,29 @@ class HomeScreen extends StatefulWidget {
     required this.session,
     required this.onLogout,
     this.onPendingChanged,
-    this.timerAlarm,
   });
   final PacusApi api;
   final AuthSession session;
   final Future<void> Function() onLogout;
   final ValueChanged<int>? onPendingChanged;
-  final TimerAlarm? timerAlarm;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  late final TimerAlarm alarm;
-  late final Future<void> alarmReady;
   DailyRoutine? routine;
   bool loading = true;
   String? error;
-  Timer? timer;
-  int? sessionMinutes;
-  DateTime? sessionEndsAt;
-  Duration remaining = Duration.zero;
-  bool sessionPaused = false;
-  bool sessionPersistedOnServer = false;
-  bool completing = false;
   bool slowLoading = false;
-  bool _adjustingTime = false;
   Timer? slowLoadTimer;
   Timer? dayBoundaryTimer;
   late String lastDayKey;
-
-  String get _sessionKey => 'pacus.flutter.session:${routine?.familyId ?? ''}:${routine?.date ?? ''}';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    alarm = widget.timerAlarm ?? TimerAlarm();
-    alarmReady = alarm.loadVolume();
     lastDayKey = _dayKey();
     _scheduleNextDayBoundary();
     _load();
@@ -66,10 +47,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    timer?.cancel();
     slowLoadTimer?.cancel();
     dayBoundaryTimer?.cancel();
-    alarm.dispose();
     super.dispose();
   }
 
@@ -79,8 +58,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final previousDayKey = lastDayKey;
       _checkDayBoundary();
       if (previousDayKey == lastDayKey) {
-        // Recarrega o estado remoto ao voltar para a aba/app. Assim uma pausa,
-        // retomada ou finalizacao feita em outro dispositivo aparece aqui tambem.
         _load();
       }
     }
@@ -125,7 +102,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     try {
       final value = await widget.api.getToday();
       routine = value;
-      await _restoreSession();
       widget.onPendingChanged?.call(
         widget.session.isAdult
             ? 0
@@ -152,385 +128,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     } finally {
       slowLoadTimer?.cancel();
     }
-  }
-
-  Future<void> _restoreSession() async {
-    final r = routine;
-    timer?.cancel();
-
-    // Sempre zera o estado em memoria antes de restaurar. Isso evita carregar uma
-    // sessao do dia anterior quando a rotina muda na virada do dia.
-    sessionMinutes = null;
-    sessionEndsAt = null;
-    remaining = Duration.zero;
-    sessionPaused = false;
-    sessionPersistedOnServer = false;
-
-    if (r == null) return;
-
-    final serverMinutes = r.gameTimerSessionMinutes;
-    if (serverMinutes != null && serverMinutes > 0) {
-      sessionPersistedOnServer = true;
-      sessionMinutes = serverMinutes;
-
-      // Qualquer cache antigo deixa de ser fonte de verdade assim que o servidor
-      // possui uma sessao persistida.
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_sessionKey);
-
-      final end = r.gameTimerSessionEndsAt;
-      if (end != null) {
-        sessionPaused = false;
-        sessionEndsAt = end;
-        final diff = end.difference(DateTime.now());
-        remaining = diff <= Duration.zero ? Duration.zero : diff;
-        _startTicker();
-        return;
-      }
-
-      final pausedSeconds = r.gameTimerSessionRemainingSeconds ?? 0;
-      if (pausedSeconds > 0) {
-        sessionPaused = true;
-        remaining = Duration(seconds: pausedSeconds);
-        return;
-      }
-
-      // Estado remoto inconsistente/expirado: a proxima acao no backend normaliza.
-      sessionMinutes = null;
-      sessionPersistedOnServer = false;
-      return;
-    }
-
-    // Compatibilidade de transicao: uma sessao iniciada antes desta correcao pode
-    // ainda existir apenas no localStorage. Ela continua funcionando ate terminar,
-    // mas toda sessao nova nasce no backend.
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_sessionKey);
-    if (raw == null) return;
-    final parts = raw.split('|');
-    if (parts.length != 2 && parts.length != 4) {
-      await prefs.remove(_sessionKey);
-      return;
-    }
-
-    final minutes = int.tryParse(parts[0]);
-    final millis = int.tryParse(parts[1]);
-    if (minutes == null || millis == null || minutes <= 0) {
-      await prefs.remove(_sessionKey);
-      return;
-    }
-
-    sessionMinutes = minutes;
-    sessionPersistedOnServer = false;
-
-    if (parts.length == 4 && parts[2] == '1') {
-      final remainingSeconds = int.tryParse(parts[3]) ?? 0;
-      sessionPaused = true;
-      remaining = Duration(seconds: math.max(0, remainingSeconds));
-      if (remaining <= Duration.zero) {
-        await prefs.remove(_sessionKey);
-        sessionMinutes = null;
-        sessionPaused = false;
-      }
-      return;
-    }
-
-    sessionPaused = false;
-    sessionEndsAt = DateTime.fromMillisecondsSinceEpoch(millis);
-    _startTicker();
-  }
-
-  Future<void> _startSession(int minutes) async {
-    final r = routine;
-    if (r == null || minutes <= 0 || minutes > r.availableGameMinutes) return;
-
-    try {
-      final updated = await widget.api.startGameTimerSession(minutes);
-      routine = updated;
-      await _restoreSession();
-      if (mounted) setState(() => error = null);
-    } catch (e) {
-      if (mounted) setState(() => error = e.toString());
-    }
-  }
-
-  void _startTicker() {
-    timer?.cancel();
-    _tick();
-    if (sessionEndsAt != null && remaining > Duration.zero) {
-      timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
-    }
-  }
-
-  void _tick() {
-    final end = sessionEndsAt;
-    if (end == null) return;
-    final diff = end.difference(DateTime.now());
-    if (diff <= Duration.zero) {
-      remaining = Duration.zero;
-      timer?.cancel();
-      if (mounted) setState(() {});
-      _finishSession();
-      return;
-    }
-    if (mounted) setState(() => remaining = diff);
-  }
-
-  Future<void> _pauseSession() async {
-    if (sessionMinutes == null || sessionPaused) return;
-
-    if (sessionPersistedOnServer) {
-      try {
-        final updated = await widget.api.pauseGameTimerSession();
-        routine = updated;
-        await _restoreSession();
-        if (mounted) setState(() => error = null);
-      } catch (e) {
-        if (mounted) setState(() => error = e.toString());
-      }
-      return;
-    }
-
-    // Sessao local legada, criada antes do deploy desta correcao.
-    final end = sessionEndsAt;
-    if (end == null) return;
-    final diff = end.difference(DateTime.now());
-    final safeRemaining = diff <= Duration.zero ? Duration.zero : diff;
-    timer?.cancel();
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _sessionKey,
-      '${sessionMinutes!}|0|1|${safeRemaining.inSeconds}',
-    );
-
-    if (mounted) {
-      setState(() {
-        sessionPaused = true;
-        sessionEndsAt = null;
-        remaining = safeRemaining;
-      });
-    }
-  }
-
-  Future<void> _resumeSession() async {
-    if (sessionMinutes == null || !sessionPaused || remaining <= Duration.zero) return;
-
-    if (sessionPersistedOnServer) {
-      try {
-        final updated = await widget.api.resumeGameTimerSession();
-        routine = updated;
-        await _restoreSession();
-        if (mounted) setState(() => error = null);
-      } catch (e) {
-        if (mounted) setState(() => error = e.toString());
-      }
-      return;
-    }
-
-    // Sessao local legada, criada antes do deploy desta correcao.
-    final end = DateTime.now().add(remaining);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _sessionKey,
-      '${sessionMinutes!}|${end.millisecondsSinceEpoch}|0|${remaining.inSeconds}',
-    );
-
-    if (mounted) {
-      setState(() {
-        sessionPaused = false;
-        sessionEndsAt = end;
-      });
-    }
-    _startTicker();
-  }
-
-  Future<void> _cancelSession() async {
-    if (sessionMinutes == null || completing) return;
-
-    final refundableMinutes = math.min(
-      sessionMinutes!,
-      (remaining.inSeconds / 60).ceil(),
-    );
-    final usedMinutes = math.max(0, sessionMinutes! - refundableMinutes);
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Encerrar esta sessão?'),
-        content: Text(
-          'Você usou aproximadamente ${_formatMinutes(usedMinutes)}. '
-          '${_formatMinutes(refundableMinutes)} voltarão para o tempo disponível de hoje.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Continuar sessão'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Encerrar e devolver'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    completing = true;
-    timer?.cancel();
-
-    try {
-      if (sessionPersistedOnServer) {
-        final updated = await widget.api.cancelGameTimerSession();
-        routine = updated;
-      } else {
-        // Sessao local antiga: ela nunca reservou saldo no backend, portanto basta
-        // remover o cache local para voltar ao saldo original.
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove(_sessionKey);
-      }
-
-      await _restoreSession();
-      if (mounted) setState(() => error = null);
-    } catch (e) {
-      if (mounted) setState(() => error = e.toString());
-    } finally {
-      completing = false;
-    }
-  }
-
-  Future<void> _finishSession() async {
-    if (completing || sessionMinutes == null) return;
-    completing = true;
-
-    // O aviso não depende da rede nem atrasa a confirmação visual.
-    unawaited(alarmReady.then((_) => alarm.play()));
-
-    final wasPersistedOnServer = sessionPersistedOnServer;
-    final selectedMinutes = sessionMinutes!;
-
-    try {
-      final updated = wasPersistedOnServer
-          ? await widget.api.finishGameTimerSession()
-          : await widget.api.consumeGameTimer(selectedMinutes);
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_sessionKey);
-
-      routine = updated;
-      await _restoreSession();
-
-      if (!mounted) return;
-      setState(() => error = null);
-      await showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          scrollable: true,
-          title: const Text('Tempo encerrado'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Seu tempo terminou. Restam ${_formatMinutes(updated.availableGameMinutes)} hoje.'),
-              const SizedBox(height: 16),
-              TimerAlarmControls(alarm: alarm),
-            ],
-          ),
-          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Entendi e parar alarme'))],
-        ),
-      ).whenComplete(alarm.stop);
-    } catch (e) {
-      if (mounted) setState(() => error = e.toString());
-    } finally {
-      completing = false;
-    }
-  }
-
-  Future<void> _adjust(int delta) async {
-    if (!mounted || _adjustingTime) return;
-    setState(() => _adjustingTime = true);
-    try {
-      final updated = await widget.api.adjustGameTimer(delta);
-      if (mounted) setState(() => routine = updated);
-    } catch (e) {
-      if (mounted) setState(() => error = e.toString());
-    } finally {
-      if (mounted) setState(() => _adjustingTime = false);
-    }
-  }
-
-  Future<void> _addCustomTime() async {
-    final selected = await _pickMinutes(
-      title: 'Adicionar tempo',
-      action: 'Adicionar',
-      maxMinutes: 1440,
-    );
-    if (selected != null) await _adjust(selected);
-  }
-
-  Future<void> _startCustomSession(int available) async {
-    final maxMinutes = math.min(60, available);
-    if (maxMinutes < 1) return;
-
-    final selected = await _pickMinutes(
-      title: 'Quanto tempo você quer usar?',
-      action: 'Iniciar',
-      maxMinutes: maxMinutes,
-    );
-    if (!mounted || selected == null) return;
-    await _startSession(selected);
-  }
-
-  Future<int?> _pickMinutes({
-    required String title,
-    required String action,
-    required int maxMinutes,
-  }) {
-    final formKey = GlobalKey<FormState>();
-    int? minutes;
-    return showDialog<int>(
-      context: context,
-      builder: (dialogContext) {
-        void submit() {
-          if (formKey.currentState?.validate() == true) {
-            Navigator.pop(dialogContext, minutes);
-          }
-        }
-
-        return AlertDialog(
-          title: Text(title),
-          content: Form(
-            key: formKey,
-            child: TextFormField(
-              autofocus: true,
-              keyboardType: TextInputType.number,
-              textInputAction: TextInputAction.done,
-              decoration: InputDecoration(
-                labelText: 'Minutos',
-                helperText: 'De 1 a $maxMinutes minutos',
-              ),
-              onChanged: (value) => minutes = int.tryParse(value.trim()),
-              validator: (_) {
-                final value = minutes;
-                if (value == null || value < 1 || value > maxMinutes) {
-                  return 'Digite um número inteiro entre 1 e $maxMinutes.';
-                }
-                return null;
-              },
-              onFieldSubmitted: (_) => submit(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(onPressed: submit, child: Text(action)),
-          ],
-        );
-      },
-    );
   }
 
   Future<void> _toggleTask(DailyTask task) async {
@@ -1181,21 +778,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  String _clock(Duration value) {
-    final total = math.max(0, value.inSeconds);
-    final h = total ~/ 3600, m = (total % 3600) ~/ 60, s = total % 60;
-    String two(int n) => n.toString().padLeft(2, '0');
-    return h > 0 ? '${two(h)}:${two(m)}:${two(s)}' : '${two(m)}:${two(s)}';
-  }
-
-  String _formatMinutes(int minutes) {
-    if (minutes >= 60) {
-      final h = minutes ~/ 60, m = minutes % 60;
-      return m == 0 ? '${h}h' : '${h}h ${m}min';
-    }
-    return '${minutes}min';
-  }
-
   @override
   Widget build(BuildContext context) {
     if (loading) {
@@ -1259,8 +841,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     const SizedBox(height: 12),
                     _plannedYesterdayCard(),
                   ],
-                  const SizedBox(height: 16),
-                  if (r.gameTimerEnabled) _timerCard(r),
                   const SizedBox(height: 20),
                   _tasksCard(r),
                   const SizedBox(height: 12),
@@ -1342,124 +922,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               'Pedir ajuda ou fazer uma pausa faz parte do processo.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
-          ],
-        ]),
-      ),
-    );
-  }
-
-  Widget _timerCard(DailyRoutine r) {
-    final active = sessionMinutes != null && (sessionEndsAt != null || sessionPaused);
-    final available = r.availableGameMinutes;
-    if (active) {
-      final totalSeconds = math.max(1, sessionMinutes! * 60);
-      final progress = (1 - remaining.inSeconds / totalSeconds).clamp(0.0, 1.0);
-      final usedSeconds = math.max(0, totalSeconds - remaining.inSeconds);
-      final usedLabel = _clock(Duration(seconds: usedSeconds));
-      final endLabel = sessionEndsAt == null
-          ? null
-          : TimeOfDay.fromDateTime(sessionEndsAt!.toLocal()).format(context);
-      return Card(
-        color: Theme.of(context).colorScheme.primaryContainer,
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(children: [
-            const Text('TEMPO DESTA SESSÃO', style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1)),
-            const SizedBox(height: 12),
-            FittedBox(child: Text(_clock(remaining), style: const TextStyle(fontSize: 66, fontWeight: FontWeight.w900))),
-            const SizedBox(height: 14),
-            TimerAlarmControls(alarm: alarm),
-            const SizedBox(height: 14),
-            LinearProgressIndicator(value: progress, minHeight: 12, borderRadius: BorderRadius.circular(99)),
-            const SizedBox(height: 12),
-            Text(
-              sessionPaused
-                  ? 'Sessão pausada • o tempo não está correndo'
-                  : 'Você escolheu ${_formatMinutes(sessionMinutes!)} • depois restam ${_formatMinutes(sessionPersistedOnServer ? available : math.max(0, available - sessionMinutes!))}',
-              style: TextStyle(fontWeight: sessionPaused ? FontWeight.w800 : FontWeight.w500),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              sessionPaused
-                  ? 'Tempo utilizado: $usedLabel'
-                  : 'Tempo utilizado: $usedLabel • término previsto: $endLabel',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                FilledButton.icon(
-                  onPressed: completing ? null : (sessionPaused ? _resumeSession : _pauseSession),
-                  icon: Icon(sessionPaused ? Icons.play_arrow_rounded : Icons.pause_rounded),
-                  label: Text(sessionPaused ? 'Retomar temporizador' : 'Pausar temporizador'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: completing ? null : _cancelSession,
-                  icon: const Icon(Icons.close_rounded),
-                  label: const Text('Voltar ao tempo disponível'),
-                ),
-              ],
-            ),
-          ]),
-        ),
-      );
-    }
-
-    final presets = [15, 30, 45, 60].where((m) => m <= available).toList();
-    return Card(
-      color: Theme.of(context).colorScheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('TEMPO DISPONÍVEL HOJE', style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1)),
-          const SizedBox(height: 8),
-          FittedBox(alignment: Alignment.centerLeft, fit: BoxFit.scaleDown,
-            child: Text(_formatMinutes(available), style: const TextStyle(fontSize: 58, fontWeight: FontWeight.w900))),
-          const SizedBox(height: 18),
-          TimerAlarmControls(alarm: alarm),
-          const SizedBox(height: 18),
-          Text(available > 0 ? 'Quanto tempo você quer usar agora?' : 'Seu tempo de tela de hoje acabou. 🦆',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          if (available > 0) ...[
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                for (final minutes in presets)
-                  FilledButton.tonal(
-                    onPressed: () => _startSession(minutes),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                      child: Text(_formatMinutes(minutes)),
-                    ),
-                  ),
-                OutlinedButton.icon(
-                  onPressed: () => _startCustomSession(available),
-                  icon: const Icon(Icons.timer_outlined),
-                  label: const Text('Escolher minutos'),
-                ),
-              ],
-            ),
-          ],
-          if (widget.session.isAdult) ...[
-            const Divider(height: 34),
-            const Text('Adulto · adicionar tempo', style: TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 10),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final minutes in const [1, 2, 5, 10, 15, 30, 60])
-                OutlinedButton(
-                  onPressed: _adjustingTime ? null : () => _adjust(minutes),
-                  child: Text(minutes == 60 ? '+1 hora' : '+$minutes min'),
-                ),
-              OutlinedButton(
-                onPressed: _adjustingTime ? null : _addCustomTime,
-                child: const Text('Outro valor'),
-              ),
-            ]),
           ],
         ]),
       ),

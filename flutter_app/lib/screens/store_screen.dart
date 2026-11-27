@@ -40,7 +40,10 @@ class _StoreScreenState extends State<StoreScreen> {
       final pendingItems = rawPending.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       widget.onPendingChanged?.call(pendingItems.length);
       setState(() {
-        items = rawItems.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        items = rawItems
+            .map((entry) => Map<String, dynamic>.from(entry as Map))
+            .where((item) => item['category'] != 'screen_time' && item['screenTimeMinutes'] == null)
+            .toList();
         pending = pendingItems;
         balance = (points['balance'] as num?)?.toInt() ?? 0;
         loading = false;
@@ -86,7 +89,6 @@ class _StoreScreenState extends State<StoreScreen> {
     final icon = TextEditingController(text: item?['icon']?.toString() ?? '🎁');
     final stock = TextEditingController(text: item?['stock']?.toString() ?? '');
     final daily = TextEditingController(text: item?['dailyLimit']?.toString() ?? '');
-    final screen = TextEditingController(text: item?['screenTimeMinutes']?.toString() ?? '');
     String category = item?['category']?.toString() ?? 'other';
 
     final result = await showDialog<Map<String, dynamic>>(
@@ -112,7 +114,6 @@ class _StoreScreenState extends State<StoreScreen> {
                   initialValue: category,
                   decoration: const InputDecoration(labelText: 'Categoria'),
                   items: const [
-                    DropdownMenuItem(value: 'screen_time', child: Text('Tempo de tela')),
                     DropdownMenuItem(value: 'toy', child: Text('Brinquedo')),
                     DropdownMenuItem(value: 'activity', child: Text('Atividade')),
                     DropdownMenuItem(value: 'other', child: Text('Outro')),
@@ -125,15 +126,6 @@ class _StoreScreenState extends State<StoreScreen> {
                   const SizedBox(width: 10),
                   Expanded(child: TextField(controller: daily, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Limite/dia'))),
                 ]),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: screen,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Minutos de tela (opcional, máx. 60 por item)'),
-                ),
-                const SizedBox(height: 6),
-                const Text('O total de tempo de tela extra aprovado é limitado a 60 minutos por dia, somando todos os itens.'),
-
               ]),
             ),
           ),
@@ -142,14 +134,6 @@ class _StoreScreenState extends State<StoreScreen> {
             FilledButton(
               onPressed: () {
                 if (title.text.trim().isEmpty) return;
-                final screenMinutes = int.tryParse(screen.text);
-                if (screen.text.trim().isNotEmpty
-                    && (screenMinutes == null || screenMinutes < 1 || screenMinutes > 60)) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Informe de 1 a 60 minutos por item.')),
-                  );
-                  return;
-                }
                 Navigator.pop(context, {
                   'title': title.text.trim(),
                   'description': description.text.trim().isEmpty ? null : description.text.trim(),
@@ -158,7 +142,6 @@ class _StoreScreenState extends State<StoreScreen> {
                   'icon': icon.text.trim().isEmpty ? null : icon.text.trim(),
                   'stock': int.tryParse(stock.text),
                   'dailyLimit': int.tryParse(daily.text),
-                  'screenTimeMinutes': int.tryParse(screen.text),
                 });
               },
               child: const Text('Salvar'),
@@ -168,7 +151,7 @@ class _StoreScreenState extends State<StoreScreen> {
       ),
     );
 
-    title.dispose(); description.dispose(); cost.dispose(); icon.dispose(); stock.dispose(); daily.dispose(); screen.dispose();
+    title.dispose(); description.dispose(); cost.dispose(); icon.dispose(); stock.dispose(); daily.dispose();
     if (result == null) return;
 
     try {
@@ -182,7 +165,7 @@ class _StoreScreenState extends State<StoreScreen> {
   }
 
   String _category(dynamic value) {
-    const labels = {'screen_time':'Tempo de tela','toy':'Brinquedo','activity':'Atividade','other':'Outro'};
+    const labels = {'toy':'Brinquedo','activity':'Atividade','other':'Outro'};
     return labels[value?.toString()] ?? value?.toString() ?? 'Outro';
   }
 
@@ -221,8 +204,6 @@ class _StoreScreenState extends State<StoreScreen> {
           ],
           const SizedBox(height: 18),
           const Text('Recompensas', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 6),
-          const Text('Tempo de tela é uma opção da família, não uma recompensa necessária por cada tarefa.'),
           const SizedBox(height: 10),
           if (items.isEmpty && loading) const Center(child: CircularProgressIndicator()),
           if (items.isEmpty && !loading && error == null)
@@ -246,7 +227,6 @@ class _StoreScreenState extends State<StoreScreen> {
                   Wrap(spacing: 8, runSpacing: 6, children: [
                     Chip(label: Text(_category(item['category']))),
                     if (item['dailyLimit'] != null) Chip(label: Text('limite ' + item['dailyLimit'].toString() + 'x/dia')),
-                    if (item['screenTimeMinutes'] != null) Chip(label: Text('+' + item['screenTimeMinutes'].toString() + ' min de tela')),
                     if (item['active'] == false) const Chip(label: Text('desativado')),
                   ]),
                   const SizedBox(height: 8),

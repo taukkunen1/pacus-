@@ -15,8 +15,6 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   String familyCode = '';
   String timezone = '';
-  bool timerEnabled = false;
-  int timerMinutes = 120;
   double pointToBrlRate = 0.06;
   List<Map<String, dynamic>> members = [];
   List<Map<String, dynamic>> growth = [];
@@ -31,7 +29,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final code = await widget.api.getMap('/family/code');
       final tz = await widget.api.getMap('/family/timezone');
-      final timer = await widget.api.getMap('/settings/game-timer');
       final pointValue = await widget.api.getMap('/settings/point-value');
       final rawMembers = await widget.api.getList('/family/children');
       final rawGrowth = await widget.api.getList('/settings/growth-stages');
@@ -40,8 +37,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         familyCode = code['familyCode']?.toString() ?? '';
         timezone = tz['timezone']?.toString() ?? '';
-        timerEnabled = timer['enabled'] == true;
-        timerMinutes = (timer['minutes'] as num?)?.toInt() ?? 120;
         pointToBrlRate = (pointValue['rate'] as num?)?.toDouble() ?? 0.06;
         members = rawMembers.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         growth = rawGrowth.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -122,13 +117,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       await widget.api.request('/family/children/' + member['id'].toString() + '/pin', method: 'PUT', body: {'newPin': pin});
       _snack('PIN atualizado.');
-    } catch (e) { _snack(e.toString()); }
-  }
-
-  Future<void> _saveTimer(bool enabled, int minutes) async {
-    try {
-      await widget.api.request('/settings/game-timer', method: 'PUT', body: {'enabled': enabled, 'minutes': minutes});
-      await _load();
     } catch (e) { _snack(e.toString()); }
   }
 
@@ -484,22 +472,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Icons.payments_outlined,
             action: TextButton(onPressed: _changePointValue, child: const Text('Alterar')),
           ),
-          const SizedBox(height: 10),
-          Card(
-            child: SwitchListTile(
-              value: timerEnabled,
-              onChanged: (v) => _saveTimer(v, timerMinutes),
-              title: const Text('Tempo de tela', style: TextStyle(fontWeight: FontWeight.w800)),
-              subtitle: Text('Limite diário: ' + timerMinutes.toString() + ' minutos'),
-              secondary: const Icon(Icons.timer_outlined),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, children: [60, 90, 120, 180].map((m) => ChoiceChip(
-            label: Text(m.toString() + ' min'),
-            selected: timerMinutes == m,
-            onSelected: (_) => _saveTimer(timerEnabled, m),
-          )).toList()),
           const SizedBox(height: 18),
           Row(children: [
             const Expanded(child: Text('Membros da família', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900))),

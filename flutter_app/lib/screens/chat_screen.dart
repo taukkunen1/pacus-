@@ -31,6 +31,12 @@ class _ChatScreenState extends State<ChatScreen> {
   final _scrollController = ScrollController();
   final _focusNode = FocusNode();
 
+  static const _suggestedReplies = [
+    'Entendi. Me conta um pouco mais?',
+    'Tudo bem, vamos resolver isso juntos.',
+    'Quer conversar sobre isso agora?',
+  ];
+
   Timer? _pollTimer;
   bool _loading = true;
   bool _refreshing = false;
@@ -168,165 +174,12 @@ class _ChatScreenState extends State<ChatScreen> {
     return unread + pending;
   }
 
-  Future<void> _sendQuickRequest(
-    String type, {
-    int? minutes,
-    String? note,
-  }) async {
-    if (_sending) return;
-    setState(() => _sending = true);
-
-    try {
-      final body = <String, dynamic>{'type': type};
-      if (minutes != null) {
-        body['minutes'] = minutes;
-      }
-      if (note != null && note.trim().isNotEmpty) {
-        body['note'] = note.trim();
-      }
-
-      final sent = await widget.api.postMap(
-        '/chat/requests',
-        body,
-      );
-
-      if (!mounted) return;
-      setState(() {
-        if (!_messages.any(
-          (m) => m['id']?.toString() == sent['id']?.toString(),
-        )) {
-          _messages.add(sent);
-        }
-      });
-      _scrollToBottom();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pedido enviado para o adulto.')),
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Nao foi possivel enviar o pedido: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
-  Future<void> _openQuickRequestComposer(String type) async {
-    final controller = TextEditingController();
-    int minutes = 10;
-
-    final submitted = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final isExtraTime = type == 'extra_time';
-            final title = switch (type) {
-              'help' => 'Pedir ajuda',
-              'change_task' => 'Conversar sobre uma tarefa',
-              _ => 'Pedir tempo extra',
-            };
-
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                4,
-                20,
-                20 + MediaQuery.viewInsetsOf(context).bottom,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(title, style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 8),
-                  Text(
-                    isExtraTime
-                        ? 'Escolha o tempo e conte ao adulto por que ele seria útil.'
-                        : 'Você pode enviar só o pedido ou explicar um pouco melhor.',
-                  ),
-                  if (isExtraTime) ...[
-                    const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 8,
-                      children: [10, 20, 30, 45, 60]
-                          .map(
-                            (value) => ChoiceChip(
-                              label: Text('+$value min'),
-                              selected: minutes == value,
-                              onSelected: (_) =>
-                                  setModalState(() => minutes = value),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ],
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: controller,
-                    autofocus: !isExtraTime,
-                    maxLength: 500,
-                    minLines: 2,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      labelText: 'Quer explicar? (opcional)',
-                      hintText: 'Escreva aqui...',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  FilledButton.icon(
-                    onPressed: () => Navigator.pop(context, true),
-                    icon: const Icon(Icons.send_outlined),
-                    label: const Text('Enviar pedido'),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    if (submitted != true || !mounted) {
-      controller.dispose();
-      return;
-    }
-
-    final note = controller.text;
-    controller.dispose();
-    await _sendQuickRequest(
-      type,
-      minutes: type == 'extra_time' ? minutes : null,
-      note: note,
-    );
-  }
-
   void _useSuggestedReply(String text) {
     _messageController.text = text;
     _messageController.selection = TextSelection.collapsed(
       offset: _messageController.text.length,
     );
     _focusNode.requestFocus();
-  }
-
-  List<String> get _suggestedReplies {
-    if (widget.session.isAdult) {
-      return const [
-        'Entendi. Me conta um pouco mais?',
-        'Tudo bem, vamos resolver isso juntos.',
-        'Quer conversar sobre isso agora?',
-      ];
-    }
-
-    return const [
-      'Pode me ajudar?',
-      'Quero conversar sobre uma tarefa.',
-      'Tudo bem, obrigado!',
-    ];
   }
 
   Future<void> _reviewRequest(
@@ -598,65 +451,24 @@ class _ChatScreenState extends State<ChatScreen> {
                         },
                       ),
               ),
-            if (!widget.session.isAdult)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Precisa de apoio? Pedir ajuda não tira pontos.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        ActionChip(
-                          avatar: const Icon(Icons.help_outline, size: 18),
-                          label: const Text('Preciso de ajuda'),
-                          onPressed: _sending
-                              ? null
-                              : () => _openQuickRequestComposer('help'),
-                        ),
-                        ActionChip(
-                          avatar: const Icon(Icons.swap_horiz, size: 18),
-                          label: const Text('Conversar sobre uma tarefa'),
-                          onPressed: _sending
-                              ? null
-                              : () => _openQuickRequestComposer('change_task'),
-                        ),
-                        ActionChip(
-                          avatar: const Icon(Icons.timer_outlined, size: 18),
-                          label: const Text('Pedir tempo extra'),
-                          onPressed: _sending
-                              ? null
-                              : () => _openQuickRequestComposer('extra_time'),
-                        ),
-                      ],
-                    ),
-                  ],
+            if (widget.session.isAdult)
+              SizedBox(
+                height: 42,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _suggestedReplies.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final reply = _suggestedReplies[index];
+                    return ActionChip(
+                      avatar: const Icon(Icons.auto_awesome_outlined, size: 17),
+                      label: Text(reply),
+                      onPressed: _sending ? null : () => _useSuggestedReply(reply),
+                    );
+                  },
                 ),
               ),
-            SizedBox(
-              height: 42,
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                scrollDirection: Axis.horizontal,
-                itemCount: _suggestedReplies.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final reply = _suggestedReplies[index];
-                  return ActionChip(
-                    avatar: const Icon(Icons.auto_awesome_outlined, size: 17),
-                    label: Text(reply),
-                    onPressed: _sending ? null : () => _useSuggestedReply(reply),
-                  );
-                },
-              ),
-            ),
             if (_attachedImage case final image?)
               ListTile(
                 dense: true,

@@ -1,5 +1,11 @@
 # Registro de atualizações
 
+## 2026-11-27 — Rotina sem cronômetro de jogo
+
+- Removidos da tela inicial o cronômetro de jogo, seus controles, o alarme e o ajuste de tempo. A tela de configurações deixa de expor o limite diário.
+- A loja deixa de oferecer novos resgates e cadastros de recompensas de tempo. Resgates pendentes continuam disponíveis para revisão e os registros existentes são preservados.
+- O chat da criança deixa de exibir o bloco “Precisa de apoio?” e as respostas sugeridas. O campo de mensagem continua disponível.
+
 ## 2026-11-27 — Minha rotina como única visualização das tarefas
 
 - A tela inicial mostra diretamente a lista agrupada por manhã, tarde e noite para crianças e adultos. Foram removidos o cartão “Próxima tarefa” e o botão que alternava para essa visualização.

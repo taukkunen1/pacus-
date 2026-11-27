@@ -46,27 +46,6 @@ class PacusApi {
     }
   }
 
-  Future<DailyRoutine> startGameTimerSession(int minutes) async => DailyRoutine.fromJson(
-    await request('/daily-routines/today/game-timer/session/start', method: 'PUT', body: {'minutes': minutes}));
-
-  Future<DailyRoutine> pauseGameTimerSession() async => DailyRoutine.fromJson(
-    await request('/daily-routines/today/game-timer/session/pause', method: 'PUT'));
-
-  Future<DailyRoutine> resumeGameTimerSession() async => DailyRoutine.fromJson(
-    await request('/daily-routines/today/game-timer/session/resume', method: 'PUT'));
-
-  Future<DailyRoutine> cancelGameTimerSession() async => DailyRoutine.fromJson(
-    await request('/daily-routines/today/game-timer/session/cancel', method: 'PUT'));
-
-  Future<DailyRoutine> finishGameTimerSession() async => DailyRoutine.fromJson(
-    await request('/daily-routines/today/game-timer/session/finish', method: 'PUT'));
-
-  Future<DailyRoutine> consumeGameTimer(int minutes) async => DailyRoutine.fromJson(
-    await request('/daily-routines/today/game-timer/consume', method: 'PUT', body: {'minutes': minutes}));
-
-  Future<DailyRoutine> adjustGameTimer(int deltaMinutes) async => DailyRoutine.fromJson(
-    await request('/daily-routines/today/game-timer/adjust', method: 'PUT', body: {'deltaMinutes': deltaMinutes}));
-
   Future<void> completeTask(String taskId) => request('/daily-tasks/$taskId/complete', method: 'POST').then((_) {});
   Future<void> reopenTask(String taskId) => request('/daily-tasks/$taskId/reopen', method: 'POST').then((_) {});
 

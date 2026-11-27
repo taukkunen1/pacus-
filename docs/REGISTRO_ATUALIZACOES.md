@@ -1,5 +1,10 @@
 # Registro de atualizações
 
+## 2026-11-27 — Minha rotina como única visualização das tarefas
+
+- A tela inicial mostra diretamente a lista agrupada por manhã, tarde e noite para crianças e adultos. Foram removidos o cartão “Próxima tarefa” e o botão que alternava para essa visualização.
+- Validação estática: conferidas a remoção das referências ao modo anterior e a presença das ações de conclusão e ajuda na lista. O ambiente local não tem o SDK Flutter disponível.
+
 ## 2026-11-20 — Volume e alarme do cronômetro
 
 - Implementado controle de volume de 0% a 100%, com padrão de 80%, persistido neste navegador/aparelho. O controle aparece antes e durante a sessão e no aviso de término. Volume zero mantém o aviso visual.

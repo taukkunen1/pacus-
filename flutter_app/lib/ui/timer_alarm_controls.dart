@@ -12,40 +12,27 @@ class TimerAlarmControls extends StatelessWidget {
     builder: (context, _) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
+        const Row(
           children: [
-            Icon(alarm.volume == 0 ? Icons.volume_off : Icons.volume_up),
-            const SizedBox(width: 8),
+            Icon(Icons.volume_up),
+            SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Volume do alarme: ${(alarm.volume * 100).round()}%',
-                style: const TextStyle(fontWeight: FontWeight.w700),
+                'Volume do alarme: 100%',
+                style: TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
           ],
         ),
-        Slider(
-          value: alarm.volume,
-          divisions: 20,
-          label: '${(alarm.volume * 100).round()}%',
-          semanticFormatterCallback: (value) =>
-              '${(value * 100).round()} por cento',
-          onChanged: alarm.setVolume,
-        ),
-        Text(
-          alarm.volume == 0
-              ? 'Alarme silenciado. O aviso visual continua ativo.'
-              : 'Ao terminar, o alarme toca continuamente por 30 segundos.',
-        ),
+        const SizedBox(height: 8),
+        const Text('Ao terminar, o alarme toca continuamente por 30 segundos.'),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
             OutlinedButton.icon(
-              onPressed: alarm.volume == 0
-                  ? null
-                  : () => alarm.play(preview: true),
+              onPressed: () => alarm.play(preview: true),
               icon: const Icon(Icons.play_arrow_rounded),
               label: const Text('Testar som'),
             ),

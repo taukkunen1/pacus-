@@ -3,11 +3,9 @@ import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 abstract class TimerAlarmAudio {
   Future<void> play(double volume);
-  Future<void> setVolume(double volume);
   Future<void> stop();
   Future<void> dispose();
 }
@@ -19,8 +17,6 @@ class _PlayerAudio implements TimerAlarmAudio {
   @override
   Future<void> play(double volume) => _player.play(_source, volume: volume);
   @override
-  Future<void> setVolume(double volume) => _player.setVolume(volume);
-  @override
   Future<void> stop() => _player.stop();
   @override
   Future<void> dispose() => _player.dispose();
@@ -31,23 +27,14 @@ class TimerAlarm extends ChangeNotifier {
   TimerAlarm({TimerAlarmAudio? audio}) : _audio = audio ?? _PlayerAudio();
 
   static const duration = Duration(seconds: 30);
-  static const volumeKey = 'pacus.timer.alarm.volume';
+  static const volume = 1.0;
   final TimerAlarmAudio _audio;
   Future<void> _pending = Future<void>.value();
   Timer? _stopTimer;
   bool _disposed = false;
-  bool _volumeChanged = false;
   int _generation = 0;
-  double volume = 0.8;
   bool playing = false;
   String? error;
-
-  Future<void> loadVolume() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (_disposed || _volumeChanged) return;
-    volume = (prefs.getDouble(volumeKey) ?? 0.8).clamp(0.0, 1.0);
-    notifyListeners();
-  }
 
   // Serialize plugin calls so a slow play cannot restart audio after stop/dispose.
   Future<void> _enqueue(Future<void> Function() operation) {
@@ -61,29 +48,16 @@ class TimerAlarm extends ChangeNotifier {
     return _pending;
   }
 
-  Future<void> setVolume(double value) {
-    if (_disposed) return Future<void>.value();
-    volume = value.clamp(0.0, 1.0);
-    final selected = volume;
-    _volumeChanged = true;
-    notifyListeners();
-    return _enqueue(() async {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble(volumeKey, selected);
-      if (!_disposed) await _audio.setVolume(selected);
-    });
-  }
-
   Future<void> play({bool preview = false}) {
     if (_disposed) return Future<void>.value();
     final generation = ++_generation;
     _stopTimer?.cancel();
     error = null;
-    playing = volume > 0;
+    playing = true;
     notifyListeners();
     return _enqueue(() async {
       await _audio.stop();
-      if (_disposed || generation != _generation || volume == 0) return;
+      if (_disposed || generation != _generation) return;
       try {
         await _audio.play(volume);
       } catch (_) {

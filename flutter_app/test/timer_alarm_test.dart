@@ -27,14 +27,15 @@ class FakeAudio implements TimerAlarmAudio {
   }
 
   @override
-  Future<void> setVolume(double value) async => volume = value;
-  @override
   Future<void> stop() async => stops++;
   @override
   Future<void> dispose() async => disposed = true;
 }
 
 class TimerApi extends PacusApi {
+  TimerApi({this.active = true});
+
+  final bool active;
   final finish = Completer<DailyRoutine>();
   int finishes = 0;
 
@@ -53,7 +54,7 @@ class TimerApi extends PacusApi {
   );
 
   @override
-  Future<DailyRoutine> getToday() async => value(active: true);
+  Future<DailyRoutine> getToday() async => value(active: active);
   @override
   Future<DailyRoutine> finishGameTimerSession() {
     finishes++;
@@ -64,18 +65,15 @@ class TimerApi extends PacusApi {
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('alarm plays at chosen volume and stops after 30 seconds', (
+  testWidgets('alarm plays at full volume and stops after 30 seconds', (
     tester,
   ) async {
     final audio = FakeAudio();
     final alarm = TimerAlarm(audio: audio);
-    await alarm.setVolume(0.45);
     await alarm.play();
-    expect(audio.volume, 0.45);
+    expect(audio.volume, 1.0);
     await tester.pump(const Duration(seconds: 29));
     expect(alarm.playing, isTrue);
-    await alarm.setVolume(0.2);
-    expect(audio.volume, 0.2);
     await tester.pump(const Duration(seconds: 1));
     expect(alarm.playing, isFalse);
     expect(audio.stops, 2);
@@ -84,19 +82,48 @@ void main() {
     expect(audio.disposed, isTrue);
   });
 
-  testWidgets('volume persists and zero stays muted', (tester) async {
-    final first = TimerAlarm(audio: FakeAudio());
-    await first.setVolume(0);
-    first.dispose();
+  testWidgets('old mute preference cannot change the alarm volume', (tester) async {
+    SharedPreferences.setMockInitialValues({'pacus.timer.alarm.volume': 0.0});
     final audio = FakeAudio();
-    final restored = TimerAlarm(audio: audio);
-    await restored.loadVolume();
-    await restored.play();
-    expect(restored.volume, 0);
-    expect(audio.plays, 0);
-    expect(restored.playing, isFalse);
-    restored.dispose();
+    final alarm = TimerAlarm(audio: audio);
+    await alarm.play();
+    expect(audio.volume, 1.0);
+    expect(alarm.playing, isTrue);
+    alarm.dispose();
     await tester.pump();
+  });
+
+  testWidgets('reminds to start a game every 15 minutes while idle', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          api: TimerApi(active: false),
+          timerAlarm: TimerAlarm(audio: FakeAudio()),
+          session: const AuthSession(
+            token: 'test',
+            userId: 'child',
+            role: 'Child',
+            name: 'Teste',
+          ),
+          onLogout: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    const message = 'Vai jogar agora? Inicie seu tempo de jogo.';
+    expect(find.byType(Slider), findsNothing);
+    await tester.pump(const Duration(minutes: 14));
+    expect(find.text(message), findsNothing);
+    await tester.pump(const Duration(minutes: 1));
+    await tester.pumpAndSettle();
+    expect(find.text(message), findsOneWidget);
+    await tester.tap(find.text('Ver cronômetro'));
+    await tester.pumpAndSettle();
+    expect(find.text(message), findsNothing);
+    await tester.pump(const Duration(minutes: 15));
+    await tester.pumpAndSettle();
+    expect(find.text(message), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets('preview stops after two seconds and can be stopped manually', (

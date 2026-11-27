@@ -33,7 +33,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late final TimerAlarm alarm;
-  late final Future<void> alarmReady;
   DailyRoutine? routine;
   bool loading = true;
   String? error;
@@ -48,6 +47,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _adjustingTime = false;
   Timer? slowLoadTimer;
   Timer? dayBoundaryTimer;
+  Timer? _gameReminderTimer;
+  final _gameTimerCardKey = GlobalKey();
   late String lastDayKey;
 
   String get _sessionKey => 'pacus.flutter.session:${routine?.familyId ?? ''}:${routine?.date ?? ''}';
@@ -57,7 +58,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     alarm = widget.timerAlarm ?? TimerAlarm();
-    alarmReady = alarm.loadVolume();
     lastDayKey = _dayKey();
     _scheduleNextDayBoundary();
     _load();
@@ -69,6 +69,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     timer?.cancel();
     slowLoadTimer?.cancel();
     dayBoundaryTimer?.cancel();
+    _gameReminderTimer?.cancel();
     alarm.dispose();
     super.dispose();
   }
@@ -154,7 +155,54 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  bool get _canRemindToStartGame =>
+      routine?.gameTimerEnabled == true &&
+      routine!.availableGameMinutes > 0 &&
+      sessionMinutes == null;
+
+  void _syncGameReminder() {
+    if (!_canRemindToStartGame) {
+      _gameReminderTimer?.cancel();
+      _gameReminderTimer = null;
+      return;
+    }
+
+    _gameReminderTimer ??= Timer.periodic(const Duration(minutes: 15), (_) {
+      final lifecycle = WidgetsBinding.instance.lifecycleState;
+      if (!mounted ||
+          !_canRemindToStartGame ||
+          completing ||
+          ModalRoute.of(context)?.isCurrent != true ||
+          (lifecycle != null && lifecycle != AppLifecycleState.resumed)) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Vai jogar agora? Inicie seu tempo de jogo.'),
+          action: SnackBarAction(
+            label: 'Ver cronômetro',
+            onPressed: () {
+              final card = _gameTimerCardKey.currentContext;
+              if (card != null) {
+                Scrollable.ensureVisible(
+                  card,
+                  duration: const Duration(milliseconds: 250),
+                );
+              }
+            },
+          ),
+        ),
+      );
+    });
+  }
+
   Future<void> _restoreSession() async {
+    await _restoreGameSession();
+    if (mounted) _syncGameReminder();
+  }
+
+  Future<void> _restoreGameSession() async {
     final r = routine;
     timer?.cancel();
 
@@ -405,7 +453,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     completing = true;
 
     // O aviso não depende da rede nem atrasa a confirmação visual.
-    unawaited(alarmReady.then((_) => alarm.play()));
+    unawaited(alarm.play());
 
     final wasPersistedOnServer = sessionPersistedOnServer;
     final selectedMinutes = sessionMinutes!;
@@ -1260,7 +1308,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     _plannedYesterdayCard(),
                   ],
                   const SizedBox(height: 16),
-                  if (r.gameTimerEnabled) _timerCard(r),
+                  if (r.gameTimerEnabled)
+                    KeyedSubtree(key: _gameTimerCardKey, child: _timerCard(r)),
                   const SizedBox(height: 20),
                   _tasksCard(r),
                   const SizedBox(height: 12),

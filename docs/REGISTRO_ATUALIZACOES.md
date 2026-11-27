@@ -1,11 +1,10 @@
 # Registro de atualizações
 
-## 2026-11-27 — Volume fixo, lembrete de tempo de jogo e chat
+## 2026-11-27 — Rotina sem cronômetro de jogo
 
-- O alarme usa volume fixo de 100% no aplicativo. Removido o controle de volume em todas as telas do cronômetro, e preferências antigas deixam de ser usadas.
-- A tela inicial mostra um lembrete visual a cada 15 minutos quando há tempo de jogo disponível e nenhuma sessão ativa ou pausada. O aviso leva ao cronômetro para escolher a duração.
-- O chat da criança deixa de exibir o bloco “Precisa de apoio?” e as respostas sugeridas. A conversa continua pelo campo de mensagem.
-- Os testes cobrem o volume fixo mesmo com uma preferência antiga de mudo e a recorrência do lembrete. A reprodução física continua sujeita ao volume e às permissões do dispositivo.
+- Removidos da tela inicial o cronômetro de jogo, seus controles, o alarme e o ajuste de tempo. A tela de configurações deixa de expor o limite diário.
+- A loja deixa de oferecer novos resgates e cadastros de recompensas de tempo. Resgates pendentes continuam disponíveis para revisão e os registros existentes são preservados.
+- O chat da criança deixa de exibir o bloco “Precisa de apoio?” e as respostas sugeridas. O campo de mensagem continua disponível.
 
 ## 2026-11-27 — Minha rotina como única visualização das tarefas
 

@@ -40,6 +40,18 @@ jobs:
       - run: flutter analyze --no-fatal-infos
       - run: flutter build web --release --dart-define=PACUS_API_BASE_URL=https://pacus-pacus-api.fly.dev/api/v1
 
+      - name: Version Flutter entry points for browser caches
+        env:
+          PACUS_RELEASE: ${{ github.sha }}
+        run: |
+          cd build/web
+          grep -Fq 'src="flutter_bootstrap.js"' index.html
+          grep -Eq '"mainJsPath"[[:space:]]*:[[:space:]]*"main\.dart\.js"' flutter_bootstrap.js
+          sed -i "s|src=\"flutter_bootstrap.js\"|src=\"flutter_bootstrap.js?v=${PACUS_RELEASE}\"|" index.html
+          sed -i "s|main.dart.js\"|main.dart.js?v=${PACUS_RELEASE}\"|g" flutter_bootstrap.js
+          grep -Fq "flutter_bootstrap.js?v=${PACUS_RELEASE}" index.html
+          grep -Fq "main.dart.js?v=${PACUS_RELEASE}" flutter_bootstrap.js
+
       - name: Preserve custom domain
         run: cp ../CNAME build/web/CNAME
 

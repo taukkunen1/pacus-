@@ -168,9 +168,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final existingPoints = (task?['points'] as num?)?.toInt() ?? 1;
     final points = TextEditingController(text: existingPoints > 0 ? existingPoints.toString() : '1');
     final minimum = TextEditingController(text: task?['minimumGoalLabel']?.toString() ?? '');
-    String supportKind = task?['supportKind']?.toString() ?? 'none';
-    final supportSteps = TextEditingController(
-      text: ((task?['supportSteps'] as List?) ?? const []).join('\n'));
     final options = TextEditingController(text: ((task?['options'] as List?) ?? []).join(', '));
     final originalReasons = ((task?['reasons'] as List?) ?? []).join(' | ');
     final reasons = TextEditingController(text: originalReasons);
@@ -282,65 +279,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 8),
                 TextField(controller: minimum, decoration: const InputDecoration(labelText: 'Meta mínima opcional')),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: supportKind,
-                  decoration: const InputDecoration(labelText: 'Missão dividida em etapas'),
-                  items: const [
-                    DropdownMenuItem(value: 'none', child: Text('Desativada')),
-                    DropdownMenuItem(value: 'general', child: Text('Etapas gerais para qualquer tarefa')),
-                    DropdownMenuItem(value: 'reading', child: Text('Leitura do livro')),
-                    DropdownMenuItem(value: 'homework', child: Text('Lição de casa')),
-                    DropdownMenuItem(value: 'handwriting', child: Text('Caderno de caligrafia')),
-                    DropdownMenuItem(value: 'bathing', child: Text('Tomar banho (cabelo dia sim, dia não)')),
-                    DropdownMenuItem(value: 'mood_board', child: Text('Desenhar na lousa — o humor de hoje')),
-                  ],
-                  onChanged: (v) => setDialog(() {
-                    if (v != supportKind) supportSteps.clear();
-                    supportKind = v ?? 'none';
-                  }),
-                ),
-                if (supportKind == 'bathing') ...[
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Passos do banho: pegar a toalha, abrir a janela, lavar o cabelo '
-                    '(somente dia sim, dia não), tomar banho, tirar as roupas do chão '
-                    'e guardar a toalha. Em 08/10/2026 deve lavar o cabelo.',
-                  ),
-                ] else if (supportKind == 'homework') ...[
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Lição de casa da escola e do inglês é uma missão só: '
-                    'separar o material, ver o que foi pedido, escolher por onde começar, '
-                    'fazer a primeira atividade, continuar com pausas se necessário '
-                    'e conferir/guardar. Sugestão flexível: 15–25 minutos, '
-                    'sem cronômetro obrigatório e sem pontos por etapa.',
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: supportSteps,
-                    minLines: 3,
-                    maxLines: 6,
-                    decoration: const InputDecoration(
-                      labelText: 'Etapas personalizadas (uma por linha)',
-                      helperText: 'Em branco: usar as seis etapas sugeridas.',
-                    ),
-                  ),
-                ] else if (supportKind == 'mood_board') ...[
-                  const SizedBox(height: 8),
-                  const Text('Cinco etapas: escolher o tema (humor ou imaginação), ver um desafio criativo que muda a cada dia, fazer o primeiro traço, desenhar livremente e finalizar. O desafio é opcional: pode criar sua própria ideia. Não é necessário explicar sentimentos, dar título ou fazer um desenho perfeito.'),
-                ] else if (supportKind != 'none') ...[
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: supportSteps,
-                    minLines: 3,
-                    maxLines: 6,
-                    decoration: const InputDecoration(
-                      labelText: 'Etapas da missão (uma por linha)',
-                      helperText: 'Em branco: usar etapas sugeridas.',
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 8),
                 TextField(controller: options, decoration: const InputDecoration(labelText: 'Opções, separadas por vírgula')),
                 const SizedBox(height: 8),
                 TextField(controller: reasons, decoration: const InputDecoration(labelText: 'Motivos, separados por |')),
@@ -387,10 +325,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ? null
                     : reasons.text.split('|').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
                 'minimumGoalLabel': minimum.text.trim().isEmpty ? null : minimum.text.trim(),
-                'supportKind': supportKind == 'none' ? null : supportKind,
-                'supportSteps': supportKind == 'none' || supportSteps.text.trim().isEmpty
-                    ? null
-                    : supportSteps.text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+                  if (task != null) ...{
+                    'supportKind': task['supportKind'],
+                    'supportSteps': task['supportSteps'],
+                  },
                 });
               },
               child: const Text('Salvar'),
@@ -399,7 +337,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
-    title.dispose(); description.dispose(); points.dispose(); minimum.dispose(); supportSteps.dispose(); options.dispose(); reasons.dispose(); anchorDate.dispose(); intervalDays.dispose(); for (final controller in weekdayTitles.values) { controller.dispose(); }
+    title.dispose(); description.dispose(); points.dispose(); minimum.dispose(); options.dispose(); reasons.dispose(); anchorDate.dispose(); intervalDays.dispose(); for (final controller in weekdayTitles.values) { controller.dispose(); }
     if (payload == null || (payload['title']?.toString() ?? '').isEmpty) return;
     try {
       if (task == null) {
@@ -526,8 +464,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ? (task['points']).toString() + ' PP'
                           : 'sem pontos associados'),
                     ),
-                    if (task['supportKind'] != null)
-                      const Padding(padding: EdgeInsets.only(top: 4), child: Text('Missão de estudo V4 habilitada')),
                     if (task['lastModifiedByMember'] == true)
                       const Padding(
                         padding: EdgeInsets.only(top: 4),

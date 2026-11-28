@@ -1,5 +1,9 @@
 # Registro de atualizações
 
+## 2026-11-28 — Rotina sem divisão em etapas
+
+- Removidos da interface a divisão em etapas, os controles do painel de apoio e a configuração de etapas em tarefas permanentes. As tarefas continuam disponíveis na lista para conclusão direta. O histórico e os dados existentes são preservados.
+
 ## 2026-11-27 — Rotina sem cronômetro de jogo
 
 - Removidos da tela inicial o cronômetro de jogo, seus controles, o alarme e o ajuste de tempo. A tela de configurações deixa de expor o limite diário.
